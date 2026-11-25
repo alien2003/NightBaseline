@@ -188,3 +188,33 @@ placeholders, clipped text and controls on a fold). The PNGs were read by eye; t
   tests and `NavigationTest`, not by integrated images.
 - State preservation is verified by the saved-state design and `NavigationTest` (fold / unfold hand-over), not yet by
   a `StateRestorationTester` run.
+
+## Round 2: live check on the owner's phone (2026-11-26)
+
+Device: OPPO CPH2765 (book foldable), Android 17, ColorOS 17, release build 0.1.0-dev.1 signed with the release key.
+Driven over adb (taps on NightBaseline only; system settings restored afterwards). Device screenshots contain real
+data and stay in the git-ignored `.data/device-shots/`.
+
+Verified on the device:
+- First run end to end: source discovery found OHealth with its channels (heart rate, breathing, SpO2, sleep), the
+  history backfill found 57 past nights, the range was ready right after onboarding.
+- Home on the unfolded inner screen: two columns, icon + label rail, 7-night strip, not-recorded metrics collapsed.
+- Light/dark switch, rotation and fold (`cmd device_state` CLOSED) keep the screen, the data and the selected period;
+  folding moves to the outer screen with the bottom bar.
+- Half-opened posture: book layout split at the fold with the icon-only rail.
+- Half-width window (split-screen width, simulated with `wm size`): compact layout with the bottom bar.
+- Frames (`dumpsys gfxinfo`, scrolling History and Metric detail, switching periods): 6 janky of 2986 frames (0.20 %),
+  GPU p99 12 ms, UI thread slow 3.
+- The daily `NightWorker` is registered with JobScheduler.
+- Not verifiable over adb: a real freeform window (ColorOS ignores `--windowingMode 5` from adb) and the physical
+  hinge angle in tabletop; the outer-screen widget is not built.
+
+Findings to fix:
+1. Metric detail: content scrolls under the glass top bar and the "This period" heading sits on the blur without a
+   backing (principle: text never directly on blur); the night card touches the screen title.
+2. Unfolding returned Metric detail to the detail pane with the period reset from 90 to 30 nights (state must persist).
+3. Explainer copy says "last 14 to 28 nights"; the algorithm uses the last 28 valid nights, at least 7.
+4. Night label differs between screens ("Night of 25 Nov" on Home, "Night of 24–25 Nov" in Metric detail).
+5. Sleep duration range on real data reads "2 h 33 min – 11 h 30 min": correct for a very variable person but its lower
+   edge is below the 3 h short-night cut-off. Clamp the lower edge to the short-night limit and explain the width.
+6. Onboarding on the wide inner screen: the start pane (step and illustration) floats in empty space.
