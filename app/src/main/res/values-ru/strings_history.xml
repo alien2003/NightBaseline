@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Russian copy of values/strings_history.xml (same keys). -->
+<resources>
+    <string name="history_open_night">Открыть ночь</string>
+    <string name="history_filter_empty_gaps">За этот период нет ночей обучения и пропусков.</string>
+</resources>

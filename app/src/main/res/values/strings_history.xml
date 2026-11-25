@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  History screen copy that is not in strings.xml yet (docs/design/review-history.md lists the keys for states.md).
+  Same rules as strings.xml: positional pre-formatted arguments, calm wording, same keys in values-ru.
+-->
+<resources>
+    <string name="history_open_night">Open night</string>
+    <string name="history_filter_empty_gaps">No learning nights or gaps in this period.</string>
+</resources>

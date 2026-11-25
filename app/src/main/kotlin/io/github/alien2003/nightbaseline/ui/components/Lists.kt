@@ -96,6 +96,7 @@ fun NightRow(
         }
         FlowRow(
             Modifier.widthIn(max = 72.dp).clearAndSetSemantics {},
+            maxItemsInEachRow = METRIC_GLYPHS_PER_ROW,
             horizontalArrangement = Arrangement.spacedBy(NbSpace.s1),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
         ) {
@@ -229,6 +230,9 @@ fun MonthCalendar(
 }
 
 private const val DAYS = 7
+
+/** 2..6 metric glyphs in a NightRow wrap as even rows of 3 (never 5 + 1). */
+private const val METRIC_GLYPHS_PER_ROW = 3
 
 /**
  * The recent-nights strip of Home (`screens.md` 4): weekday letter and night glyph per night, titled "Last 7 nights"
