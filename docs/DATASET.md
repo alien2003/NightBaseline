@@ -67,5 +67,5 @@ manifest; the merge and the summary pick it up automatically.
 
 ## Night files
 
-The algorithm reads nights in the PulseStages interchange format (`docs/INTERCHANGE.md` of PulseStages, section 1),
-extended for NightBaseline; see [INTERCHANGE.md](INTERCHANGE.md) once stage 4 defines it.
+`algo-cli run` reads the merged dataset directly (sessions and samples of one origin) and runs the same pipeline as
+the app; see [ALGORITHM.md](../ALGORITHM.md#8-reproducing). No separate night-file format is needed.
