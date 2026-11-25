@@ -88,31 +88,13 @@ jobs:
       # Robolectric screenshot tests in one JVM at a time (they need the most memory).
       - name: Module graph, lint and assemble debug
         run: >-
-          ./gradlew verifyModuleGraph ktlintCheck detekt :app:assembleDebug
+          ./gradlew verifyModuleGraph ktlintCheck detekt :app:assembleDebug :app:processReleaseMainManifest
           --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g -Dkotlin.daemon.jvmargs=-Xmx1g
 
       - name: Module tests
         run: >-
           ./gradlew :core-algo:test :algo-cli:test :data-local:test :data-hc:test :work:test --max-workers=1
           -Dorg.gradle.jvmargs=-Xmx1536m -Dkotlin.daemon.jvmargs=-Xmx1g
-
-      # One JVM per test class: Robolectric's native graphics keeps memory outside the Java heap (measured: a
-      # screenshot class peaks at ~4.7 GB RSS with a 2 GB heap). The daemons of the earlier steps are stopped first so
-      # that the test JVM has the runner's memory to itself.
-      - name: Free memory for the screenshot tests
-        run: |
-          ./gradlew --stop
-          pkill -f KotlinCompileDaemon || true
-          free -m
-
-      - name: App unit, screenshot and contrast tests
-        run: >-
-          ./gradlew :app:test --max-workers=1 -PtestMaxHeap=2g -PtestForkEvery=1
-          -Dorg.gradle.jvmargs=-Xmx1g -Dkotlin.daemon.jvmargs=-Xmx768m
-
-      - name: Memory after tests
-        if: always()
-        run: free -m
 
       # MergedManifestTest (part of "test" above) already fails on INTERNET in the debug and release merged manifests.
       # This step repeats the check on the release manifest directly, so the rule holds even if the test is changed.
@@ -130,19 +112,6 @@ jobs:
             exit 1
           fi
           echo "No network permission in $manifest"
-
-      # The screenshot matrix (CatalogScreenshotsTest, synthetic data only) is rendered into app/build/screenshots by
-      # every test run. Kept 3 days for review.
-      - name: Upload screenshots (synthetic data)
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        # A full artifact storage quota must never turn a passing build red.
-        continue-on-error: true
-        with:
-          name: screenshots
-          path: app/build/screenshots/
-          if-no-files-found: ignore
-          retention-days: 3
 
       # Pushes to main only, kept 2 days: the 500 MB artifact quota of a private repository fills up quickly. Tagged
       # builds live on the Releases page.
@@ -171,5 +140,82 @@ jobs:
             **/build/test-results/
             !.data/**
             !.tooling/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  app-tests:
+    name: App, screenshot and contrast tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this job needs the token, so it is not left in .git/config.
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          # Fully open-source (MIT) cache implementation on top of actions/cache. Only main writes cache entries
+          # (the action's default); other branches and pull requests read them. The release build uses no cache.
+          cache-provider: basic
+
+      - name: Install missing Android SDK packages
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          # compileSdk 37 is the minor-versioned platform "android-37.0"; AGP 9.4 defaults to build-tools 36.0.0.
+          PACKAGES=()
+          [ -d "$ANDROID_HOME/platforms/android-36" ] || PACKAGES+=("platforms;android-36")
+          [ -d "$ANDROID_HOME/platforms/android-37.0" ] || PACKAGES+=("platforms;android-37.0")
+          [ -d "$ANDROID_HOME/build-tools/36.0.0" ] || PACKAGES+=("build-tools;36.0.0")
+          if [ "${#PACKAGES[@]}" -gt 0 ]; then
+            yes | "$SDKMANAGER" --licenses > /dev/null || true
+            "$SDKMANAGER" "${PACKAGES[@]}"
+          else
+            echo "All required SDK packages are already installed."
+          fi
+
+      # A fresh runner: hosted runners for private repositories have about 7 GB of RAM, and one Robolectric screenshot
+      # class peaks at ~4.7 GB RSS with a 2 GB heap (native graphics memory). Kotlin compiles inside the Gradle daemon
+      # (no separate Kotlin daemon), one test class per JVM.
+      - name: App unit, screenshot and contrast tests
+        run: >-
+          ./gradlew :app:testDebugUnitTest --max-workers=1 -PtestMaxHeap=2g -PtestForkEvery=1
+          -Pkotlin.compiler.execution.strategy=in-process -Dorg.gradle.jvmargs=-Xmx2g
+
+      - name: Memory and largest processes
+        if: always()
+        run: |
+          free -m
+          ps -eo rss,comm --sort=-rss | head -8
+
+      # Rendered from synthetic data only; kept 3 days for review.
+      - name: Upload screenshots (synthetic data)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        continue-on-error: true
+        with:
+          name: screenshots
+          path: app/build/screenshots/
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        continue-on-error: true
+        with:
+          name: app-test-reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
           if-no-files-found: ignore
           retention-days: 7
