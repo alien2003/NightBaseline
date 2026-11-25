@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
@@ -31,6 +32,7 @@ import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.MetricState
 import io.github.alien2003.nightbaseline.ui.model.MetricUi
 import io.github.alien2003.nightbaseline.ui.model.NightUi
+import io.github.alien2003.nightbaseline.ui.model.UiText
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
@@ -61,13 +63,18 @@ fun NbCard(
 /**
  * The hero card of Home and Night detail (`screens.md` 4): night glyph in its tonal container, the night label, the
  * headline (`state_*_title`, `type.headline`) and the body with the compared count. One merged TalkBack node
- * (`a11y_summary`); the glyph is decorative.
+ * (`a11y_summary`); the glyph is decorative. The optional [action] (`states.md` 2: "See {metric}", "What this
+ * means") is a text button under the body and its own TalkBack node. [showLabel] false hides the visible night label
+ * where a title or heading right above already shows it (it stays in the TalkBack text).
  */
 @Composable
 fun NightSummaryCard(
     night: NightUi,
     source: String,
     modifier: Modifier = Modifier,
+    action: String? = null,
+    onAction: () -> Unit = {},
+    showLabel: Boolean = true,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
@@ -81,15 +88,21 @@ fun NightSummaryCard(
                 .fillMaxWidth()
                 .widthIn(max = NbDimens.textMax)
                 .solidCard(NbShapes.xl)
-                .padding(NbSpace.s6)
-                .clearAndSetSemantics { contentDescription = description },
+                .padding(NbSpace.s6),
         horizontalArrangement = Arrangement.spacedBy(NbSpace.s5),
     ) {
-        NightGlyphBadge(night.state.glyph, night.state.tone)
+        NightGlyphBadge(night.state.glyph, night.state.tone, Modifier.clearAndSetSemantics {})
         Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s2), modifier = Modifier.weight(1f)) {
-            Text(label, style = NbTheme.typography.labelSmall, color = colors.textSecondary)
-            Text(title, style = NbTheme.typography.headline, color = colors.textPrimary)
-            Text(body, style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+            Column(
+                Modifier.clearAndSetSemantics { contentDescription = description },
+                verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
+            ) {
+                if (showLabel) Text(label, style = NbTheme.typography.labelSmall, color = colors.textSecondary)
+                Text(title, style = NbTheme.typography.headline, color = colors.textPrimary)
+                Text(body, style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+            }
+            // Pulled back by the button's inner padding so its label lines up with the body text.
+            action?.let { NbTextButton(it, onClick = onAction, modifier = Modifier.offset(x = -NbSpace.s4)) }
         }
     }
 }
@@ -101,6 +114,8 @@ fun NightSummaryCard(
  * tile, no band), access off. The whole tile is one 48 dp+ target and one TalkBack node (`a11y_tile*`).
  *
  * @param selected list-detail selection: a solid outline plus `selected` semantics.
+ * @param explain Night detail: also show and announce the state sentence (`detail_*`) and the middle value for
+ *   compared and learning states (missing states always show their sentence).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -111,10 +126,12 @@ fun MetricRangeTile(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     forced: ForcedInteraction? = null,
+    explain: Boolean = false,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
-    val description = text.tileDescription(metric, source)
+    val explanation = if (explain) text.explanation(metric, source) else null
+    val description = listOfNotNull(text.tileDescription(metric, source), explanation).joinToString(" ")
     val shape = NbShapes.l
     Column(
         modifier =
@@ -173,6 +190,7 @@ fun MetricRangeTile(
             if (!metric.state.compared && metric.state != MetricState.Learning) {
                 Text(text.detail(metric, source), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
             }
+            explanation?.let { Text(it, style = NbTheme.typography.bodySmall, color = colors.textSecondary) }
         }
     }
 }
@@ -191,6 +209,16 @@ private fun CollapsedTileContent(
             Text(text.status(metric, source), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
         }
     }
+}
+
+/** The state sentence plus the middle value of a compared or learning metric (Night detail tiles), else null. */
+private fun UiText.explanation(
+    metric: MetricUi,
+    source: String,
+): String? {
+    if (!metric.state.compared && metric.state != MetricState.Learning) return null
+    val median = metric.range?.let { string(R.string.stats_median, value(metric.metric, it.median, decimals(metric)).text) }
+    return listOfNotNull(detail(metric, source), median?.let { "$it." }).joinToString(" ")
 }
 
 /** The dash shown in place of a missing value. */
