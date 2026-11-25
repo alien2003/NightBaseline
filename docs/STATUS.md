@@ -50,8 +50,22 @@ Live project state. A new session starts here. Updated after every step.
   Real data: OHealth 0 notifications / 51 nights; importer 7 / 856 nights.
 - [x] algo-cli (aggregate output; details only into `.data/out/`). ktlint + detekt + module graph green.
 
+- [x] data-local, data-hc, work modules (80 tests green at commit time).
+- [x] :app phase 1: design system, Haze glass + solid fallback, components, debug catalog, JVM screenshots (blur
+  renders under Robolectric), contrast test, merged-manifest test.
+- [x] Release signing key: `<project>/.secrets/nightbaseline-release.jks` + `keystore.properties`
+  (mode 600, never committed). Certificate SHA-256 `26:EC:1D:EC:35:93:AD:CE:D2:68:BB:64:1E:CB:74:7B:2E:8B:15:42:D5:66:24:78:20:2F:E0:C6:B1:F4:D3:77`.
+  Uploaded as repo secrets NIGHTBASELINE_KEYSTORE_BASE64 / _KEYSTORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD.
+  **The owner must back it up: without it no update can be installed over the released app.**
+
+## In progress (2026-11-25 evening)
+- Screens workflow: 4 agents in isolated worktrees (home+night, metric, history, setup) → merge into worktree-dev.
+- CI workflows agent (.github only).
+- UI review notes so far: book (medium) shows a bottom bar instead of the rail; chart clips the newest point;
+  uneven y-axis ticks.
+
 ## Next
-- Design docs (workflow running) → review; add AMBIGUOUS_NIGHT state to states.md.
+- Design docs (done) → review; add AMBIGUOUS_NIGHT state to states.md.
 - Android modules: data-local, data-hc, work; then app UI.
 - ALGORITHM.md (parameters + justification) for stage 5 docs.
 - Re-export on new nights to measure real publication delay (needs the phone: ask first).
