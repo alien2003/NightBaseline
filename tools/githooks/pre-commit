@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Enable once per clone: git config core.hooksPath tools/githooks
+# The project is English-only except the app's ru resources and README.ru.md.
+exec "$(git rev-parse --show-toplevel)/tools/check-language.sh" --staged
