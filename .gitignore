@@ -1,6 +1,40 @@
-.tooling
+# Gradle / Kotlin
 .gradle/
 build/
+!gradle/wrapper/gradle-wrapper.jar
 .kotlin/
+
+# Local tooling (mise-managed SDK, Gradle user home, caches)
+.tooling
 local.properties
+
+# Health data, device dumps, design reference screenshots: NEVER commit
+.data
+tools/**/out/
+
+# Signing material and secrets
+.secrets/
+*.jks
+*.keystore
+keystore.properties
+
+# IDE
+.idea/
+*.iml
+captures/
+*.apk
+*.aab
+output-metadata.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# OS / editors / agents
+.DS_Store
+Thumbs.db
+*.swp
 .claude/worktrees/
+.claude/settings.local.json
+.worktrees/
