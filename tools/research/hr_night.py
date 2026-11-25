@@ -77,6 +77,7 @@ def overlaps(r, sessions):
 
 print("multi-sample records overlapping an OHealth exercise session:", sum(overlaps(r, ex) for r in dense),
       "/", len(dense), "; overlapping an OHealth sleep session:", sum(overlaps(r, sl) for r in dense))
+print("multi-sample record samples/record:", q([len(r["samples"]) for r in dense]))
 print("multi-sample record intra-interval s:", q(np.concatenate([np.diff([s[0] for s in r["samples"]]) / 1000 for r in dense])))
 print("OHealth exercise sessions:", len(ex), "with a multi-sample HR record:", sum(overlaps(e, dense) for e in ex))
 print("multi-sample lastModified - end h:", q([(r["lastModifiedMs"] - r["end"]) / 3600e3 for r in dense]))

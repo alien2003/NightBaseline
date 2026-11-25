@@ -406,6 +406,29 @@ rules = {
     "E C or (ended>=180m and quiet>=60m)":
         lambda ev, t, lp, af, w: (bool(w) and t - lp >= 15 * MIN) or (t >= ev + 180 * MIN and t - lp >= 60 * MIN),
 }
+
+
+def newest_visible(m, t, a, b):
+    """newest sample time of metric m in [a, b] whose write is at or before t (None if none)."""
+    ts, lms = in_night(m, a, b)
+    ts = ts[lms <= t]
+    return ts.max() if ts.size else None
+
+
+def covered(ev, t, rr_margin=30, sp_margin=60):
+    rr = newest_visible("respiratory_rate", t, ev - 12 * 3600000, ev + 6 * 3600000)
+    sp = newest_visible("spo2", t, ev - 12 * 3600000, ev + 6 * 3600000)
+    return rr is not None and sp is not None and rr >= ev - rr_margin * MIN and sp >= ev - sp_margin * MIN
+
+
+rules.update({
+    "F C and RR>=end-30m and SpO2>=end-60m visible":
+        lambda ev, t, lp, af, w: bool(w) and t - lp >= 15 * MIN and covered(ev, t),
+    "G ended>=60m, quiet>=30m, RR>=end-30m, SpO2>=end-60m":
+        lambda ev, t, lp, af, w: t >= ev + 60 * MIN and t - lp >= 30 * MIN and covered(ev, t),
+    "H G or F": lambda ev, t, lp, af, w: (t >= ev + 60 * MIN and t - lp >= 30 * MIN and covered(ev, t))
+        or (bool(w) and t - lp >= 15 * MIN and covered(ev, t)),
+})
 for name, rule in rules.items():
     for Z in (6, 12):
         o = simulate2(rule, Z)

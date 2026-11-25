@@ -81,7 +81,7 @@ print(c.most_common())
 
 spo2 = sorted((r for r in load("spo2") if r["origin"] == IMP), key=lambda r: r["time"])
 rr_days = {ldate(r["time"], r.get("zoneOffsetS")) for r in load("respiratory_rate") if r["origin"] == IMP}
-print("\n== importer SpO2 by era: era B = days with importer RR (Apple Watch era), A = earlier ==")
+print("\n== importer SpO2 by era: era B = days with importer RR (last era of the previous wearable), A = earlier ==")
 per_day = collections.Counter(ldate(r["time"], r.get("zoneOffsetS")) for r in spo2)
 eraB_start = min(rr_days)
 for era, sel in (("A", lambda r: ldate(r["time"], r.get("zoneOffsetS")) < eraB_start),
