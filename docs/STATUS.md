@@ -7,7 +7,9 @@ Live project state. A new session starts here. Updated after every step.
   origin). `main` holds only the initial commit until the pre-release merge.
 - `.tooling/` and `.data/` in the worktree are symlinks to `<project>/.tooling` and
   `<project>/.data` (independent of the worktree, both git-ignored).
-- Repository: github.com/alien2003/NightBaseline (private).
+- Repository: github.com/alien2003/NightBaseline — PUBLIC since 2026-11-26 at the owner's request (before the
+  release). History was rewritten once more beforehand to remove absolute home paths; `tools/check-leaks.sh` guards it.
+  Unreachable pre-rewrite commits may still exist on GitHub's side (low sensitivity: Russian docs, home paths).
 
 ## Done
 - [x] Stage 0: environment checked (mise, Java 17, Python 3.12, Android SDK copied from PulseStages into
