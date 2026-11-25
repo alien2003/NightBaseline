@@ -36,9 +36,18 @@ Live project state. A new session starts here. Updated after every step.
 ## Next
 1. Build and test core-algo; ADR for architecture (stage 2); design (stage 3); implementation (stage 4).
 
+- [x] core-algo builds; synthetic check: 0.49 % false alarms per normal night, 199/200 episodes detected.
+- [x] History squashed so no commit contains Russian (ADR 0002); remote branch replaced. `tools/check-language.sh`
+  guards commits (run it before `git commit`; hook in `tools/githooks`).
+- [x] Phone cleanup (with permission, 2026-11-25): stay-awake is off (0, unchanged), exporter force-stopped, no temp
+  files left.
+
 ## Waiting for the owner
-- Permission for a < 1 min phone check/cleanup: read stay-awake setting, force-stop the exporter, remove temp files
-  `/sdcard/nb-ui.xml`, `/sdcard/nb-rec.mp4` if present. **No phone access until the owner says yes.**
+- Nothing right now. **Phone: ask before every access (what, how long).**
+
+## For the pre-publication batch (stage 5)
+- Propose recreating the GitHub repository from the clean history (old unreachable commits with Russian text and a
+  symlink path may persist on GitHub).
 
 ## Problems and workarounds
 - `InstantaneousRecord`/`IntervalRecord` are internal in connect-client 1.1.0: time encoded per type.
