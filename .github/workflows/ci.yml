@@ -47,7 +47,7 @@ jobs:
   build:
     name: Lint, test and assemble
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -84,8 +84,17 @@ jobs:
             echo "All required SDK packages are already installed."
           fi
 
-      - name: Module graph, lint, test and assemble debug
-        run: ./gradlew verifyModuleGraph ktlintCheck detekt test :app:assembleDebug
+      # Hosted runners for private repositories have about 7 GB of RAM: smaller daemons, few workers, and the
+      # Robolectric screenshot tests in one JVM at a time (they need the most memory).
+      - name: Module graph, lint and assemble debug
+        run: >-
+          ./gradlew verifyModuleGraph ktlintCheck detekt :app:assembleDebug
+          --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g -Dkotlin.daemon.jvmargs=-Xmx1g
+
+      - name: Unit, screenshot and contrast tests
+        run: >-
+          ./gradlew test --max-workers=1 -PtestMaxHeap=2560m
+          -Dorg.gradle.jvmargs=-Xmx1536m -Dkotlin.daemon.jvmargs=-Xmx1g
 
       # MergedManifestTest (part of "test" above) already fails on INTERNET in the debug and release merged manifests.
       # This step repeats the check on the release manifest directly, so the rule holds even if the test is changed.

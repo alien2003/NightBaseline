@@ -158,7 +158,8 @@ tasks.withType<Test>().configureEach {
     systemProperty("nightbaseline.screenshots.dir", screenshotDir)
     systemProperty("nightbaseline.tokens.file", tokensDoc.absolutePath)
     if (recordScreenshots) outputs.upToDateWhen { false }
-    maxHeapSize = "3g"
+    // CI runners have less memory: .github/workflows/ci.yml passes -PtestMaxHeap.
+    maxHeapSize = providers.gradleProperty("testMaxHeap").getOrElse("3g")
 }
 
 androidComponents {
