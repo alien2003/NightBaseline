@@ -42,6 +42,20 @@ Live project state. A new session starts here. Updated after every step.
 - [x] Phone cleanup (with permission, 2026-11-25): stay-awake is off (0, unchanged), exporter force-stopped, no temp
   files left.
 
+- [x] Stage 1b: `docs/research/metrics-matrix.md` (aggregates only, audited). Key facts: OHealth rewrites the previous
+  day each morning; SpO2/RR arrive 26–61 min late; resting HR record is a daytime value (unused in v1).
+- [x] Stage 2: ADR 0001 (architecture/reuse), 0002 (English only), 0003 (own design layer + Haze).
+- [x] core-algo revised from the data: midpoint night keying, ambiguous nights, p10 sleeping HR, floors, z 2.5,
+  duration only with a physiological metric, night-complete rule. Synthetic: 0.05 % false alarms, 196/200 found.
+  Real data: OHealth 0 notifications / 51 nights; importer 7 / 856 nights.
+- [x] algo-cli (aggregate output; details only into `.data/out/`). ktlint + detekt + module graph green.
+
+## Next
+- Design docs (workflow running) → review; add AMBIGUOUS_NIGHT state to states.md.
+- Android modules: data-local, data-hc, work; then app UI.
+- ALGORITHM.md (parameters + justification) for stage 5 docs.
+- Re-export on new nights to measure real publication delay (needs the phone: ask first).
+
 ## Waiting for the owner
 - Nothing right now. **Phone: ask before every access (what, how long).**
 
