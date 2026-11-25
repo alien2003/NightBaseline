@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Russian copy of res/values/strings_metric.xml (Metric detail); same keys and argument positions. -->
+<resources>
+    <string name="chart_axis_hours">%1$s ч</string>
+    <string name="metric_side_low_only">Для показателя «%1$s» учитываются только более низкие значения. Более высокие показываются, но не учитываются.</string>
+    <string name="metric_side_high_only">Для показателя «%1$s» учитываются только более высокие значения. Более низкие показываются, но не учитываются.</string>
+    <string name="metric_detail_side_ignored_lower">Более низкие значения показателя «%1$s» показываются, но не считаются изменением.</string>
+    <string name="metric_source_line_no_sync">Измерено: %1$s.</string>
+    <string name="metric_chart_empty">Ваши ночи появятся здесь, когда %1$s их запишет.</string>
+    <string name="metric_stats_title">За этот период</string>
+</resources>
