@@ -1,0 +1,493 @@
+package io.github.alien2003.nightbaseline.ui.history
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.ui.components.NbIconButton
+import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NightRow
+import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
+import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
+import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
+import io.github.alien2003.nightbaseline.ui.layout.NavigationKind
+import io.github.alien2003.nightbaseline.ui.model.NightUi
+import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.shell.AppScaffold
+import io.github.alien2003.nightbaseline.ui.theme.NbDimens
+import io.github.alien2003.nightbaseline.ui.theme.NbSpace
+import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import java.time.LocalDate
+import java.time.YearMonth
+
+/** The summary of a selected night shown in place; `interactive` is false in the tabletop top half (view only). */
+typealias NightPreviewSlot = @Composable (night: NightUi, interactive: Boolean) -> Unit
+
+/**
+ * History (`screens.md` 7.4, `layouts.md` 5.3): "which nights were unusual?". Stateless: everything comes from
+ * [state], every interaction goes to [actions]. One `resolveLayout` decision ([layout], fold info included) picks the
+ * arrangement:
+ * - `Compact` / `CompactShort` / single-pane `Medium` and `Expanded`: one column (max 600 dp). List: filter chips and
+ *   the feed with sticky month headers; a row opens Night detail. Calendar: month grid and legend; in Compact a day
+ *   opens Night detail, from 600 dp the selected night's summary reflows below the grid.
+ * - Two panes (`Expanded` / `Large` when the two-pane rule passes, `WideShort`, `Book` split exactly at the fold):
+ *   list or calendar in the list pane (360 / 400 dp, or the start half), [nightPreview] of the selected night (default
+ *   the newest) in the detail pane; a row or day selects.
+ * - `Tabletop`: the selected night's summary in the top half (view only), list or calendar and all controls in the
+ *   bottom half.
+ * - `Glance`: list only, compact rows, the "More" button.
+ *
+ * The List / Calendar toggle sits in the top bar when it fits next to the title (wide windows, normal font), otherwise
+ * it is the first row of the content, so the title never has to break inside a word at 200 % font.
+ */
+@Composable
+fun HistoryScreen(
+    state: HistoryUiState,
+    layout: LayoutSpec,
+    modifier: Modifier = Modifier,
+    actions: HistoryActions = HistoryActions(),
+    onSelectTab: (TopLevel) -> Unit = {},
+    listState: LazyListState = rememberLazyListState(),
+    nightPreview: NightPreviewSlot = { night, interactive ->
+        HistoryNightPreview(night, state.source, interactive, onOpen = { actions.onOpenNight(night.wakeDate) })
+    },
+) {
+    val density = LocalDensity.current
+    val arrangement = HistoryArrangement.of(layout, density.fontScale)
+    var barHeight by remember { mutableStateOf(0.dp) }
+    AppScaffold(
+        layout = layout,
+        selected = TopLevel.History,
+        onSelect = onSelectTab,
+        modifier = modifier,
+        topBar = { padding ->
+            if (arrangement.topBar) {
+                HistoryTopBar(
+                    state,
+                    layout,
+                    arrangement,
+                    listState,
+                    Modifier
+                        .padding(start = padding.calculateLeftPadding(LayoutDirection.Ltr))
+                        .then(if (arrangement.twoPanes) Modifier.width(arrangement.listPaneOuter) else Modifier)
+                        .onSizeChanged { barHeight = with(density) { it.height.toDp() } },
+                    actions.onView,
+                )
+            }
+        },
+    ) { padding ->
+        val content = HistoryContent(state, actions, arrangement, nightPreview)
+        when (layout.mode) {
+            LayoutMode.Glance -> {
+                GlanceHistory(state, actions, padding, listState)
+            }
+
+            LayoutMode.Tabletop -> {
+                TabletopHistory(content, layout, padding, listState)
+            }
+
+            else -> {
+                if (arrangement.twoPanes) {
+                    TwoPaneHistory(
+                        content,
+                        layout,
+                        padding,
+                        barHeight,
+                        listState,
+                    )
+                } else {
+                    SinglePaneHistory(content, layout, padding, barHeight, listState)
+                }
+            }
+        }
+    }
+}
+
+/** Where things go for one layout (derived once from [LayoutSpec] and the font scale). */
+private data class HistoryArrangement(
+    val mode: LayoutMode,
+    val twoPanes: Boolean,
+    /** The toggle is in the top bar (else the first content row). */
+    val toggleInBar: Boolean,
+    /** A shell top bar exists (not in Glance and Tabletop). */
+    val topBar: Boolean,
+    /** Gutter of the list pane. */
+    val listGutter: Dp,
+    /** Width of the list pane content (two panes only). */
+    val listWidth: Dp,
+    /** A tap selects in place (two panes, tabletop, calendar reflow) instead of opening Night detail. */
+    val selectsInPlace: Boolean,
+    /** The calendar view shows the selected night below the grid (single pane from 600 dp). */
+    val previewBelowCalendar: Boolean,
+) {
+    /** List pane including its start gutter (the top bar spans it in two-pane layouts). */
+    val listPaneOuter: Dp get() = listGutter + listWidth
+
+    companion object {
+        fun of(
+            layout: LayoutSpec,
+            fontScale: Float,
+        ): HistoryArrangement {
+            val mode = layout.mode
+            val twoPanes = layout.twoPanes || mode == LayoutMode.WideShort
+            val rail = if (layout.navigation in RAILS) NbDimens.railArea.value else 0f
+            val fold = layout.verticalFold
+            // A book half narrower than the calendar pane (346 dp at 520 dpi) gets the compact gutter (layouts.md 3.3).
+            val bookPane = fold?.let { it.positionDp - it.occludedDp / 2 - rail - NbDimens.hingeClearance.value }
+            val listGutter = if (bookPane != null && bookPane < CALENDAR_PANE) NbDimens.gutterCompact else layout.gutter
+            val listWidth = listWidth(mode, bookPane, listGutter)
+            val barWidth = if (twoPanes) listWidth.value + listGutter.value else layout.widthDp - rail
+            return HistoryArrangement(
+                mode = mode,
+                twoPanes = twoPanes,
+                toggleInBar = barWidth / fontScale >= TOGGLE_BAR_MIN,
+                topBar = mode != LayoutMode.Glance && mode != LayoutMode.Tabletop,
+                listGutter = listGutter,
+                listWidth = listWidth,
+                selectsInPlace = twoPanes || mode == LayoutMode.Tabletop,
+                previewBelowCalendar = !twoPanes && mode != LayoutMode.Tabletop && layout.widthDp >= MEDIUM_W,
+            )
+        }
+
+        private fun listWidth(
+            mode: LayoutMode,
+            bookPane: Float?,
+            gutter: Dp,
+        ): Dp =
+            when {
+                bookPane != null -> (bookPane - gutter.value).dp
+                mode == LayoutMode.Large || mode == LayoutMode.ExtraLarge -> LIST_PANE_MAX.dp
+                else -> CALENDAR_PANE.dp
+            }
+
+        private val RAILS = setOf(NavigationKind.Rail, NavigationKind.RailIcons, NavigationKind.RailLabelled)
+        private const val CALENDAR_PANE = 360f
+        private const val LIST_PANE_MAX = 400f
+        private const val TOGGLE_BAR_MIN = 360f
+        private const val MEDIUM_W = 600f
+    }
+}
+
+@Composable
+private fun HistoryTopBar(
+    state: HistoryUiState,
+    layout: LayoutSpec,
+    arrangement: HistoryArrangement,
+    listState: LazyListState,
+    modifier: Modifier,
+    onView: (HistoryView) -> Unit,
+) {
+    val density = LocalDensity.current
+    val large = layout.mode == LayoutMode.Compact
+    val range = NbDimens.topBarLarge - NbDimens.topBarCollapsed
+    val scrolled =
+        if (listState.firstVisibleItemIndex > 0) range * 2 else with(density) { listState.firstVisibleItemScrollOffset.toDp() }
+    val height =
+        when (layout.mode) {
+            LayoutMode.Compact -> NbDimens.topBarLarge
+            LayoutMode.CompactShort, LayoutMode.WideShort -> NbDimens.topBarShort
+            else -> NbDimens.topBarMedium
+        }
+    Box(modifier) {
+        ShellTopBar(
+            title = stringResource(R.string.history_title),
+            large = large,
+            collapse = if (large) (scrolled / range).coerceIn(0f, 1f) else 1f,
+            height = height,
+            scrolledUnder = if (large) (scrolled - range).coerceAtLeast(0.dp) else scrolled,
+            actions = {
+                if (arrangement.toggleInBar && !state.empty && !state.loading) {
+                    HistoryViewToggle(state.view, onView, Modifier.padding(end = NbSpace.s3))
+                }
+            },
+        )
+    }
+}
+
+/** The list-pane content shared by the single-pane, two-pane and tabletop arrangements. */
+private class HistoryContent(
+    val state: HistoryUiState,
+    val actions: HistoryActions,
+    val arrangement: HistoryArrangement,
+    val nightPreview: NightPreviewSlot,
+) {
+    private fun tap(date: LocalDate) = if (arrangement.selectsInPlace) actions.onSelect(date) else actions.onOpenNight(date)
+
+    private fun dayTap(date: LocalDate) =
+        if (arrangement.selectsInPlace || arrangement.previewBelowCalendar) actions.onSelect(date) else actions.onOpenNight(date)
+
+    /** The selection is drawn where the selected night is also shown in place. */
+    private val showSelection: Boolean get() = arrangement.selectsInPlace
+
+    fun LazyListScope.items() {
+        state.access?.let { access ->
+            item(key = "banner") { HistoryAccessBanner(access, onAction = { actions.onFixAccess(access) }) }
+        }
+        val controls = !state.empty && !state.loading
+        if (controls && (!arrangement.toggleInBar || !arrangement.topBar)) {
+            item(key = "toggle") {
+                Box(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax)) { HistoryViewToggle(state.view, actions.onView) }
+            }
+        }
+        when {
+            state.loading -> item(key = "loading") { HistorySkeleton(rows = SKELETON_ROWS) }
+            state.empty -> item(key = "empty") { EmptyHistory() }
+            state.view == HistoryView.List -> listItems()
+            else -> calendarItems()
+        }
+    }
+
+    private fun LazyListScope.listItems() {
+        item(key = "filters") {
+            HistoryFilterChips(state.filter, actions.onFilter, Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax))
+        }
+        val visible = state.visibleNights
+        if (visible.isEmpty()) {
+            item(key = "filter-empty") {
+                HistoryEmptyCard(
+                    title = null,
+                    body =
+                        stringResource(
+                            if (state.filter == HistoryFilter.Gaps) R.string.history_filter_empty_gaps else R.string.history_filter_empty,
+                        ),
+                    action = stringResource(R.string.action_show_all),
+                    onAction = { actions.onFilter(HistoryFilter.All) },
+                )
+            }
+            return
+        }
+        val selected = state.selectedNight?.wakeDate
+        visible.groupBy { YearMonth.from(it.wakeDate) }.forEach { (month, nights) ->
+            stickyHeader(key = "month:$month") {
+                val text = rememberUiText()
+                Box(Modifier.fillMaxWidth().background(NbTheme.colors.background), contentAlignment = Alignment.TopCenter) {
+                    HistoryMonthHeader(text.month(month.atDay(1)), Modifier.widthIn(max = NbDimens.textMax))
+                }
+            }
+            items(nights, key = { "night:${it.wakeDate.toEpochDay()}" }) { night ->
+                NightRow(night, onClick = { tap(night.wakeDate) }, selected = showSelection && night.wakeDate == selected)
+            }
+        }
+    }
+
+    private fun LazyListScope.calendarItems() {
+        item(key = "calendar") {
+            HistoryCalendar(
+                month = state.month,
+                nights = state.byDate,
+                today = state.today,
+                onDay = ::dayTap,
+                onMonth = actions.onMonth,
+                selected = state.selectedNight?.wakeDate?.takeIf { showSelection || arrangement.previewBelowCalendar },
+                firstMonth = state.firstMonth,
+            )
+        }
+        item(key = "legend") { HistoryLegend(threshold = state.nights.firstOrNull()?.threshold ?: 2) }
+        val night = state.selectedNight
+        if (arrangement.previewBelowCalendar && night != null) {
+            item(key = "preview") { nightPreview(night, true) }
+        }
+    }
+}
+
+@Composable
+private fun EmptyHistory() {
+    HistoryEmptyCard(title = stringResource(R.string.history_empty_title), body = stringResource(R.string.history_empty_body))
+}
+
+@Composable
+private fun HistoryList(
+    content: HistoryContent,
+    listState: LazyListState,
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier,
+        state = listState,
+        contentPadding = contentPadding,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
+    ) {
+        with(content) { items() }
+    }
+}
+
+@Composable
+private fun SinglePaneHistory(
+    content: HistoryContent,
+    layout: LayoutSpec,
+    padding: PaddingValues,
+    barHeight: Dp,
+    listState: LazyListState,
+) {
+    HistoryList(
+        content,
+        listState,
+        PaddingValues(start = layout.gutter, end = layout.gutter, top = NbSpace.s3, bottom = padding.calculateBottomPadding() + NbSpace.s5),
+        Modifier
+            .fillMaxSize()
+            .padding(start = padding.calculateLeftPadding(LayoutDirection.Ltr), end = padding.calculateRightPadding(LayoutDirection.Ltr))
+            .padding(top = barHeight),
+    )
+}
+
+@Composable
+private fun TwoPaneHistory(
+    content: HistoryContent,
+    layout: LayoutSpec,
+    padding: PaddingValues,
+    barHeight: Dp,
+    listState: LazyListState,
+) {
+    val arrangement = content.arrangement
+    val start = padding.calculateLeftPadding(LayoutDirection.Ltr)
+    val bottom = padding.calculateBottomPadding() + NbSpace.s5
+    val fold = layout.verticalFold
+    Row(Modifier.fillMaxSize().padding(start = start, top = barHeight)) {
+        HistoryList(
+            content,
+            listState,
+            PaddingValues(start = arrangement.listGutter, top = NbSpace.s3, bottom = bottom),
+            Modifier.width(arrangement.listWidth + arrangement.listGutter).fillMaxHeight(),
+        )
+        // On a separating fold the gap is the hinge plus 12 dp on each side; otherwise the pane spacer.
+        Spacer(Modifier.width(if (fold != null) NbDimens.hingeClearance * 2 + fold.occludedDp.dp else PANE_SPACER))
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .verticalScroll(rememberScrollState())
+                .padding(end = layout.gutter + padding.calculateRightPadding(LayoutDirection.Ltr), top = NbSpace.s3, bottom = bottom),
+        ) {
+            val night = content.state.selectedNight
+            if (night != null && !content.state.loading) content.nightPreview(night, true)
+        }
+    }
+}
+
+@Composable
+private fun TabletopHistory(
+    content: HistoryContent,
+    layout: LayoutSpec,
+    padding: PaddingValues,
+    listState: LazyListState,
+) {
+    val fold = layout.horizontalFold ?: return
+    val topHalf = (fold.positionDp - fold.occludedDp / 2).dp - NbDimens.hingeClearance
+    val colors = NbTheme.colors
+    Column(Modifier.fillMaxSize().padding(start = padding.calculateLeftPadding(LayoutDirection.Ltr))) {
+        // Top half: view only. It scrolls only as a last resort at very large font, so nothing is ever cut off.
+        Column(
+            Modifier
+                .height(topHalf)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(WindowInsets.statusBars.asPaddingValues())
+                .padding(horizontal = layout.gutter, vertical = NbSpace.s4),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
+        ) {
+            Text(
+                stringResource(R.string.history_title),
+                style = NbTheme.typography.title,
+                color = colors.textPrimary,
+                modifier = Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax).semantics { heading() },
+            )
+            content.state.selectedNight?.let { content.nightPreview(it, false) }
+        }
+        Spacer(Modifier.height(NbDimens.hingeClearance * 2 + fold.occludedDp.dp))
+        HistoryList(
+            content,
+            listState,
+            PaddingValues(start = layout.gutter, end = layout.gutter, bottom = padding.calculateBottomPadding() + NbSpace.s5),
+            Modifier.fillMaxWidth().weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun GlanceHistory(
+    state: HistoryUiState,
+    actions: HistoryActions,
+    padding: PaddingValues,
+    listState: LazyListState,
+) {
+    val colors = NbTheme.colors
+    LazyColumn(
+        Modifier.fillMaxSize().padding(padding).padding(WindowInsets.statusBars.asPaddingValues()),
+        state = listState,
+        contentPadding = PaddingValues(horizontal = NbDimens.gutterGlance, vertical = NbSpace.s3),
+        verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
+    ) {
+        item(key = "title") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.history_title),
+                    style = NbTheme.typography.title,
+                    color = colors.textPrimary,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+                NbIconButton(NbIcons.More, stringResource(R.string.action_more), onClick = actions.onMore)
+            }
+        }
+        state.access?.let { access -> item(key = "banner") { HistoryAccessBanner(access, onAction = { actions.onFixAccess(access) }) } }
+        when {
+            state.loading -> {
+                item(key = "loading") { HistorySkeleton(rows = GLANCE_SKELETON_ROWS) }
+            }
+
+            state.empty -> {
+                item(key = "empty") { EmptyHistory() }
+            }
+
+            else -> {
+                items(state.nights, key = { "night:${it.wakeDate.toEpochDay()}" }) { night ->
+                    GlanceNightRow(night, onClick = { actions.onOpenNight(night.wakeDate) })
+                }
+            }
+        }
+    }
+}
+
+private const val SKELETON_ROWS = 6
+private const val GLANCE_SKELETON_ROWS = 3
+private val PANE_SPACER = 24.dp
