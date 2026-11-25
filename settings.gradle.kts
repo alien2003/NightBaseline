@@ -29,6 +29,7 @@ dependencyResolutionManagement {
 rootProject.name = "NightBaseline"
 
 include(":core-algo")
+include(":algo-cli")
 
 // Debug-only dataset exporter (never shipped): reads Health Connect, writes JSONL into its private files dir.
 include(":hc-exporter")
