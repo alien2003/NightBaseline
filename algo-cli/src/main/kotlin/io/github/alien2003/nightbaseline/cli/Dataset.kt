@@ -82,10 +82,15 @@ object DatasetReader {
         channels[ChannelId.RESPIRATORY_RATE] = instant(datasetDir, "respiratory_rate", origin)
         channels[ChannelId.HRV_RMSSD] = instant(datasetDir, "hrv_rmssd", origin)
         channels[ChannelId.SKIN_TEMPERATURE] =
-            lines(datasetDir, "skin_temperature", origin).flatMap { o ->
-                o["deltas"]?.jsonArray.orEmpty().map { s ->
-                    Sample(s.jsonArray[SAMPLE_TIME].jsonPrimitive.long, s.jsonArray[SAMPLE_VALUE].jsonPrimitive.double)
-                }
+            // A skin temperature record covers an interval (on the sources seen: one record per night with a single
+            // delta whose timestamp may lie outside the session). Its value is the mean delta, placed at the interval
+            // midpoint, so it belongs to the night the record overlaps most.
+            lines(datasetDir, "skin_temperature", origin).mapNotNull { o ->
+                val deltas = o["deltas"]?.jsonArray.orEmpty().map { it.jsonArray[SAMPLE_VALUE].jsonPrimitive.double }
+                if (deltas.isEmpty()) return@mapNotNull null
+                val start = o.getValue("start").jsonPrimitive.long
+                val end = o.getValue("end").jsonPrimitive.long
+                Sample(start + (end - start) / 2, deltas.average())
             }
         return SourceData(sessions, channels.mapValues { (_, v) -> v.sortedBy { it.timeMs } })
     }

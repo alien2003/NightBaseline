@@ -48,7 +48,12 @@ data class NightSummary(
     val short: Boolean,
     /** Values of every configured metric. */
     val values: Map<MetricId, MetricValue>,
-)
+    /** Another long sleep competes for the date: not evaluated, not used for baselines. */
+    val ambiguous: Boolean = false,
+) {
+    /** Usable for baselines: neither short nor ambiguous. */
+    val valid: Boolean get() = !short && !ambiguous
+}
 
 /** Computes metric values from a night. */
 object MetricExtractor {
@@ -69,8 +74,12 @@ object MetricExtractor {
             asleepMinutes = night.asleepMinutes,
             short = night.asleepMinutes < params.minNightMinutes,
             values = values,
+            ambiguous = night.ambiguous,
         )
     }
+
+    private const val TRIM_SHARE = 0.1
+    private const val P10_QUANTILE = 0.1
 
     // Early returns per missing reason read more clearly than one nested expression.
     @Suppress("ReturnCount")
@@ -84,8 +93,11 @@ object MetricExtractor {
         }
         val channel = checkNotNull(spec.channel)
         if (channel !in provided) return MetricValue(spec.id, null, 0, 0.0, MissingReason.NOT_PROVIDED)
+        val from = night.startMs + (spec.skipFirstMinutes * MS_PER_MIN).toLong()
         val samples =
-            night.channels[channel].orEmpty().filter { it.value.isFinite() && it.value in spec.plausibleMin..spec.plausibleMax }
+            night.channels[channel].orEmpty().filter {
+                it.timeMs >= from && it.value.isFinite() && it.value in spec.plausibleMin..spec.plausibleMax
+            }
         if (samples.isEmpty()) return MetricValue(spec.id, null, 0, 0.0, MissingReason.NO_DATA)
         val coverage = coverage(samples, night, spec.coverageBinMin)
         val missing =
@@ -96,14 +108,20 @@ object MetricExtractor {
             }
         if (missing != null) return MetricValue(spec.id, null, samples.size, coverage, missing)
         val v = samples.map { it.value }
-        val value =
-            when (spec.aggregation) {
-                Aggregation.MEDIAN -> Stats.median(v)
-                Aggregation.MEAN -> Stats.mean(v)
-                Aggregation.SLEEP_MINUTES -> error("handled above")
-            }
-        return MetricValue(spec.id, value, samples.size, coverage)
+        return MetricValue(spec.id, aggregate(spec.aggregation, v), samples.size, coverage)
     }
+
+    private fun aggregate(
+        aggregation: Aggregation,
+        v: List<Double>,
+    ): Double =
+        when (aggregation) {
+            Aggregation.MEDIAN -> Stats.median(v)
+            Aggregation.MEAN -> Stats.mean(v)
+            Aggregation.TRIMMED_MEAN -> Stats.trimmedMean(v, TRIM_SHARE)
+            Aggregation.P10 -> Stats.quantile(v, P10_QUANTILE)
+            Aggregation.SLEEP_MINUTES -> error("sleep minutes have no samples")
+        }
 
     /** Share of [binMin]-minute bins of the night's sessions that contain at least one sample. */
     internal fun coverage(

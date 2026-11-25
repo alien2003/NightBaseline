@@ -15,6 +15,42 @@ class StatsTest {
         assertEquals(1.75, Stats.quantile(listOf(1.0, 2.0, 3.0, 4.0), 0.25))
         assertEquals(1.0, Stats.mad(listOf(1.0, 2.0, 3.0, 4.0, 100.0)))
         assertTrue(Stats.median(emptyList()).isNaN())
+        assertEquals(5.5, Stats.trimmedMean((1..10).map { it.toDouble() }, 0.1))
+        assertEquals(3.0, Stats.trimmedMean(listOf(-100.0, 2.0, 3.0, 4.0, 100.0, 3.0, 2.0, 4.0, 3.0, 3.0), 0.1))
+    }
+}
+
+class CompletenessTest {
+    private val end = 1_000_000_000L
+    private val min = 60_000L
+    private val all = setOf(ChannelId.HEART_RATE, ChannelId.RESPIRATORY_RATE, ChannelId.SPO2)
+
+    private fun input(
+        now: Long,
+        step: Long? = end + 10 * min,
+        last: Map<ChannelId, Long> = all.associateWith { end },
+        write: Long = end + 5 * min,
+        steps: Boolean = true,
+    ) = CompletenessInput(now, end, all, last, steps, step, write)
+
+    @Test
+    fun `complete when up, channels reach the end and the source is quiet`() {
+        assertEquals(Readiness.COMPLETE, Completeness.judge(input(end + 60 * min)).readiness)
+    }
+
+    @Test
+    fun `waits for the person to get up, late channels and quiet`() {
+        assertEquals(listOf(WaitReason.NOT_UP_YET), Completeness.judge(input(end + 60 * min, step = null)).reasons)
+        val lateSpo2 = all.associateWith { end } + (ChannelId.SPO2 to end - 90 * min)
+        assertEquals(listOf(WaitReason.CHANNEL_INCOMPLETE), Completeness.judge(input(end + 60 * min, last = lateSpo2)).reasons)
+        assertEquals(listOf(WaitReason.SOURCE_STILL_WRITING), Completeness.judge(input(end + 60 * min, write = end + 50 * min)).reasons)
+    }
+
+    @Test
+    fun `fallback without steps and the hard cap`() {
+        assertEquals(Readiness.WAIT, Completeness.judge(input(end + 120 * min, step = null, steps = false)).readiness)
+        assertEquals(Readiness.COMPLETE, Completeness.judge(input(end + 200 * min, step = null, steps = false)).readiness)
+        assertEquals(Readiness.CAP_REACHED, Completeness.judge(input(end + 13 * 60 * min, step = null)).readiness)
     }
 }
 
@@ -56,6 +92,25 @@ class NightSelectorTest {
             )
         val nights = NightSelector.select(sessions, p)
         assertEquals(listOf("main"), nights.single().sessions.map { it.id })
+        assertTrue(!nights.single().ambiguous)
+    }
+
+    @Test
+    fun `late sleeper keeps the night`() {
+        val nights = NightSelector.select(listOf(SleepSession("late", at("2026-01-02", 5), at("2026-01-02", 15), off)), p)
+        assertEquals("2026-01-02", nights.single().date)
+    }
+
+    @Test
+    fun `two long sleeps on one date are ambiguous`() {
+        val sessions =
+            listOf(
+                SleepSession("night", at("2026-01-01", 23), at("2026-01-02", 5), off),
+                SleepSession("day", at("2026-01-02", 9), at("2026-01-02", 13), off),
+            )
+        val night = NightSelector.select(sessions, p).single()
+        assertEquals(listOf("night"), night.sessions.map { it.id })
+        assertTrue(night.ambiguous)
     }
 }
 
@@ -172,9 +227,30 @@ class EvaluatorTest {
     fun `constant history uses the spread floor`() {
         val flat = (0 until 20).map { summary(d0.plusDays(it.toLong()), 55.0, 14.0, 96.0) }
         val b = Evaluator.baseline(DefaultMetrics.SLEEPING_HR, d0.plusDays(20).toString(), flat, p)!!
-        assertEquals(1.0, b.spread)
-        assertEquals(52.0, b.low)
-        assertEquals(58.0, b.high, "minAbsDeviation widens the band beyond z·spread")
+        assertEquals(2.5, b.spread)
+        assertEquals(48.75, b.low, 1e-9)
+        assertEquals(61.25, b.high, 1e-9)
+        val wide = DefaultMetrics.SLEEPING_HR.copy(minAbsDeviation = 10.0)
+        val bw = Evaluator.baseline(wide, d0.plusDays(20).toString(), flat, p)!!
+        assertEquals(65.0, bw.high, 1e-9, "minAbsDeviation widens the band beyond z·spread")
+    }
+
+    @Test
+    fun `sleep duration alone never notifies but shows`() {
+        val e = Evaluator.evaluate(summary(d0.plusDays(20), 56.0, 14.2, 96.5, minutes = 250.0), history, p)
+        assertEquals(MetricStatus.BELOW, e.metrics.first { it.metric == MetricId.SLEEP_DURATION }.status)
+        assertEquals(NightStatus.SOME_DEVIATIONS, e.status)
+        assertEquals(0, e.deviating)
+        val withHr = Evaluator.evaluate(summary(d0.plusDays(20), 64.0, 14.2, 96.5, minutes = 250.0), history, p)
+        assertEquals(NightStatus.DEVIATIONS, withHr.status, "duration counts together with a physiological metric")
+    }
+
+    @Test
+    fun `ambiguous night is not evaluated`() {
+        val n = summary(d0.plusDays(20), 70.0, 18.0, 90.0).copy(ambiguous = true)
+        assertEquals(NightStatus.AMBIGUOUS_NIGHT, Evaluator.evaluate(n, history, p).status)
+        val withAmbiguous = history + n
+        assertEquals(20, Evaluator.window(d0.plusDays(21).toString(), withAmbiguous, p).size, "ambiguous nights stay out of baselines")
     }
 
     @Test

@@ -65,6 +65,8 @@ data class NightInput(
     val sessions: List<SleepSession>,
     /** Samples per channel (only channels the source writes). */
     val channels: Map<ChannelId, List<Sample>>,
+    /** Another long sleep competes for the same date (see [NightSelector]). */
+    val ambiguous: Boolean = false,
 ) {
     init {
         require(sessions.isNotEmpty()) { "a night needs at least one session" }

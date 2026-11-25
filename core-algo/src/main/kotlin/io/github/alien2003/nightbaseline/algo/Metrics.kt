@@ -82,6 +82,12 @@ enum class Aggregation {
     /** Mean of the channel's samples inside the session. */
     MEAN,
 
+    /** Mean after dropping the lowest and highest 10 % of samples. */
+    TRIMMED_MEAN,
+
+    /** 10th percentile: the low, settled level (sleeping heart rate). */
+    P10,
+
     /** Asleep minutes (no channel). */
     SLEEP_MINUTES,
 }
@@ -117,4 +123,11 @@ data class MetricSpec(
     val coverageBinMin: Int,
     /** Minimum share of session bins that contain at least one sample. */
     val minCoverage: Double,
+    /** Samples in the first minutes after the night starts are ignored (settling, late first readings). */
+    val skipFirstMinutes: Int = 0,
+    /**
+     * Physiological metrics count towards the notification on their own; non-physiological ones (sleep duration)
+     * count only when at least one physiological metric deviates in the same night.
+     */
+    val physiological: Boolean = true,
 )

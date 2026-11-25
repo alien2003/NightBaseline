@@ -39,4 +39,16 @@ object Stats {
 
     /** Robust standard deviation: MAD · 1.4826. */
     fun robustSd(values: List<Double>): Double = mad(values) * MAD_TO_SD
+
+    /** Mean after dropping the lowest and highest [share] of the sorted values; NaN when empty. */
+    fun trimmedMean(
+        values: List<Double>,
+        share: Double,
+    ): Double {
+        require(share in 0.0..<MEDIAN_QUANTILE) { "share must be in [0, 0.5)" }
+        if (values.isEmpty()) return Double.NaN
+        val sorted = values.sorted()
+        val cut = (sorted.size * share).toInt()
+        return mean(sorted.subList(cut, sorted.size - cut))
+    }
 }

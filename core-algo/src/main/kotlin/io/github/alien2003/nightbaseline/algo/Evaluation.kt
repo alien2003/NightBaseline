@@ -78,6 +78,9 @@ enum class NightStatus {
     /** The night is shorter than [AlgoParams.minNightMinutes]. */
     SHORT_NIGHT,
 
+    /** Two long sleeps compete for the date (e.g. a long day sleep after a night shift): not compared. */
+    AMBIGUOUS_NIGHT,
+
     /** No metric could be evaluated (all missing). */
     NOT_EVALUATED,
 }
@@ -130,7 +133,7 @@ object Evaluator {
         return history
             .filter { n ->
                 val nd = LocalDate.parse(n.date)
-                !n.short && nd.isBefore(d) && ChronoUnit.DAYS.between(nd, d) <= params.lookbackDays
+                n.valid && nd.isBefore(d) && ChronoUnit.DAYS.between(nd, d) <= params.lookbackDays
             }.sortedByDescending { it.date }
     }
 
@@ -145,14 +148,15 @@ object Evaluator {
             params.metrics
                 .filter { night.values[it.id]?.missing != MissingReason.NOT_PROVIDED }
                 .map { spec -> evaluateMetric(spec, night, history, params) }
-        val deviating = metrics.count { it.deviates }
+        val deviating = countDeviations(metrics, params)
         val status =
             when {
                 night.short -> NightStatus.SHORT_NIGHT
+                night.ambiguous -> NightStatus.AMBIGUOUS_NIGHT
                 historyNights < params.minNights -> NightStatus.LEARNING
                 metrics.none { it.status in EVALUATED } -> NightStatus.NOT_EVALUATED
                 deviating >= params.minDeviatingMetrics -> NightStatus.DEVIATIONS
-                deviating > 0 -> NightStatus.SOME_DEVIATIONS
+                metrics.any { it.deviates } -> NightStatus.SOME_DEVIATIONS
                 else -> NightStatus.ALL_WITHIN
             }
         return NightEvaluation(night.date, status, metrics, if (status in NO_COUNT) 0 else deviating, historyNights)
@@ -189,6 +193,24 @@ object Evaluator {
         return MetricEvaluation(spec.id, value, base, z, status, deviates && !night.short)
     }
 
+    /**
+     * Deviations that count towards [AlgoParams.minDeviatingMetrics]: every deviating physiological metric, plus the
+     * non-physiological ones (sleep duration) only when at least one physiological metric deviates too.
+     */
+    fun countDeviations(
+        metrics: List<MetricEvaluation>,
+        params: AlgoParams,
+    ): Int {
+        val physiological =
+            params.metrics
+                .filter { it.physiological }
+                .map { it.id }
+                .toSet()
+        val (phys, other) = metrics.filter { it.deviates }.partition { it.metric in physiological }
+        return phys.size + if (phys.isNotEmpty()) other.size else 0
+    }
+
     private val EVALUATED = setOf(MetricStatus.WITHIN, MetricStatus.ABOVE, MetricStatus.BELOW)
-    private val NO_COUNT = setOf(NightStatus.SHORT_NIGHT, NightStatus.LEARNING, NightStatus.NOT_EVALUATED)
+    private val NO_COUNT =
+        setOf(NightStatus.SHORT_NIGHT, NightStatus.AMBIGUOUS_NIGHT, NightStatus.LEARNING, NightStatus.NOT_EVALUATED)
 }
