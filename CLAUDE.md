@@ -55,7 +55,9 @@ no internet. Current state and plan: `docs/STATUS.md` (read it first in a new se
     for explicit permission. Never open or drive other apps without separate permission. Leave no persistent changes
     (stay-awake settings, apps left open that keep the screen on, temp files); afterwards report and clean up.
 11. The owner's personal data (email, name, phone serial) never reaches the repository or external requests. git uses
-    `alien2003@users.noreply.github.com`.
+    `alien2003@users.noreply.github.com`. The repository is PUBLIC (since 2026-11-26): no absolute paths with a user
+    name in committed files (write repository-relative paths, `../PulseStages`, `<project>`); `tools/check-leaks.sh`
+    and `tools/check-language.sh` run before every commit and in CI.
 
 ## Environment
 - `mise exec -- <cmd>` (or activated mise) provides Java, the Android SDK in `.tooling/android-sdk`,

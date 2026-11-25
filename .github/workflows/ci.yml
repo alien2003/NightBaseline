@@ -41,6 +41,9 @@ jobs:
       - name: English only (no Cyrillic outside the ru resources and README.ru.md)
         run: bash tools/check-language.sh
 
+      - name: No home paths, keys, passwords, tokens or personal emails
+        run: bash tools/check-leaks.sh
+
       - name: Contrast of the design tokens
         run: python3 tools/design/contrast_check.py docs/design/tokens.md
 
