@@ -208,21 +208,71 @@ private fun SingleColumn(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
-        if (state.loading) {
-            LoadingBlocks(chartHeight(layout))
-            return@Column
-        }
-        HeaderCard(state, actions)
-        NoticeCard(state, actions)
-        Period(state, actions, Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax), fill = true)
-        ChartBlock(state, actions, chartHeight(layout))
-        Column(Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth()) { StatsBlock(state) }
-        ComputedCard(state)
-        MeaningCard()
-        SourceLine(state)
-        DisclaimerFooter(onAbout = actions.onAbout, modifier = Modifier.widthIn(max = NbDimens.textMax))
+        SingleColumnBlocks(state, actions, chartHeight(layout))
     }
 }
+
+@Composable
+private fun ColumnScope.SingleColumnBlocks(
+    state: MetricDetailState,
+    actions: MetricDetailActions,
+    chartHeight: Dp,
+    footer: Boolean = true,
+) {
+    if (state.loading) {
+        LoadingBlocks(chartHeight)
+        return
+    }
+    HeaderCard(state, actions)
+    NoticeCard(state, actions)
+    Period(state, actions, Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax), fill = true)
+    ChartBlock(state, actions, chartHeight)
+    Column(Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth()) { StatsBlock(state) }
+    ComputedCard(state)
+    MeaningCard()
+    SourceLine(state)
+    if (footer) DisclaimerFooter(onAbout = actions.onAbout, modifier = Modifier.widthIn(max = NbDimens.textMax))
+}
+
+/**
+ * Metric detail as the detail pane of another screen (two-pane Home, `layouts.md` 5.1 and 5.2): the same blocks as
+ * the standalone screen without its scaffold, top bar or scroll container (the caller's pane scrolls). The pane uses
+ * the Medium arrangement from [WIDE_PANE] wide, else the single column. The explainer is the caller's overlay.
+ */
+@Composable
+fun MetricDetailPane(
+    state: MetricDetailState,
+    layout: LayoutSpec,
+    paneWidth: Dp,
+    modifier: Modifier = Modifier,
+    actions: MetricDetailActions = MetricDetailActions(),
+) {
+    val text = rememberUiText()
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
+        Row(Modifier.widthIn(max = NbDimens.chartMax).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text.name(state.metric.metric),
+                style = NbTheme.typography.title,
+                color = NbTheme.colors.textPrimary,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+            NbIconButton(NbIcons.Info, text.string(R.string.a11y_range_info), onClick = actions.onOpenExplainer)
+        }
+        if (paneWidth >= WIDE_PANE) {
+            Column(
+                Modifier.widthIn(max = NbDimens.chartMax).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(NbDimens.groupGap),
+            ) {
+                WideColumnBlocks(state, actions, chartHeight(layout), footer = false)
+            }
+        } else {
+            SingleColumnBlocks(state, actions, chartHeight(layout), footer = false)
+        }
+    }
+}
+
+/** From this pane width Metric detail uses the Medium arrangement (`layouts.md` 5.2). */
+val WIDE_PANE: Dp = 640.dp
 
 /** Medium and up (standalone): header beside stats, full-width chart, summary beside the explainer cards. */
 @Composable
@@ -247,39 +297,49 @@ private fun WideColumn(
             Modifier.widthIn(max = NbDimens.chartMax).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(NbDimens.groupGap),
         ) {
-            if (state.loading) {
-                LoadingBlocks(chartHeight(layout))
-                return@Column
-            }
-            val hasStats = state.shownPoints.any { it.state.compared }
-            val hasCard = state.notice != null && state.notice != MetricNotice.WaitingSync
-            if (hasStats || hasCard) {
-                Row(horizontalArrangement = Arrangement.spacedBy(NbDimens.groupGap)) {
-                    HeaderCard(state, actions, Modifier.weight(1f))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
-                        NoticeCard(state, actions)
-                        StatsBlock(state)
-                    }
-                }
-            } else {
-                // Nothing to put beside the header (learning, nothing compared): it takes the text column alone.
-                HeaderCard(state, actions)
-            }
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { Period(state, actions) }
-            ChartBlock(state, actions, chartHeight(layout), showSummary = false)
-            Row(horizontalArrangement = Arrangement.spacedBy(NbDimens.groupGap)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
-                    SummaryText(state)
-                    SourceLine(state)
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
-                    ComputedCard(state)
-                    MeaningCard()
-                }
-            }
-            DisclaimerFooter(onAbout = actions.onAbout)
+            WideColumnBlocks(state, actions, chartHeight(layout))
         }
     }
+}
+
+@Composable
+private fun ColumnScope.WideColumnBlocks(
+    state: MetricDetailState,
+    actions: MetricDetailActions,
+    chartHeight: Dp,
+    footer: Boolean = true,
+) {
+    if (state.loading) {
+        LoadingBlocks(chartHeight)
+        return
+    }
+    val hasStats = state.shownPoints.any { it.state.compared }
+    val hasCard = state.notice != null && state.notice != MetricNotice.WaitingSync
+    if (hasStats || hasCard) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NbDimens.groupGap)) {
+            HeaderCard(state, actions, Modifier.weight(1f))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
+                NoticeCard(state, actions)
+                StatsBlock(state)
+            }
+        }
+    } else {
+        // Nothing to put beside the header (learning, nothing compared): it takes the text column alone.
+        HeaderCard(state, actions)
+    }
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { Period(state, actions) }
+    ChartBlock(state, actions, chartHeight, showSummary = false)
+    Row(horizontalArrangement = Arrangement.spacedBy(NbDimens.groupGap)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
+            SummaryText(state)
+            SourceLine(state)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
+            ComputedCard(state)
+            MeaningCard()
+        }
+    }
+    if (footer) DisclaimerFooter(onAbout = actions.onAbout)
 }
 
 /** Phone landscape: the chart at the start (60 %, full height), a scrolling column at the end. */
@@ -633,7 +693,36 @@ private fun ExplainerOverlay(
     actions: MetricDetailActions,
 ) {
     val text = rememberUiText()
-    val title = text.string(R.string.explainer_title)
+    RangeExplainerOverlay(layout, sideLine = text.sideLine(state), onClose = actions.onCloseExplainer)
+}
+
+/**
+ * "How your usual range works" (`states.md` 8) for any screen: a glass sheet in Compact, CompactShort, Tabletop
+ * (lower half only) and Glance, a glass dialog from Medium up (in the end pane in Book). [sideLine] is the
+ * metric-specific line ("Only lower values of SpO2 count"), null outside Metric detail.
+ */
+@Composable
+fun RangeExplainerOverlay(
+    layout: LayoutSpec,
+    sideLine: String?,
+    onClose: () -> Unit,
+) {
+    val text = rememberUiText()
+    InfoOverlay(layout, text.string(R.string.explainer_title), onClose) { ExplainerBody(sideLine, it) }
+}
+
+/**
+ * A titled sheet or dialog (`layouts.md` 4.4): a glass sheet in Compact, CompactShort, Tabletop (lower half only)
+ * and Glance, a centred glass dialog from Medium up, placed in the end pane in Book. [body] gets the modifier that
+ * lets it scroll inside the available height.
+ */
+@Composable
+fun InfoOverlay(
+    layout: LayoutSpec,
+    title: String,
+    onClose: () -> Unit,
+    body: @Composable ColumnScope.(Modifier) -> Unit,
+) {
     val sheet = layout.mode in setOf(LayoutMode.Compact, LayoutMode.CompactShort, LayoutMode.Tabletop, LayoutMode.Glance)
     val maxHeight =
         when (layout.mode) {
@@ -651,17 +740,17 @@ private fun ExplainerOverlay(
             }
         }
     if (sheet) {
-        OverlayHost(onDismiss = actions.onCloseExplainer, alignment = Alignment.BottomCenter) {
-            GlassSheet(title, onClose = actions.onCloseExplainer, modifier = Modifier.heightIn(max = maxHeight)) {
-                ExplainerBody(state, Modifier.weight(1f, fill = false))
+        OverlayHost(onDismiss = onClose, alignment = Alignment.BottomCenter) {
+            GlassSheet(title, onClose = onClose, modifier = Modifier.heightIn(max = maxHeight)) {
+                body(Modifier.weight(1f, fill = false))
             }
         }
     } else {
         val fold = layout.verticalFold
         val startPad = fold?.let { (it.positionDp + it.occludedDp / 2).dp + NbDimens.hingeClearance } ?: 0.dp
-        OverlayHost(onDismiss = actions.onCloseExplainer, alignment = Alignment.Center) {
+        OverlayHost(onDismiss = onClose, alignment = Alignment.Center) {
             Box(Modifier.fillMaxSize().padding(start = startPad).padding(NbSpace.s7), contentAlignment = Alignment.Center) {
-                ExplainerDialog(title, state, actions, maxHeight)
+                InfoDialog(title, onClose, maxHeight, body)
             }
         }
     }
@@ -670,11 +759,11 @@ private fun ExplainerOverlay(
 private const val SHEET_SHARE = 0.85f
 
 @Composable
-private fun ExplainerDialog(
+private fun InfoDialog(
     title: String,
-    state: MetricDetailState,
-    actions: MetricDetailActions,
+    onClose: () -> Unit,
     maxHeight: Dp,
+    body: @Composable ColumnScope.(Modifier) -> Unit,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
@@ -697,19 +786,33 @@ private fun ExplainerDialog(
             NbIconButton(
                 NbIcons.Close,
                 text.string(R.string.a11y_close),
-                onClick = actions.onCloseExplainer,
+                onClick = onClose,
                 tint = colors.onGlassPrimary,
                 onGlass = true,
             )
         }
-        ExplainerBody(state, Modifier.weight(1f, fill = false))
+        body(Modifier.weight(1f, fill = false))
+    }
+}
+
+/** Paragraphs on a solid card inside an [InfoOverlay]. */
+@Composable
+fun InfoParagraphs(
+    paragraphs: List<String>,
+    modifier: Modifier = Modifier,
+) {
+    val colors = NbTheme.colors
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        NbCard(Modifier.fillMaxWidth()) {
+            paragraphs.forEach { Text(it, style = NbTheme.typography.body, color = colors.textPrimary) }
+        }
     }
 }
 
 /** The explainer copy on a solid card: range, learning, outside, side line, meaning, care, full disclaimer. */
 @Composable
-private fun ColumnScope.ExplainerBody(
-    state: MetricDetailState,
+private fun ExplainerBody(
+    sideLine: String?,
     modifier: Modifier = Modifier,
 ) {
     val text = rememberUiText()
@@ -720,7 +823,7 @@ private fun ColumnScope.ExplainerBody(
                 text.string(R.string.explainer_range),
                 text.string(R.string.explainer_learning),
                 text.string(R.string.explainer_outside),
-                text.sideLine(state),
+                sideLine,
             ).forEach { Text(it, style = NbTheme.typography.body, color = colors.textPrimary) }
             Text(
                 text.string(R.string.explainer_meaning_title),

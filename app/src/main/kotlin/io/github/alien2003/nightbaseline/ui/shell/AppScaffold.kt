@@ -1,6 +1,7 @@
 package io.github.alien2003.nightbaseline.ui.shell
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,6 +28,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import io.github.alien2003.nightbaseline.ui.components.BarClearance
@@ -81,43 +83,42 @@ fun AppScaffold(
         )
     CompositionLocalProvider(LocalHazeState provides hazeState, LocalLayoutSpec provides layout) {
         Box(modifier.fillMaxSize().background(NbTheme.colors.background)) {
+            // Focus order (layouts.md 10.1): rail -> top bar -> panes in rail layouts, content -> bar with the bar.
+            // The rail is composed first for traversal and drawn on top with zIndex (it must stay outside the
+            // backdrop it blurs). Each shell part is one focus group.
+            if (rail) {
+                Box(
+                    Modifier
+                        .zIndex(1f)
+                        .fillMaxHeight()
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(start = NbDimens.railOffset),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    FloatingNavRail(
+                        selected,
+                        onSelect,
+                        modifier = Modifier.focusGroup().onSizeChanged { railWidth = with(density) { it.width.toDp() } },
+                        showLabels = layout.navigation != NavigationKind.RailIcons,
+                        wide = layout.navigation == NavigationKind.RailLabelled,
+                    )
+                }
+            }
             Box(Modifier.fillMaxSize().hazeSource(hazeState)) { content(padding) }
             topBar(padding)
-            when (layout.navigation) {
-                NavigationKind.Bar -> {
-                    // In Book posture the bar is centred in the start pane, never across the fold (layouts.md 4.1).
-                    val paneWidth = layout.verticalFold?.let { (it.positionDp - it.occludedDp / 2).dp - NbDimens.hingeClearance }
-                    Box(
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .then(if (paneWidth != null) Modifier.width(paneWidth) else Modifier.fillMaxSize())
-                            .navigationBarsPadding()
-                            .padding(bottom = NbDimens.barOffset),
-                        contentAlignment = Alignment.BottomCenter,
-                    ) {
-                        FloatingNavBar(selected, onSelect)
-                    }
+            if (layout.navigation == NavigationKind.Bar) {
+                // In Book posture the bar is centred in the start pane, never across the fold (layouts.md 4.1).
+                val paneWidth = layout.verticalFold?.let { (it.positionDp - it.occludedDp / 2).dp - NbDimens.hingeClearance }
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .then(if (paneWidth != null) Modifier.width(paneWidth) else Modifier.fillMaxSize())
+                        .navigationBarsPadding()
+                        .padding(bottom = NbDimens.barOffset),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    FloatingNavBar(selected, onSelect, Modifier.focusGroup())
                 }
-
-                NavigationKind.Rail, NavigationKind.RailIcons, NavigationKind.RailLabelled -> {
-                    Box(
-                        Modifier
-                            .fillMaxHeight()
-                            .windowInsetsPadding(WindowInsets.safeDrawing)
-                            .padding(start = NbDimens.railOffset),
-                        contentAlignment = Alignment.CenterStart,
-                    ) {
-                        FloatingNavRail(
-                            selected,
-                            onSelect,
-                            modifier = Modifier.onSizeChanged { railWidth = with(density) { it.width.toDp() } },
-                            showLabels = layout.navigation != NavigationKind.RailIcons,
-                            wide = layout.navigation == NavigationKind.RailLabelled,
-                        )
-                    }
-                }
-
-                NavigationKind.None -> {}
             }
             overlay()
         }

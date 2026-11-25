@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
@@ -68,6 +69,7 @@ fun NightRow(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     forced: ForcedInteraction? = null,
+    maxWidth: Dp = NbDimens.textMax,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
@@ -76,9 +78,10 @@ fun NightRow(
     val moved = night.movedMetrics.map { text.name(it.metric) }
     val description = if (moved.isEmpty()) "$label: $status." else "$label: $status. ${text.list(moved)}."
     Row(
-        modifier
+        Modifier
+            .widthIn(max = maxWidth)
+            .then(modifier)
             .fillMaxWidth()
-            .widthIn(max = NbDimens.textMax)
             .sizeIn(minHeight = NbDimens.rowMinHeight)
             .background(if (selected) colors.surface3 else colors.surface1, NbShapes.l)
             .nbClickable(onClick = onClick, shape = NbShapes.l, forced = forced)
@@ -256,7 +259,14 @@ fun HistoryStrip(
     NbCard(modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                stringResource(if (nights.size > DAYS) R.string.home_strip_title_14 else R.string.home_strip_title),
+                when {
+                    nights.size > DAYS -> stringResource(R.string.home_strip_title_14)
+
+                    nights.size == DAYS -> stringResource(R.string.home_strip_title)
+
+                    // Learning: fewer nights are stored than the strip holds.
+                    else -> text.plural(R.plurals.home_strip_title_n, nights.size, text.int(nights.size))
+                },
                 style = NbTheme.typography.titleSmall,
                 color = colors.textPrimary,
                 modifier = Modifier.weight(1f).semantics { heading() },
@@ -329,7 +339,7 @@ fun SettingsGroup(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier.fillMaxWidth().widthIn(max = NbDimens.textMax)) {
+    Column(Modifier.widthIn(max = NbDimens.textMax).then(modifier).fillMaxWidth()) {
         SectionHeader(title)
         Column(Modifier.fillMaxWidth().solidCard(NbShapes.l), content = content)
     }

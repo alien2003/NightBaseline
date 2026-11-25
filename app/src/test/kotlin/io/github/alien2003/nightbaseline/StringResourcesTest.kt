@@ -13,12 +13,32 @@ import javax.xml.parsers.DocumentBuilderFactory
  * and no text uses the banned alarm words, "Vitals" or an exclamation mark (`principles.md` 1).
  */
 class StringResourcesTest {
-    private val en = load("src/main/res/values/strings.xml")
-    private val ru = load("src/main/res/values-ru/strings.xml")
+    private val en = loadAll(EN_DIR)
+    private val ru = loadAll(RU_DIR)
 
     @Test
     fun `English and Russian have the same keys`() {
         assertEquals(en.keys.sorted(), ru.keys.sorted())
+    }
+
+    @Test
+    fun `every strings file exists in both languages with the same keys`() {
+        assertEquals(files(EN_DIR).map { it.name }, files(RU_DIR).map { it.name })
+        files(EN_DIR).forEach { file ->
+            val enKeys = load(file.path).keys.sorted()
+            val ruKeys = load(File(RU_DIR, file.name).path).keys.sorted()
+            assertEquals(enKeys, ruKeys, "keys of ${file.name}")
+        }
+    }
+
+    @Test
+    fun `no key is defined in two files`() {
+        val dup =
+            files(EN_DIR)
+                .flatMap { f -> load(f.path).keys.map { it to f.name } }
+                .groupBy({ it.first }, { it.second })
+                .filterValues { it.size > 1 }
+        assertEquals(emptyMap<String, List<String>>(), dup)
     }
 
     @Test
@@ -57,8 +77,17 @@ class StringResourcesTest {
         assertEquals(emptyList<String>(), ruHits)
     }
 
-    private val enPlurals by lazy { plurals("src/main/res/values/strings.xml") }
-    private val ruPlurals by lazy { plurals("src/main/res/values-ru/strings.xml") }
+    private val enPlurals by lazy { files(EN_DIR).map { plurals(it.path) }.reduce { a, b -> a + b } }
+    private val ruPlurals by lazy { files(RU_DIR).map { plurals(it.path) }.reduce { a, b -> a + b } }
+
+    /** Every translatable `strings*.xml` of [dir] (`strings_untranslatable.xml` holds proper nouns only). */
+    private fun files(dir: String): List<File> =
+        File(dir)
+            .listFiles { f -> f.name.startsWith("strings") && f.name.endsWith(".xml") && f.name != UNTRANSLATABLE }
+            .orEmpty()
+            .sortedBy { it.name }
+
+    private fun loadAll(dir: String): Map<String, List<String>> = files(dir).map { load(it.path) }.reduce { a, b -> a + b }
 
     private fun args(text: String): List<String> = POSITIONAL.findAll(text).map { it.value }.toList()
 
@@ -85,6 +114,10 @@ class StringResourcesTest {
     private fun parse(path: String) = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(File(path))
 
     private companion object {
+        const val EN_DIR = "src/main/res/values"
+        const val RU_DIR = "src/main/res/values-ru"
+        const val UNTRANSLATABLE = "strings_untranslatable.xml"
+
         /** Arguments a key passes although English does not show them: night_label gets the range and the wake date. */
         val EXTRA_ARGS = mapOf("night_label" to setOf("%2${'$'}s"))
         val POSITIONAL = Regex("%\\d+\\\$s")

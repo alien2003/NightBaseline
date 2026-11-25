@@ -9,6 +9,7 @@ import io.github.alien2003.nightbaseline.data.local.settings.AppSettings
 import io.github.alien2003.nightbaseline.data.local.settings.GlassMode
 import io.github.alien2003.nightbaseline.data.local.settings.SensitivityLevel
 import io.github.alien2003.nightbaseline.data.local.settings.SettingsRepository
+import io.github.alien2003.nightbaseline.data.local.settings.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +46,9 @@ class InMemoryNightRepository : NightRepository {
 
     override fun observe(sourcePackage: String): Flow<List<NightRecord>> =
         rows.map { m -> m.values.filter { it.sourcePackage == sourcePackage }.sortedByDescending { it.date } }
+
+    override fun observeAll(): Flow<List<NightRecord>> =
+        rows.map { m -> m.values.sortedWith(compareByDescending<NightRecord> { it.date }.thenBy { it.sourcePackage }) }
 }
 
 /** In-memory [RunLog] (lines in insertion order in [lines]). */
@@ -84,4 +88,13 @@ class FakeSettingsRepository(
     override suspend fun setOnboardingDone(done: Boolean) = state.update { it.copy(onboardingDone = done) }
 
     override suspend fun setGlassMode(mode: GlassMode) = state.update { it.copy(glassMode = mode) }
+
+    override suspend fun setProblemNotificationsEnabled(enabled: Boolean) = state.update { it.copy(problemNotificationsEnabled = enabled) }
+
+    override suspend fun setTheme(mode: ThemeMode) = state.update { it.copy(theme = mode) }
+
+    override suspend fun setNotificationBannerDismissedAt(timeMs: Long?) =
+        state.update { it.copy(notificationBannerDismissedAtMs = timeMs) }
+
+    override suspend fun setRangeReadySeen(seen: Boolean) = state.update { it.copy(rangeReadySeen = seen) }
 }

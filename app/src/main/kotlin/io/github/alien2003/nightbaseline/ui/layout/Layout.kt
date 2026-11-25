@@ -113,7 +113,6 @@ private const val MEDIUM_W = 600f
 private const val EXPANDED_W = 840f
 private const val LARGE_W = 1200f
 private const val XL_W = 1600f
-private const val BOOK_START_PANE_MIN = 360f
 private const val LIST_PANE_MIN = 320f
 private const val DETAIL_PANE_MIN = 360f
 private const val MAX_PANE_FONT_SCALE = 1.5f
@@ -127,7 +126,7 @@ fun resolveLayout(inputs: LayoutInputs): LayoutSpec {
     val vFold = inputs.verticalFold?.takeIf { it.separating }
     val hFold = inputs.horizontalFold?.takeIf { it.separating }
     val mode = modeOf(inputs.widthDp, inputs.heightDp, vFold, hFold)
-    val navigation = navigationOf(mode, vFold)
+    val navigation = navigationOf(mode)
     val gutter = gutterOf(mode)
     val twoPanes = twoPanes(inputs, mode, navigation, gutter)
     return LayoutSpec(mode, navigation, gutter, twoPanes, inputs.widthDp, inputs.heightDp, vFold, hFold)
@@ -153,17 +152,16 @@ private fun modeOf(
         else -> LayoutMode.ExtraLarge
     }
 
-private fun navigationOf(
-    mode: LayoutMode,
-    vFold: FoldInfo?,
-): NavigationKind =
+private fun navigationOf(mode: LayoutMode): NavigationKind =
     when (mode) {
         LayoutMode.Glance -> NavigationKind.None
 
         LayoutMode.Tabletop, LayoutMode.Compact, LayoutMode.CompactShort -> NavigationKind.Bar
 
-        // A rail only when the start pane keeps >= 360 dp next to it (layouts.md 3.2).
-        LayoutMode.Book -> if (bookStartPane(vFold) >= BOOK_START_PANE_MIN) NavigationKind.Rail else NavigationKind.Bar
+        // Book always gets the rail (review round 1, integration): a bar inside a 346 dp start pane read as a phone
+        // layout on an open book. It is the icon rail (labels as content description and tooltip, like WideShort): a
+        // labelled rail grows with its labels and would leave the start half too narrow for the list (layouts.md 4.2).
+        LayoutMode.Book -> NavigationKind.RailIcons
 
         LayoutMode.WideShort -> NavigationKind.RailIcons
 
@@ -171,8 +169,6 @@ private fun navigationOf(
 
         LayoutMode.Large, LayoutMode.ExtraLarge -> NavigationKind.RailLabelled
     }
-
-private fun bookStartPane(vFold: FoldInfo?): Float = (vFold?.positionDp ?: 0f) - NbDimens.railArea.value
 
 private fun gutterOf(mode: LayoutMode): Dp =
     when (mode) {

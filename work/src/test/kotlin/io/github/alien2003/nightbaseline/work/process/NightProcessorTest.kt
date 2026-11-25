@@ -261,7 +261,7 @@ class NightProcessorTest {
             val gen = nights(10)
             SyntheticSource.load(h.gateway, gen)
             h.clock.nowMs = endOf(gen.last()) + 2 * HOUR
-            val run = NightRun(h.backfill, h.processor, h.runLog, h.problemNotifier)
+            val run = NightRun(h.backfill, h.processor, h.runLog, h.problemNotifier, h.settings)
 
             h.gateway.failures += HcError.RateLimited("read")
             assertEquals(RunResult.Failure(transient = true), run.run())
@@ -281,7 +281,7 @@ class NightProcessorTest {
             val gen = nights(10)
             SyntheticSource.load(h.gateway, gen)
             h.clock.nowMs = endOf(gen.last()) + 2 * HOUR
-            val run = NightRun(h.backfill, h.processor, h.runLog, h.problemNotifier)
+            val run = NightRun(h.backfill, h.processor, h.runLog, h.problemNotifier, h.settings)
 
             h.gateway.granted -= HcPermissions.READ_HEALTH_DATA_IN_BACKGROUND
             run.run()

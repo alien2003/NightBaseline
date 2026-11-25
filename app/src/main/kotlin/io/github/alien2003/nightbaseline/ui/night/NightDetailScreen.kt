@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -38,6 +39,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
@@ -51,7 +53,9 @@ import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.TonalButton
+import io.github.alien2003.nightbaseline.ui.history.CompactNightSummary
 import io.github.alien2003.nightbaseline.ui.home.BlockHeading
+import io.github.alien2003.nightbaseline.ui.home.FitColumn
 import io.github.alien2003.nightbaseline.ui.home.GlanceHome
 import io.github.alien2003.nightbaseline.ui.home.HomeActions
 import io.github.alien2003.nightbaseline.ui.home.LoadingCard
@@ -60,6 +64,7 @@ import io.github.alien2003.nightbaseline.ui.home.NightActionsRow
 import io.github.alien2003.nightbaseline.ui.home.NightBlock
 import io.github.alien2003.nightbaseline.ui.home.NotRecordedRow
 import io.github.alien2003.nightbaseline.ui.home.ScreenFrame
+import io.github.alien2003.nightbaseline.ui.home.TABLETOP_COMPACT_FONT
 import io.github.alien2003.nightbaseline.ui.home.contentWidth
 import io.github.alien2003.nightbaseline.ui.home.tileColumns
 import io.github.alien2003.nightbaseline.ui.home.topInset
@@ -275,6 +280,7 @@ private fun ColumnScope.NightBlocks(
                 Modifier.widthIn(max = maxWidth),
                 onAction = { actions.onBannerAction(it) },
                 onDismiss = { actions.onBannerDismiss(it) },
+                maxWidth = maxWidth,
             )
         }
         NightBlock(
@@ -288,6 +294,7 @@ private fun ColumnScope.NightBlocks(
             onHowItWorks = actions.onHowItWorks,
             // The top bar title is the night label.
             showLabel = false,
+            maxWidth = maxWidth,
         )
     }
     if (tiles) MeasurementBlocks(state, actions, columns, maxWidth)
@@ -401,28 +408,28 @@ private fun TabletopNight(
 ) {
     val night = state.night
     Box(Modifier.fillMaxSize().padding(horizontal = layout.gutter)) {
-        Column(
+        // Top half: view only and never scrolls (layouts.md 6.4); at large font it keeps the compact summary only.
+        val large = LocalDensity.current.fontScale >= TABLETOP_COMPACT_FONT
+        Box(
             Modifier
                 .fillMaxWidth()
                 .height(foldY - NbDimens.hingeClearance)
-                .verticalScroll(rememberScrollState())
+                .clipToBounds()
                 .padding(top = topInset(barHeight), bottom = NbSpace.s3),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
-            if (night.state ==
-                NightState.Loading
-            ) {
-                LoadingCard()
-            } else {
-                NightSummaryCard(night, state.source, Modifier.widthIn(max = NbDimens.textMax), showLabel = false)
-            }
-            if (night.state == NightState.Learning) {
-                LearningProgress(
-                    night.historyNights,
-                    Modifier.widthIn(max = NbDimens.textMax),
-                    skipped = if (state.lastNightShort) 1 else 0,
-                )
+            FitColumn(NbDimens.cardGap) {
+                when {
+                    night.state == NightState.Loading -> LoadingCard()
+                    large -> CompactNightSummary(night, state.source, Modifier.widthIn(max = NbDimens.textMax))
+                    else -> NightSummaryCard(night, state.source, Modifier.widthIn(max = NbDimens.textMax), showLabel = false)
+                }
+                if (night.state == NightState.Learning && !large) {
+                    LearningProgress(
+                        night.historyNights,
+                        Modifier.widthIn(max = NbDimens.textMax),
+                        skipped = if (state.lastNightShort) 1 else 0,
+                    )
+                }
             }
         }
         Column(
@@ -446,6 +453,7 @@ private fun TabletopNight(
                     Modifier.widthIn(max = maxWidth),
                     onAction = { actions.onBannerAction(it) },
                     onDismiss = { actions.onBannerDismiss(it) },
+                    maxWidth = maxWidth,
                 )
             }
             NightActionsRow(

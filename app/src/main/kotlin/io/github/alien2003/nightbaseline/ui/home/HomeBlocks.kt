@@ -64,6 +64,7 @@ internal fun NightBlock(
     onStateSecondary: (NightState) -> Unit = {},
     onHowItWorks: () -> Unit = {},
     showLabel: Boolean = true,
+    maxWidth: Dp = NbDimens.textMax,
 ) {
     val text = rememberUiText()
     when {
@@ -88,6 +89,7 @@ internal fun NightBlock(
                     }
                 },
                 showLabel = showLabel,
+                maxWidth = maxWidth,
             )
         }
 

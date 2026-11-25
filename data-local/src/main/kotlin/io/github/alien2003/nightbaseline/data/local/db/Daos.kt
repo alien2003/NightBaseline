@@ -31,6 +31,10 @@ interface NightDao {
     @Query("SELECT * FROM nights WHERE sourcePackage = :sourcePackage ORDER BY date DESC")
     fun observe(sourcePackage: String): Flow<List<NightEntity>>
 
+    /** Every night of every source, newest first, updated on every change. */
+    @Query("SELECT * FROM nights ORDER BY date DESC, sourcePackage")
+    fun observeAll(): Flow<List<NightEntity>>
+
     /** Number of stored nights of [sourcePackage]. */
     @Query("SELECT COUNT(*) FROM nights WHERE sourcePackage = :sourcePackage")
     suspend fun count(sourcePackage: String): Int

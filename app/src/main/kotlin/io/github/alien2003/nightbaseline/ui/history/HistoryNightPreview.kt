@@ -54,7 +54,7 @@ fun HistoryNightPreview(
     val text = rememberUiText()
     val colors = NbTheme.colors
     if (!interactive) {
-        GlanceSummary(night, source, modifier)
+        CompactNightSummary(night, source, modifier)
         return
     }
     Column(modifier.fillMaxWidth().widthIn(max = NbDimens.textMax), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
@@ -94,10 +94,10 @@ fun HistoryNightPreview(
  * node). The body and metric lines are left to the Night detail: half a folded screen cannot hold them at large font.
  */
 @Composable
-private fun GlanceSummary(
+fun CompactNightSummary(
     night: NightUi,
     source: String,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors

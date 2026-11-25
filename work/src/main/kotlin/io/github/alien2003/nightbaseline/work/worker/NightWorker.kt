@@ -10,6 +10,7 @@ import io.github.alien2003.nightbaseline.data.hc.HcError
 import io.github.alien2003.nightbaseline.data.local.RunLog
 import io.github.alien2003.nightbaseline.data.local.RunLogKind
 import io.github.alien2003.nightbaseline.data.local.ZoneSource
+import io.github.alien2003.nightbaseline.data.local.settings.SettingsRepository
 import io.github.alien2003.nightbaseline.work.notify.DataProblem
 import io.github.alien2003.nightbaseline.work.notify.ProblemNotifier
 import io.github.alien2003.nightbaseline.work.process.BackfillOutcome
@@ -22,6 +23,7 @@ import io.github.alien2003.nightbaseline.work.schedule.NightScheduler
 import io.github.alien2003.nightbaseline.work.schedule.RunResult
 import io.github.alien2003.nightbaseline.work.schedule.WorkPlanner
 import io.github.alien2003.nightbaseline.work.schedule.WorkStep
+import kotlinx.coroutines.flow.first
 import java.time.Clock
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
@@ -32,6 +34,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * cancellation.
  */
 @HiltWorker
+@Suppress("LongParameterList") // Assisted worker parameters plus the injected collaborators.
 class NightWorker
     @AssistedInject
     constructor(
@@ -42,6 +45,7 @@ class NightWorker
         private val problems: ProblemNotifier,
         private val clock: Clock,
         private val zone: ZoneSource,
+        private val settings: SettingsRepository,
     ) : CoroutineWorker(appContext, params) {
         override suspend fun doWork(): Result {
             val result = run.run()
@@ -53,7 +57,9 @@ class NightWorker
 
                 is WorkStep.RunAt -> {
                     // Out of retries: the reads keep failing, which the person should know about.
-                    if (result is RunResult.Failure) problems.update(DataProblem.READ_FAILED)
+                    if (result is RunResult.Failure && settings.settings.first().problemNotificationsEnabled) {
+                        problems.update(DataProblem.READ_FAILED)
+                    }
                     scheduler.scheduleNext(step.atMs)
                     Result.success()
                 }
@@ -72,6 +78,7 @@ class NightRun
         private val processor: NightProcessor,
         private val runLog: RunLog,
         private val problems: ProblemNotifier,
+        private val settings: SettingsRepository,
     ) {
         /** Runs once. */
         @Suppress("TooGenericExceptionCaught") // A background run must never crash: every exception becomes a logged failure.
@@ -82,7 +89,9 @@ class NightRun
                         is BackfillOutcome.Blocked -> ProcessOutcome.Blocked(b.reason)
                         else -> processor.process()
                     }
-                problems.update((outcome as? ProcessOutcome.Blocked)?.let { problemOf(it.reason) })
+                // "Problems reading data" off in Settings: nothing is posted and shown problems are cancelled.
+                val notify = settings.settings.first().problemNotificationsEnabled
+                problems.update((outcome as? ProcessOutcome.Blocked)?.takeIf { notify }?.let { problemOf(it.reason) })
                 RunResult.Outcome(outcome)
             } catch (e: CancellationException) {
                 throw e

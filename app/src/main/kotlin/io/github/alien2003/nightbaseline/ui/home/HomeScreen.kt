@@ -31,15 +31,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.algo.AlgoParams
 import io.github.alien2003.nightbaseline.algo.MetricId
+import io.github.alien2003.nightbaseline.algo.Sensitivity
 import io.github.alien2003.nightbaseline.ui.components.DisclaimerFooter
 import io.github.alien2003.nightbaseline.ui.components.HistoryStrip
 import io.github.alien2003.nightbaseline.ui.components.InlineBanner
@@ -48,8 +54,12 @@ import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.history.CompactNightSummary
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
+import io.github.alien2003.nightbaseline.ui.metric.MetricDetailActions
+import io.github.alien2003.nightbaseline.ui.metric.MetricDetailPane
+import io.github.alien2003.nightbaseline.ui.metric.MetricDetailState
 import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
 import io.github.alien2003.nightbaseline.ui.shell.AppScaffold
@@ -259,6 +269,7 @@ private fun ColumnScope.HomeBlocks(
                 onAction = { actions.onBannerAction(it) },
                 onDismiss = { actions.onBannerDismiss(it) },
                 quietDays = state.quietDays,
+                maxWidth = maxWidth,
             )
         }
         if (stripBesideSummary && state.recent.isNotEmpty()) {
@@ -273,7 +284,7 @@ private fun ColumnScope.HomeBlocks(
                 )
             }
         } else {
-            NightBlockOf(state, actions, Modifier.widthIn(max = maxWidth))
+            NightBlockOf(state, actions, Modifier.widthIn(max = maxWidth), maxWidth)
         }
         LastResultBlock(state, maxWidth)
     }
@@ -301,7 +312,7 @@ private fun LastResultBlock(
     val text = rememberUiText()
     BlockHeading(text.string(R.string.home_last_result_heading, text.nightLabel(metricsNight)), Modifier.widthIn(max = maxWidth))
     // The heading above already names the night.
-    NightSummaryCard(metricsNight, state.source, Modifier.widthIn(max = maxWidth), showLabel = false)
+    NightSummaryCard(metricsNight, state.source, Modifier.widthIn(max = maxWidth), showLabel = false, maxWidth = maxWidth)
 }
 
 /** Skeleton tiles (loading), "Already visible" (learning), the tiles, the "Not recorded by" row, "What to expect". */
@@ -333,11 +344,13 @@ private fun NightBlockOf(
     state: HomeState,
     actions: HomeActions,
     modifier: Modifier = Modifier,
+    maxWidth: Dp = NbDimens.textMax,
 ) {
     NightBlock(
         state.night,
         state.source,
         modifier,
+        maxWidth = maxWidth,
         lastNightShort = state.lastNightShort,
         onMetric = actions.onMetric,
         onStateAction = actions.onStateAction,
@@ -430,7 +443,7 @@ private fun TwoPaneHome(
                 .padding(end = if (supporting) 0.dp else endGutter, top = top, bottom = bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
-            DetailPaneContent(state, actions)
+            DetailPaneContent(state, actions, layout)
         }
         if (supporting) {
             Spacer(Modifier.width(PANE_SPACER))
@@ -456,18 +469,38 @@ private fun TwoPaneHome(
 private fun DetailPaneContent(
     state: HomeState,
     actions: HomeActions,
+    layout: LayoutSpec,
 ) {
-    val metric = state.metricsNight?.metrics?.firstOrNull { it.metric == state.detailMetric }
+    val night = state.metricsNight
+    val metric = night?.metrics?.firstOrNull { it.metric == state.detailMetric }
     if (metric != null) {
-        MetricDetailPane(
-            metric,
-            state.series[metric.metric],
-            state.source,
-            state.period,
-            state.chartSelection,
-            actions.onPeriod,
-            actions.onChartSelect,
-        )
+        val series = state.series[metric.metric]?.takeIf { s -> s.points.any { it.value != null } }
+        val detail =
+            MetricDetailState(
+                metric = metric,
+                anchorDate = night.wakeDate,
+                series = series,
+                source = state.source,
+                period = state.period,
+                selected = state.chartSelection,
+                countedSide = AlgoParams().metrics.firstOrNull { it.id == metric.metric }?.sensitivity ?: Sensitivity.BOTH,
+                storedNights = series?.let { s -> s.points.size - s.points.indexOfFirst { it.value != null } } ?: 0,
+            )
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            MetricDetailPane(
+                detail,
+                layout,
+                paneWidth = maxWidth,
+                actions =
+                    MetricDetailActions(
+                        onPeriod = actions.onPeriod,
+                        onSelect = actions.onChartSelect,
+                        onOpenNight = actions.onNight,
+                        onOpenExplainer = actions.onHowItWorks,
+                        onAbout = actions.onAbout,
+                    ),
+            )
+        }
     } else {
         ExplainerCard(meaning = state.night.state.hasSummary)
     }
@@ -536,36 +569,37 @@ private fun TabletopHome(
     val night = state.night
     val text = rememberUiText()
     Box(Modifier.fillMaxSize().padding(horizontal = layout.gutter)) {
-        // Top half: a column that only scrolls when 200 % text does not fit; it holds no control.
-        Column(
+        // Top half: view only and never scrolls (layouts.md 6.4); at large font it keeps the compact summary only.
+        val large = LocalDensity.current.fontScale >= TABLETOP_COMPACT_FONT
+        Box(
             Modifier
                 .fillMaxWidth()
                 .height(foldY - NbDimens.hingeClearance)
-                .verticalScroll(rememberScrollState())
+                .clipToBounds()
                 .padding(top = topInset(barHeight), bottom = NbSpace.s3),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
-            if (night.state == NightState.Loading) {
-                LoadingCard()
-            } else {
-                NightSummaryCard(night, state.source, Modifier.widthIn(max = NbDimens.textMax))
-            }
-            if (night.state == NightState.Learning || night.state == NightState.LearningStart) {
-                LearningProgress(
-                    night.historyNights,
-                    Modifier.widthIn(max = NbDimens.textMax),
-                    skipped = if (state.lastNightShort) 1 else 0,
-                )
-            }
-            if (state.recent.isNotEmpty()) {
-                HistoryStrip(
-                    state.recent.takeLast(STRIP_NIGHTS),
-                    onNight = {},
-                    onSeeAll = {},
-                    interactive = false,
-                    modifier = Modifier.widthIn(max = NbDimens.textMax),
-                )
+            FitColumn(NbDimens.cardGap) {
+                when {
+                    night.state == NightState.Loading -> LoadingCard()
+                    large -> CompactNightSummary(night, state.source, Modifier.widthIn(max = NbDimens.textMax))
+                    else -> NightSummaryCard(night, state.source, Modifier.widthIn(max = NbDimens.textMax))
+                }
+                if (night.state == NightState.Learning || night.state == NightState.LearningStart) {
+                    LearningProgress(
+                        night.historyNights,
+                        Modifier.widthIn(max = NbDimens.textMax),
+                        skipped = if (state.lastNightShort) 1 else 0,
+                    )
+                }
+                if (state.recent.isNotEmpty() && !large) {
+                    HistoryStrip(
+                        state.recent.takeLast(STRIP_NIGHTS),
+                        onNight = {},
+                        onSeeAll = {},
+                        interactive = false,
+                        modifier = Modifier.widthIn(max = NbDimens.textMax),
+                    )
+                }
             }
         }
         Column(
@@ -589,6 +623,7 @@ private fun TabletopHome(
                     onAction = { actions.onBannerAction(it) },
                     onDismiss = { actions.onBannerDismiss(it) },
                     quietDays = state.quietDays,
+                    maxWidth = maxWidth,
                 )
             }
             NightActionsRow(
@@ -609,6 +644,40 @@ private fun TabletopHome(
         }
     }
 }
+
+/**
+ * A view-only column for the tabletop top half (`layouts.md` 6.4): children in order, centred, each placed only if it
+ * fits completely in the height left (later ones are dropped, never cut), so the half never scrolls or clips text.
+ */
+@Composable
+internal fun FitColumn(
+    spacing: Dp,
+    content: @Composable () -> Unit,
+) {
+    Layout(content, Modifier.fillMaxSize()) { measurables, constraints ->
+        val gap = spacing.roundToPx()
+        val loose = constraints.copy(minWidth = 0, minHeight = 0, maxHeight = Constraints.Infinity)
+        val placed = mutableListOf<Placeable>()
+        var used = 0
+        for (m in measurables) {
+            val p = m.measure(loose)
+            val need = used + (if (placed.isEmpty()) 0 else gap) + p.height
+            if (need > constraints.maxHeight && placed.isNotEmpty()) break
+            placed += p
+            used = need
+        }
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            var y = 0
+            placed.forEach {
+                it.placeRelative((constraints.maxWidth - it.width) / 2, y)
+                y += it.height + gap
+            }
+        }
+    }
+}
+
+/** From this font scale the tabletop top half shows the compact summary only (it never scrolls). */
+internal const val TABLETOP_COMPACT_FONT = 1.5f
 
 /** Nights in the compact strip. */
 internal const val STRIP_NIGHTS = 7

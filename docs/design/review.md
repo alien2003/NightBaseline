@@ -123,3 +123,68 @@ patterns, no personal content of the reference screenshots.
 | Vendor neutral, any Health Connect source, OHealth default | `screens.md` 7.5; `states.md` 7.3 | OK |
 | Screenshot tests: screen x state x theme x language x font x glass/fallback x window sizes | `layouts.md` 11; `screens.md` 10 | OK after finding 40 |
 | No health data or vendor screenshots in the repo | `reference-analysis.md` intro; `README.md` | OK |
+
+## Round 1 (integration)
+
+Date: 2026-11-25. Scope: wiring the stateless screens (`ui.home`, `ui.night`, `ui.metric`, `ui.history`,
+`ui.onboarding`, `ui.learning`, `ui.settings`) to `:data-local`, `:data-hc` and `:work`, the navigation graph, the
+adaptive shell on real window information, and the open items of `review-home.md`, `review-metric.md`,
+`review-history.md` and `review-setup.md` that were cheap to close. Method: ViewModel unit tests over the data-local /
+data-hc fakes, a Robolectric navigation and deep-link test, and the new integrated screenshot matrix
+(`IntegratedScreenshotsTest`: Home, History and Settings x phone, flip-cover-square, owner-book, owner-tabletop,
+tablet-land, tablet-portrait x light, dark x font 1.0, 2.0 x glass, solid = 144 images, each checked for unfilled
+placeholders, clipped text and controls on a fold). The PNGs were read by eye; the fixes below come from them.
+
+### What was wired
+
+| Area | Change | Why |
+|---|---|---|
+| Application | `NightBaselineApp` is `@HiltAndroidApp` and `Configuration.Provider` with `HiltWorkerFactory`; the manifest removes `androidx.work.WorkManagerInitializer` (`tools:node="remove"`, as PulseStages); on start it creates both notification channels (`Channels` in `:work` is now public) and calls `ensureScheduled()` once onboarding is done. | `NightWorker` needs injected collaborators; the default initializer would build WorkManager without them. |
+| Data glue (`app/`) | `AppData` (one injectable bundle: settings, nights, run log, platform status, check state, scheduler, clock, zone, reader, backfill, dispatchers); `AccessMonitor` (Health Connect availability, granted permissions, background feature, source installed + label, notification access; refreshed on start, every resume and after permission results); `CheckState` (WorkManager `RUNNING` of the unique chain); `NightPresenter` (pure: night state by the `states.md` 1 priorities, banners by the `states.md` 3 order, per-night UI, chart series with the range recomputed per night by `Evaluator` under the current sensitivity); `SourceDiscovery` (sources of the last 30 days and the metrics each writes). | The screens stay stateless; the rules live in pure, unit-tested code; Health Connect *data* is read only by the work and by explicit user steps (onboarding, source picker). |
+| ViewModels | Hilt ViewModels per area: Home (plus the learning presentation), Night detail (date and previous / next in `SavedStateHandle`), Metric detail (period in `SavedStateHandle`), History (view, filter, month, selection in `SavedStateHandle`), Settings (page, section, pending source), Onboarding (step, selection, denial count in `SavedStateHandle`), and a root ViewModel (theme, glass, onboarding flag, newest night). Mapping runs on `Dispatchers.Default`, reads on IO; nothing is logged. | State survives fold / unfold, rotation and recreation without reloading (`layouts.md` 8). |
+| Settings data | `AppSettings` gained `problemNotificationsEnabled`, `theme`, `notificationBannerDismissedAtMs` (`B-NOTIF-OFF`, 30 days) and `rangeReadySeen` (`B-RANGE-READY` once); `NightRepository.observeAll()` lists every source's nights. `NightRun` and `NightWorker` honour "Problems reading data". | Settings rows and banners needed stored state; a source change restarts learning (nights are stored per source) while History keeps the earlier source's nights. |
+| Navigation | navigation-compose 2.10.2 with typed `@Serializable` routes (`HomeRoute`, `HistoryRoute`, `SettingsRoute(page)`, `NightRoute(date, section)`, `MetricRoute(metric, date, section)`, `OnboardingRoute(step)`); top-level navigation saves and restores each section; Ctrl+1/2/3, Ctrl+R, Esc and Alt+Left; shortcuts listed for the system helper. | `screens.md` 2-3, `layouts.md` 10.2. |
+| List-detail hand-over | Home metrics and History nights select in place on two-pane windows; folding with an explicit selection pushes Metric / Night detail; unfolding with a pushed detail pops it and selects it in the pane (saved-state handshake). | `layouts.md` 8.2 rule 4; covered by `NavigationTest`. |
+| Real detail panes | Home's local metric pane (`HomePanes.MetricDetailPane`) was removed; the detail pane is the real `MetricDetailPane` (the Metric detail blocks without scaffold; Medium arrangement from 640 dp). History's two-pane detail is the real Night detail content with its own title row. | One implementation per screen. |
+| Deep links | `nightbaseline://night/{date}` and the `night_date` extra are parsed by `DeepLinks.parse` (validated with `NightIntents.nightDateOf`; unknown hosts / segments and malformed URIs ignored); the newest night opens Home, an older one Night detail above Home; links wait for onboarding. `fix/permission` launches the Health Connect request on Home, `fix/health-connect` opens Home with the update card, `fix/source-sync` opens the source picker. Opening a night cancels its notification. | `screens.md` 3, `states.md` 6. |
+| Onboarding | Health Connect check, source discovery, the permission request through `PermissionController.createRequestPermissionResultContract()` with `HcPermissions` (feature-gated ones only where available; a second denial opens Health Connect), `POST_NOTIFICATIONS` on 33+, `HistoryBackfill` on the ready step, then `runNow()`, which also starts the daily chain. Before sleep may be read the source list holds only the installed default; "Check again" on an empty list asks for the permissions first. | `screens.md` 7.5, `states.md` 7.3. |
+| Window info | `androidx.window:window` 1.5.1 (latest stable on Google Maven, 2026-11-25): `WindowInfoTracker` folding features (orientation, `isSeparating`, occlusion, bounds) and `WindowMetricsCalculator` window bounds, recomputed on each configuration change, mapped by the pure `layoutInputsOf` (`nav/FoldSpec.kt`). The manifest keeps `configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density"`, no orientation lock, resizable (`MergedManifestTest` now asserts all five values and the removed initializer). | `layouts.md` 2, 3.1. |
+| Release build | `proguard-rules.pro` keeps the typed routes' serializers, the core-algo serializers used by the stored JSON and the worker constructor. `:app:assembleRelease` succeeds unsigned without signing variables. | R8 safety for lookups by name. |
+
+### Fixes from the open items and the integrated screenshots
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | Book (owner-book, 692 dp) showed the floating bar. | `Book` always uses the rail, icon-only: a labelled rail grows to about 94 dp at font 1.0 (more at 2.0) and the History rows then crossed the fold clearance (caught by the new fold assertion). `layouts.md` 3.2 and 4.2 updated. |
+| 2 | `HistoryStrip` titled itself "Last 7 nights" while learning showed fewer. | Plural `home_strip_title_n` ("Last {n} nights", en + ru) below 7 nights. |
+| 3 | Shared components put `widthIn(max)` after the caller's `fillMaxWidth()`, so their 600 dp cap never applied. | `NightSummaryCard`, `MetricRangeTile`, `InlineBanner`, `NightRow` and `SettingsGroup` apply the cap before the caller's modifier (`Modifier.widthIn(max).then(modifier)`) and take a `maxWidth` parameter; Home and Night detail pass their grid width. `NbCard`'s ineffective cap was removed (the caller owns its width). |
+| 4 | `StringResourcesTest` read only `strings.xml`. | It loads every `strings*.xml` (except `strings_untranslatable.xml`), checks that each file exists in both languages with the same keys and that no key is defined twice. |
+| 5 | Tabletop: the top half scrolled at 200 % font (`layouts.md` 6.4: only the bottom half scrolls). | Home and Night detail top halves are clipped, never scroll, and from font 1.5 show the compact summary (glyph, label, headline; shared `CompactNightSummary`). |
+| 6 | Large (tablet-land 1280 dp) never showed the "Recent nights" supporting pane. | Geometry kept (rail + 360 + 360 + 320 + spacers + gutters need about 1360 dp); `layouts.md` 5.1 and 7 updated: the pane appears from about 1400 dp. |
+| 7 | Book: the summary headline broke inside words ("measure / ments") in the narrow start half. | The summary card stacks its glyph above the text below 300 dp inner width; all type styles use `Hyphens.Auto`, so a word that still does not fit (e.g. "Notifications" at 200 %) breaks at a syllable with a hyphen. |
+| 8 | Keyboard focus order put the rail after the content. | The rail is composed first (drawn on top with `zIndex`), the bar last; both are focus groups (`layouts.md` 10.1). |
+| 9 | Home's range explainer, the "Not recorded by" sheet and the Glance "More" sheet had no host. | App-level overlays (`InfoOverlay` / `RangeExplainerOverlay` extracted from Metric detail; the More sheet with labelled destinations), saved across fold and recreation, closed by back and Esc. |
+| 10 | `B-RANGE-READY` would show forever on any history that once was learning. | Offered only while the learning period ended at most 3 nights ago and it was not dismissed. |
+| 11 | With the rail, the book start half (about 222 dp of content) cannot hold even the transposed month grid at 48 dp per cell (`HistoryScreenshotsTest` target assertion). | The transposed grid scrolls sideways when 6 week columns do not fit; cells keep 48 dp. |
+| 12 | The clipped tabletop top half cut the history strip at font 1.0 (clipping assertion). | `FitColumn`: the top half places its view-only blocks in order and drops a block that does not fit whole (the strip), never cutting text. |
+| 13 | Wiring `:work` merged WorkManager's `ACCESS_NETWORK_STATE` into the app (`MergedManifestTest`). | Removed with `tools:node="remove"`: the night check has no network constraint. |
+
+### Decisions recorded here
+
+- `E-SYNC` vs `E-NODATA` without a "newest record of the source" time from Health Connect (the UI does not read
+  data): after 18:00 with no night for the expected wake date, `E-SYNC` when the night before is missing too (the
+  source has been silent), otherwise `E-NODATA`. Hypothesis to revisit if the daily work starts storing the source's
+  last write time.
+- `LOADING` = no stored night while the unique night check is `RUNNING`; otherwise `L0`.
+- The learning area has no ViewModel of its own: `HomeViewModel` emits either Home or the learning presentation
+  (`screens.md` 7.6 makes learning a state of Home).
+
+### Open after this round
+
+- `E-SOURCE-GONE` names the source by its package (the label of an uninstalled app is not stored).
+- F6 / Ctrl+Tab between panes, Alt+Up / Alt+Down in list-detail and re-tap-to-top on the bar are not implemented.
+- Book at 200 % font: the 238 dp start half is tight (hyphenated titles); a denser row for narrow panes would help.
+- The integrated matrix captures each top-level destination at rest; pushed destinations are covered by the per-area
+  tests and `NavigationTest`, not by integrated images.
+- State preservation is verified by the saved-state design and `NavigationTest` (fold / unfold hand-over), not yet by
+  a `StateRestorationTester` run.

@@ -85,12 +85,24 @@ class MergedManifestTest {
             val activity = manifest.elements("activity").first { qualified(it.androidAttr("name")) == MAIN_ACTIVITY }
             assertEquals("", activity.androidAttr("screenOrientation"), "$variant: orientation must not be locked")
             assertTrue(activity.androidAttr("resizeableActivity") != "false", variant)
-            assertTrue("smallestScreenSize" in activity.androidAttr("configChanges"), variant)
+            val changes = activity.androidAttr("configChanges").split('|').toSet()
+            assertTrue(
+                changes.containsAll(setOf("screenSize", "smallestScreenSize", "screenLayout", "orientation", "density")),
+                "$variant: $changes",
+            )
             val launchers =
                 (manifest.elements("activity") + manifest.elements("activity-alias"))
                     .filter { it.isLauncherEntry() }
                     .map { qualified(it.androidAttr("name")) }
             assertEquals(listOf(MAIN_ACTIVITY), launchers, "$variant launcher entries")
+        }
+    }
+
+    @Test
+    fun `WorkManager's default initializer is removed, the app configures it with the Hilt worker factory`() {
+        forEachManifest { variant, manifest ->
+            val initializers = manifest.elements("meta-data").map { it.androidAttr("name") }
+            assertFalse("androidx.work.WorkManagerInitializer" in initializers, "$variant: $initializers")
         }
     }
 

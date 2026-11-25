@@ -61,6 +61,12 @@ interface NightRepository {
 
     /** Every night of [sourcePackage], newest first, updated on change. */
     fun observe(sourcePackage: String): Flow<List<NightRecord>>
+
+    /**
+     * Every stored night of every source, newest first (same date: by source package), updated on change. A source
+     * change restarts learning for the new source, but the nights of the earlier one stay in History.
+     */
+    fun observeAll(): Flow<List<NightRecord>>
 }
 
 /** JSON of the stored :core-algo types; unknown keys are ignored so older rows survive new fields. */
@@ -126,4 +132,6 @@ class RoomNightRepository
 
         override fun observe(sourcePackage: String): Flow<List<NightRecord>> =
             dao.observe(sourcePackage).map { rows -> rows.map(NightJson::fromEntity) }
+
+        override fun observeAll(): Flow<List<NightRecord>> = dao.observeAll().map { rows -> rows.map(NightJson::fromEntity) }
     }

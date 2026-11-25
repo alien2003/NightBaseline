@@ -5,6 +5,7 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
@@ -68,6 +69,9 @@ private fun style(
         fontFeatureSettings = if (numeric) TABULAR_FIGURES else null,
         platformStyle = PlatformTextStyle(includeFontPadding = false),
         lineHeightStyle = LineHeightStyle(alignment = LineHeightStyle.Alignment.Center, trim = LineHeightStyle.Trim.None),
+        // A word wider than a narrow pane at 200 % font (a book half next to the rail) breaks with a hyphen at a
+        // syllable instead of at an arbitrary letter (review round 1, integration).
+        hyphens = Hyphens.Auto,
     )
 
 /** The one type scale (colour is applied by the components, not baked into the styles). */

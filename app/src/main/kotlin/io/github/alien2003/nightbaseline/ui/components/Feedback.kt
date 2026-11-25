@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.material.solidCard
@@ -266,15 +267,17 @@ fun InlineBanner(
     onAction: () -> Unit = {},
     onDismiss: (() -> Unit)? = null,
     quietDays: Int = 3,
+    maxWidth: Dp = NbDimens.textMax,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
     val dismissible = onDismiss != null && (kind == BannerKind.NotificationsOff || kind == BannerKind.RangeReady)
     Row(
         modifier =
-            modifier
+            Modifier
+                .widthIn(max = maxWidth)
+                .then(modifier)
                 .fillMaxWidth()
-                .widthIn(max = NbDimens.textMax)
                 .solidCard(NbShapes.m)
                 .padding(start = NbSpace.s5, top = NbSpace.s3, bottom = NbSpace.s3, end = NbSpace.s2)
                 .semantics { liveRegion = LiveRegionMode.Polite },

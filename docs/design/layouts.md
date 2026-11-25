@@ -56,7 +56,7 @@ Versions as verified in `large-screens.md` section 1 (2026-11-25) and the projec
 |---|---|---|
 | Window size class (incl. Large/XLarge) and posture | `currentWindowAdaptiveInfoV2()` -> `WindowAdaptiveInfo(windowSizeClass, windowPosture)`; checks via `windowSizeClass.isWidthAtLeastBreakpoint(...)`, `isHeightAtLeastBreakpoint(...)` | `androidx.compose.material3.adaptive:adaptive` **1.3.0** (catalog `material3Adaptive = "1.3.0"`) |
 | Exact window size in dp | `currentWindowDpSize()` (adaptive 1.2+) | same |
-| Folding features | `Posture.hingeList`, `isTabletop`, extensions `separatingVerticalHingeBounds`, `occludingVerticalHingeBounds`, `allHorizontalHingeBounds`; lower level `collectFoldingFeaturesAsState()` | `adaptive` 1.3.0; `androidx.window:window` **1.5.1** only if `FoldingFeature.state`/`occlusionType` beyond `Posture` are needed |
+| Folding features | **As built (round 1, integration):** `WindowInfoTracker.windowLayoutInfo(activity)` -> `FoldingFeature` (orientation, `isSeparating`, `occlusionType`, bounds) mapped to `LayoutInputs` by `nav/FoldSpec.kt`; window size from `WindowMetricsCalculator.computeCurrentWindowMetrics` on every configuration change | `androidx.window:window` **1.5.1** (latest stable on Google Maven, 2026-11-25; the adaptive artifact is not used) |
 | List-detail | `NavigableListDetailPaneScaffold`, `rememberListDetailPaneScaffoldNavigator<NightKey/MetricKey>()`, `AnimatedPane`, `calculatePaneScaffoldDirective(adaptiveInfo)` (customised, section 3.3) | `adaptive-layout`, `adaptive-navigation` **1.3.0** |
 | Supporting pane (Large/XL only) | `NavigableSupportingPaneScaffold` | same |
 | Navigation shell | **Custom** `NbNavigationShell` (glass floating bar / floating rail). Decision logic follows `NavigationSuiteScaffold` rules with two documented deviations (section 4). `NavigationSuiteScaffold` itself is not used: its bar and rail are edge-docked M3 components and the component override API was removed in 1.4.0-alpha01 | `material3-adaptive-navigation-suite` **1.5.0** used only for `NavigationSuiteType` constants and as a behavioural reference, or not at all |
@@ -118,7 +118,7 @@ current display. How TENT appears to apps (outer or inner display, which `Foldin
 |---|---|---|---|---|
 | 1 | `Glance` | `min(w, h) < 320` or (`w < 400` and `h < 480`) | none; "More" button opens a glass sheet with sections | 1, glance content |
 | 2 | `Tabletop` | separating horizontal fold and `h >= 480` | floating bottom bar in the lower half | top half: view, bottom half: controls |
-| 3 | `Book` | separating vertical fold and `w >= 600` | rail if the start pane keeps >= 360 dp next to it, else floating bar inside the start pane | 2, split exactly at the fold |
+| 3 | `Book` | separating vertical fold and `w >= 600` | floating rail, icons only (labels as content description and tooltip; review round 1, integration) | 2, split exactly at the fold |
 | 4 | `CompactShort` | `w < 600` and `h < 480` | floating bar, hides on scroll down | 1 |
 | 5 | `Compact` | `w < 600` | floating bottom bar | 1 |
 | 6 | `WideShort` | `w >= 600` and `h < 480` | floating rail (icons only) | 1 or 2 (side by side, no vertical stacking) |
@@ -169,7 +169,7 @@ appear on the owner's phone in Book posture (forced by the hinge) and on any win
 Three top-level sections: **Last night** (Home, `nav_home`), **History**, **Settings**. Metric detail and Night detail are child
 destinations. Onboarding is outside the shell (no navigation shown).
 
-### 4.1 Floating bottom bar (Compact, CompactShort, Tabletop, Book with narrow start pane)
+### 4.1 Floating bottom bar (Compact, CompactShort, Tabletop)
 
 Measured on the owner's outer screen (system apps, 1 dp = 2.3625 px, font scale 1.35) **[verified: UI dumps]**:
 floating pill 237 x 77 dp (2 items) and 327 x 56 dp (3 items), centered, bottom edge 16-22 dp above the screen bottom;
@@ -184,22 +184,24 @@ icons 24-33 dp; item hit areas 70-97 x 48-66 dp; the bar's hosting area is 88-12
 | Item | icon 24 dp + label, hit area >= 48 x 48 dp; selected item: solid tinted capsule behind icon + label (shape and weight carry selection, not color alone) |
 | Content padding | scrolling content gets bottom padding = bar height + offset + 16 dp, so the last row can scroll above the bar |
 | Behaviour | always visible in `Compact`; in `CompactShort` slides away on scroll down and returns on scroll up or when focus/TalkBack moves to it |
-| Fold rule | the bar is never centered across a vertical fold: in `Book` it is centered in the start pane |
+| Fold rule | the bar is never centered across a vertical fold (`Book` uses the rail, 4.2) |
 
-### 4.2 Floating rail (Medium, Expanded, WideShort, Book with wide start pane)
+### 4.2 Floating rail (Medium, Expanded, WideShort, Book)
 
 | Property | Value |
 |---|---|
 | Shape | vertical pill, 72 dp wide, `material.glass.rail` (fallback `material.solid.bar`), same rim as the bar |
 | Position | start edge + 12 dp (plus start system inset / cutout), vertically centered in the area below the top bar |
-| Items | icon + label below (medium, expanded; labels wrap to 2 lines at large font and the rail grows, scrolling if taller than the window); `WideShort`: icon only, label in tooltip and content description |
+| Items | icon + label below (medium, expanded; labels wrap to 2 lines at large font and the rail grows, scrolling if taller than the window); `WideShort` and `Book`: icon only, label in tooltip and content description (a labelled rail grows with its labels, about 94 dp at font 1.0 and more at 2.0, and would leave the book start half too narrow for the list) |
 | Large / XL | widens to a labelled pill (icon + label side by side, about 180 dp), same position |
 | Content | panes start after `railArea` (96 dp); content never scrolls under the rail |
 
 **Deviations from `NavigationSuiteScaffold` defaults** (which choose a bottom bar when *width or height* is compact):
 1. `WideShort` (phone landscape, e.g. 915 x 412 dp) uses the rail: a bottom bar would take about 25 % of a 412 dp
    height; a rail takes about 10 % of the width.
-2. `Book` keeps the bar inside the start pane when a rail would leave the start pane under 360 dp.
+2. `Book` always uses the (icon) rail. Round 1 (integration) replaced "bar inside the start pane when the rail would
+   leave it under 360 dp": on the owner's 692 dp inner screen that rule put a phone-style bar under a 346 dp half and
+   left the end pane without navigation.
 `Tabletop` matches the default (bar).
 
 ### 4.3 Top bar
@@ -301,8 +303,11 @@ If the two-pane rule fails (large font), it renders the Medium layout.
 ```
 
 **Large (1200-1599)** - as Expanded plus a **supporting pane** (320) at the end: "Recent nights" list (last 14
-nights with marks, tap opens History at that night). Detail pane chart capped at 840; extra width goes to margins
-around the detail pane.
+nights with marks, tap opens History at that night), shown only when the detail pane keeps its 360 dp minimum next
+to it: list 360 + detail 360 + supporting 320 + 2 x 24 spacer + 2 x 32 gutter + the labelled rail area (about 204 dp)
+need about 1360 dp, so the pane appears from about 1400 dp wide; on a 1280 dp tablet in landscape Home is list +
+detail (review round 1, integration: the rail plus three panes do not fit 1280 dp without squeezing the detail pane
+below its minimum). Detail pane chart capped at 840; extra width goes to margins around the detail pane.
 
 **ExtraLarge (>= 1600)** - same three panes; the whole layout is centered with max width 1600; outer space is plain
 background (no stretched cards).
@@ -329,8 +334,8 @@ fold area plus 12 dp above and below stays empty.
 +------------------------------------------+
 ```
 
-**Book (vertical separating fold)** - start half: summary + metric list (+ floating bar centered in this half if the
-rail would leave < 360 dp); end half: Metric detail of the selected metric. Pane boundary = fold; 12 dp clearance on
+**Book (vertical separating fold)** - start half: summary + metric list next to the icon rail; end half: Metric detail
+of the selected metric. In the narrow start half the summary card stacks its glyph above the text (below 300 dp). Pane boundary = fold; 12 dp clearance on
 both sides of the hinge.
 ```
 +---------------------++---------------------+
@@ -531,8 +536,9 @@ per `large-screens.md` section 7. No vendor cover-screen widget metadata.
    readable), but **controls must not straddle it**: centered small controls (period selector, segmented
    List/Calendar, the floating bar, dialog buttons) are start-aligned or split so that their bounds do not intersect
    the fold +- 12 dp. Implemented with a `Modifier.avoidFold()` that offsets a control to the nearer side.
-4. **Tabletop**: top half = view only (no interactive element), bottom half = all controls, scrolling lists and the
-   floating bar. Sheets stay in the bottom half. Dialogs: in the bottom half, max height = half minus 24 dp.
+4. **Tabletop**: top half = view only (no interactive element) and never scrolls (from font scale 1.5 Home and Night
+   detail show the compact summary there: glyph, night label, headline), bottom half = all controls, scrolling lists
+   and the floating bar. Sheets stay in the bottom half. Dialogs: in the bottom half, max height = half minus 24 dp.
 5. **Book**: start half = navigation/list, end half = detail. Dialogs in the end half.
 6. Posture changes animate panes with the standard pane motion; with "remove animations" they switch instantly.
 
@@ -550,7 +556,7 @@ per `large-screens.md` section 7. No vendor cover-screen widget metadata.
 | Freeform tiny window | 220-400 x 220-480 | Glance | min window 220 x 220 dp declared; content scrolls, nothing clips |
 | Freeform resizing | continuous | any | layout recomputed on every size; state kept (section 8); no reload, no flicker |
 | Tablet portrait | 800 x 1280 | Medium, height expanded | 2-column metric grid, taller chart; History single pane with reflow; Settings centered column |
-| Tablet landscape | 1280 x 800 | Large | list-detail + supporting pane |
+| Tablet landscape | 1280 x 800 | Large | list-detail (the supporting pane needs about 1400 dp, 5.1) |
 | Small tablet landscape | 1024 x 640 | Expanded | list-detail |
 | Desktop / Chromebook | 1600 x 900 | ExtraLarge | centered 1600, mouse + keyboard first-class |
 | Phone landscape | 915 x 412 | WideShort | rail (deviation 1, section 4.2) |

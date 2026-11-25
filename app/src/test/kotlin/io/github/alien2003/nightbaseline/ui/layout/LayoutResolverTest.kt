@@ -49,7 +49,7 @@ class LayoutResolverTest {
         assertEquals(NavigationKind.RailIcons, resolveLayout(LayoutInputs(915f, 412f)).navigation)
         assertEquals(NavigationKind.RailLabelled, resolveLayout(LayoutInputs(1280f, 800f)).navigation)
         assertEquals(NavigationKind.None, resolveLayout(LayoutInputs(340f, 352f)).navigation)
-        // Book with a 346 dp start pane keeps the bar inside the start pane (rail would leave < 360 dp).
-        assertEquals(NavigationKind.Bar, resolveLayout(LayoutInputs(692f, 763f, verticalFold = FoldInfo(346f, true))).navigation)
+        // Book always shows the (icon) rail, also on the owner's 692 dp inner screen (review round 1, integration).
+        assertEquals(NavigationKind.RailIcons, resolveLayout(LayoutInputs(692f, 763f, verticalFold = FoldInfo(346f, true))).navigation)
     }
 }

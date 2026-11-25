@@ -2,6 +2,7 @@ package io.github.alien2003.nightbaseline.ui.components
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -24,6 +25,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
@@ -52,7 +54,6 @@ fun NbCard(
     Column(
         modifier =
             modifier
-                .widthIn(max = NbDimens.textMax)
                 .solidCard(shape)
                 .padding(NbDimens.cardPadding),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s4),
@@ -75,6 +76,7 @@ fun NightSummaryCard(
     action: String? = null,
     onAction: () -> Unit = {},
     showLabel: Boolean = true,
+    maxWidth: Dp = NbDimens.textMax,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
@@ -82,30 +84,47 @@ fun NightSummaryCard(
     val title = text.nightTitle(night, source)
     val body = text.nightBody(night, source)
     val description = text.string(R.string.a11y_summary, label, title, body)
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .widthIn(max = NbDimens.textMax)
-                .solidCard(NbShapes.xl)
-                .padding(NbSpace.s6),
-        horizontalArrangement = Arrangement.spacedBy(NbSpace.s5),
+    BoxWithConstraints(
+        Modifier
+            .widthIn(max = maxWidth)
+            .then(modifier)
+            .fillMaxWidth()
+            .solidCard(NbShapes.xl)
+            .padding(NbSpace.s6),
     ) {
-        NightGlyphBadge(night.state.glyph, night.state.tone, Modifier.clearAndSetSemantics {})
-        Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s2), modifier = Modifier.weight(1f)) {
-            Column(
-                Modifier.clearAndSetSemantics { contentDescription = description },
-                verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
-            ) {
-                if (showLabel) Text(label, style = NbTheme.typography.labelSmall, color = colors.textSecondary)
-                Text(title, style = NbTheme.typography.headline, color = colors.textPrimary)
-                Text(body, style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+        // In narrow panes (a book half next to the rail) the glyph goes above the text, so the headline keeps
+        // whole words on its lines.
+        val stacked = this.maxWidth < SUMMARY_STACK_BELOW
+        val content: @Composable (Modifier) -> Unit = { textModifier ->
+            Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s2), modifier = textModifier) {
+                Column(
+                    Modifier.clearAndSetSemantics { contentDescription = description },
+                    verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
+                ) {
+                    if (showLabel) Text(label, style = NbTheme.typography.labelSmall, color = colors.textSecondary)
+                    Text(title, style = NbTheme.typography.headline, color = colors.textPrimary)
+                    Text(body, style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+                }
+                // Pulled back by the button's inner padding so its label lines up with the body text.
+                action?.let { NbTextButton(it, onClick = onAction, modifier = Modifier.offset(x = -NbSpace.s4)) }
             }
-            // Pulled back by the button's inner padding so its label lines up with the body text.
-            action?.let { NbTextButton(it, onClick = onAction, modifier = Modifier.offset(x = -NbSpace.s4)) }
+        }
+        if (stacked) {
+            Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s4)) {
+                NightGlyphBadge(night.state.glyph, night.state.tone, Modifier.clearAndSetSemantics {})
+                content(Modifier)
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(NbSpace.s5)) {
+                NightGlyphBadge(night.state.glyph, night.state.tone, Modifier.clearAndSetSemantics {})
+                content(Modifier.weight(1f))
+            }
         }
     }
 }
+
+/** Below this inner width the summary card stacks its glyph above the text. */
+private val SUMMARY_STACK_BELOW = 300.dp
 
 /**
  * One metric of one night (`screens.md` 4): name, last night's value + unit as the largest text, the [RangeBand],
@@ -127,6 +146,7 @@ fun MetricRangeTile(
     selected: Boolean = false,
     forced: ForcedInteraction? = null,
     explain: Boolean = false,
+    maxWidth: Dp = NbDimens.textMax,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
@@ -135,9 +155,10 @@ fun MetricRangeTile(
     val shape = NbShapes.l
     Column(
         modifier =
-            modifier
+            Modifier
+                .widthIn(max = maxWidth)
+                .then(modifier)
                 .fillMaxWidth()
-                .widthIn(max = NbDimens.textMax)
                 .sizeIn(minHeight = NbDimens.targetMin)
                 .solidCard(shape)
                 .then(if (selected) Modifier.border(2.dp, colors.primary, shape) else Modifier)

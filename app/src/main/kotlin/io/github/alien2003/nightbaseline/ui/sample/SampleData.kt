@@ -65,6 +65,15 @@ object SampleData {
 
     private val summaries: List<NightSummary> by lazy { generated.map { it.first } }
 
+    /**
+     * Every generated night as core-algo summary and evaluation, oldest first: what the daily work would store. The
+     * integrated screenshots and the navigation tests fill fake repositories with it (synthetic, never real data).
+     */
+    val evaluated: List<Pair<NightSummary, NightEvaluation>> get() = generated
+
+    /** The zone of the synthetic person (UTC+3). */
+    val ZONE: ZoneOffset get() = zone
+
     /** Every evaluated sample night, oldest first. */
     val nights: List<NightUi> by lazy {
         generated.map { (summary, evaluation) -> NightUiMapper.night(summary, evaluation, params, summaries, zone = zone) }

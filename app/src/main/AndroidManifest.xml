@@ -6,6 +6,10 @@
     <uses-permission
         android:name="android.permission.INTERNET"
         tools:node="remove" />
+    <!-- WorkManager declares it for network constraints; the night check has none (one local read a day). -->
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
 
     <!-- Health Connect: READ only. No WRITE permission is declared, so the app cannot change any health data. -->
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
@@ -57,6 +61,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            WorkManager is configured by NightBaselineApp (Configuration.Provider with HiltWorkerFactory), so its
+            default initializer is removed; androidx.startup stays for the other libraries.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
         <!-- Health Connect shows this privacy rationale from its permission screen (Android 13 and below). -->
         <activity

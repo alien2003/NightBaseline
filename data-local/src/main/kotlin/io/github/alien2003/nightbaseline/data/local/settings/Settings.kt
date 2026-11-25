@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.alien2003.nightbaseline.algo.AlgoParams
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +40,18 @@ enum class GlassMode {
     OFF,
 }
 
+/** Settings > Appearance > Theme. */
+enum class ThemeMode {
+    /** Follow the system. */
+    SYSTEM,
+
+    /** Always light. */
+    LIGHT,
+
+    /** Always dark. */
+    DARK,
+}
+
 /** The user's settings. */
 data class AppSettings(
     /** Package of the Health Connect source app the nights are read from. */
@@ -51,6 +64,14 @@ data class AppSettings(
     val onboardingDone: Boolean = false,
     /** Glass surfaces. */
     val glassMode: GlassMode = GlassMode.AUTO,
+    /** Whether data-access problems ("Problems reading data") may be notified. */
+    val problemNotificationsEnabled: Boolean = true,
+    /** Light, dark or the system theme. */
+    val theme: ThemeMode = ThemeMode.SYSTEM,
+    /** When the "notifications are off" banner was dismissed, epoch ms (it stays hidden for 30 days). */
+    val notificationBannerDismissedAtMs: Long? = null,
+    /** The one-time "your usual range is ready" banner was dismissed. */
+    val rangeReadySeen: Boolean = false,
 ) {
     /** Algorithm parameters for these settings: [base] with the sensitivity's z threshold. */
     fun algoParams(base: AlgoParams = AlgoParams()): AlgoParams = base.copy(zThreshold = sensitivity.zThreshold)
@@ -81,6 +102,18 @@ interface SettingsRepository {
 
     /** Sets [AppSettings.glassMode]. */
     suspend fun setGlassMode(mode: GlassMode)
+
+    /** Sets [AppSettings.problemNotificationsEnabled]. */
+    suspend fun setProblemNotificationsEnabled(enabled: Boolean)
+
+    /** Sets [AppSettings.theme]. */
+    suspend fun setTheme(mode: ThemeMode)
+
+    /** Sets [AppSettings.notificationBannerDismissedAtMs]. */
+    suspend fun setNotificationBannerDismissedAt(timeMs: Long?)
+
+    /** Sets [AppSettings.rangeReadySeen]. */
+    suspend fun setRangeReadySeen(seen: Boolean)
 }
 
 /**
@@ -120,6 +153,22 @@ class DataStoreSettingsRepository
             store.edit { it[Keys.GLASS] = mode.name }
         }
 
+        override suspend fun setProblemNotificationsEnabled(enabled: Boolean) {
+            store.edit { it[Keys.PROBLEM_NOTIFICATIONS] = enabled }
+        }
+
+        override suspend fun setTheme(mode: ThemeMode) {
+            store.edit { it[Keys.THEME] = mode.name }
+        }
+
+        override suspend fun setNotificationBannerDismissedAt(timeMs: Long?) {
+            store.edit { if (timeMs == null) it.remove(Keys.NOTIF_BANNER_DISMISSED) else it[Keys.NOTIF_BANNER_DISMISSED] = timeMs }
+        }
+
+        override suspend fun setRangeReadySeen(seen: Boolean) {
+            store.edit { it[Keys.RANGE_READY_SEEN] = seen }
+        }
+
         private fun read(p: Preferences): AppSettings {
             val defaults = AppSettings()
             return AppSettings(
@@ -128,6 +177,10 @@ class DataStoreSettingsRepository
                 sensitivity = SensitivityLevel.entries.firstOrNull { it.name == p[Keys.SENSITIVITY] } ?: defaults.sensitivity,
                 onboardingDone = p[Keys.ONBOARDING] ?: defaults.onboardingDone,
                 glassMode = GlassMode.entries.firstOrNull { it.name == p[Keys.GLASS] } ?: defaults.glassMode,
+                problemNotificationsEnabled = p[Keys.PROBLEM_NOTIFICATIONS] ?: defaults.problemNotificationsEnabled,
+                theme = ThemeMode.entries.firstOrNull { it.name == p[Keys.THEME] } ?: defaults.theme,
+                notificationBannerDismissedAtMs = p[Keys.NOTIF_BANNER_DISMISSED],
+                rangeReadySeen = p[Keys.RANGE_READY_SEEN] ?: defaults.rangeReadySeen,
             )
         }
 
@@ -137,6 +190,10 @@ class DataStoreSettingsRepository
             val SENSITIVITY = stringPreferencesKey("sensitivity")
             val ONBOARDING = booleanPreferencesKey("onboarding_done")
             val GLASS = stringPreferencesKey("glass_mode")
+            val PROBLEM_NOTIFICATIONS = booleanPreferencesKey("problem_notifications_enabled")
+            val THEME = stringPreferencesKey("theme")
+            val NOTIF_BANNER_DISMISSED = longPreferencesKey("notification_banner_dismissed_at")
+            val RANGE_READY_SEEN = booleanPreferencesKey("range_ready_seen")
         }
 
         /** Constants. */

@@ -11,4 +11,10 @@
         <item quantity="many">Обычные диапазоны рассчитаны по %1$s ночам до этой.</item>
         <item quantity="other">Обычные диапазоны рассчитаны по %1$s ночи до этой.</item>
     </plurals>
+    <plurals name="home_strip_title_n">
+        <item quantity="one">Последняя %1$s ночь</item>
+        <item quantity="few">Последние %1$s ночи</item>
+        <item quantity="many">Последние %1$s ночей</item>
+        <item quantity="other">Последние %1$s ночи</item>
+    </plurals>
 </resources>

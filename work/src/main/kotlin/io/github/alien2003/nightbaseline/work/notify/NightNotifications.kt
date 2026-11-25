@@ -326,8 +326,11 @@ class AndroidProblemNotifier
         }
     }
 
-/** Lazily created channels (an importance cannot be raised later, so each starts at its final level). */
-internal object Channels {
+/**
+ * The notification channels, created lazily by the notifiers and once by the app on start (an importance cannot be
+ * raised later, so each starts at its final level).
+ */
+object Channels {
     /** Creates both channels if missing. */
     fun ensure(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return

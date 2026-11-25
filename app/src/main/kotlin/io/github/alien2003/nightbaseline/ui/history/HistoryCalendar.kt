@@ -1,6 +1,7 @@
 package io.github.alien2003.nightbaseline.ui.history
 
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -108,6 +110,8 @@ fun HistoryCalendar(
     }
     BoxWithConstraints(modifier.fillMaxWidth().widthIn(max = CALENDAR_MAX)) {
         val transposed = maxWidth < NbDimens.targetMin * DAYS + CELL_GAP * (DAYS - 1)
+        // Narrower still (a book half next to the rail): the weeks scroll sideways, cells keep 48 dp.
+        val fits = maxWidth >= WEEKDAY_COLUMN + (NbDimens.targetMin + CELL_GAP) * MAX_WEEKS
         Column(
             Modifier
                 .fillMaxWidth()
@@ -148,7 +152,7 @@ fun HistoryCalendar(
                 }
             }
             if (transposed) {
-                TransposedGrid(weeks, firstDay, cell)
+                TransposedGrid(weeks, firstDay, cell, scrolls = !fits)
             } else {
                 WeekGrid(weeks, firstDay, cell)
             }
@@ -243,10 +247,13 @@ private fun TransposedGrid(
     weeks: List<List<LocalDate?>>,
     firstDay: DayOfWeek,
     cell: @Composable (LocalDate?, Int, Int, Modifier) -> Unit,
+    scrolls: Boolean = false,
 ) {
     val text = rememberUiText()
     Column(
-        Modifier.semantics { collectionInfo = CollectionInfo(DAYS, weeks.size) },
+        Modifier
+            .then(if (scrolls) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
+            .semantics { collectionInfo = CollectionInfo(DAYS, weeks.size) },
         verticalArrangement = Arrangement.spacedBy(CELL_GAP),
     ) {
         repeat(DAYS) { d ->
@@ -255,7 +262,9 @@ private fun TransposedGrid(
                     text.weekdayLetter(anyDate(firstDay.plus(d.toLong()))),
                     Modifier.width(WEEKDAY_COLUMN).clearAndSetSemantics {},
                 )
-                weeks.forEachIndexed { w, week -> cell(week[d], d, w, Modifier.weight(1f)) }
+                weeks.forEachIndexed { w, week ->
+                    cell(week[d], d, w, if (scrolls) Modifier.width(NbDimens.targetMin) else Modifier.weight(1f))
+                }
             }
         }
     }
@@ -383,6 +392,9 @@ private const val DAYS = 7
 private const val MAX_SEARCH_STEPS = 62
 private const val SWIPE_DP = 64
 private val CELL_GAP = 2.dp
+
+/** Weeks a month can touch (columns of the transposed grid). */
+private const val MAX_WEEKS = 6
 
 /** Cells grow to 64 dp at most (`layouts.md` 5.3: 48-64 dp); wider panes center the grid. */
 private val CALENDAR_MAX = 64.dp * DAYS + CELL_GAP * (DAYS - 1)

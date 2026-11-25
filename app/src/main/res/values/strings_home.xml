@@ -13,4 +13,9 @@
         <item quantity="one">Usual ranges use the %1$s night before this one.</item>
         <item quantity="other">Usual ranges use the %1$s nights before this one.</item>
     </plurals>
+    <!-- History strip title while fewer than 7 nights are stored (learning): "Last {n} nights". -->
+    <plurals name="home_strip_title_n">
+        <item quantity="one">Last night</item>
+        <item quantity="other">Last %1$s nights</item>
+    </plurals>
 </resources>

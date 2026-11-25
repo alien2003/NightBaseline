@@ -60,57 +60,6 @@ import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import java.time.LocalDate
 
 /**
- * The Metric detail of the two-pane Home (`screens.md` 7.3, short form): header card with the value, status and the
- * state sentence, the period selector, the chart with its text summary and the stats row. Period and chart selection
- * are hoisted.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-internal fun MetricDetailPane(
-    metric: MetricUi,
-    series: MetricSeriesUi?,
-    source: String,
-    period: ChartPeriod,
-    selection: Int?,
-    onPeriod: (ChartPeriod) -> Unit,
-    onSelect: (Int?) -> Unit,
-) {
-    val text = rememberUiText()
-    val colors = NbTheme.colors
-    NbCard(Modifier.widthIn(max = NbDimens.chartMax).fillMaxWidth()) {
-        Text(
-            text.name(metric.metric),
-            style = NbTheme.typography.title,
-            color = colors.textPrimary,
-            modifier = Modifier.semantics { heading() },
-        )
-        val value = text.value(metric)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-            Text(
-                value?.number ?: DASH,
-                style = NbTheme.typography.numericDisplay,
-                color = if (value == null) colors.textSecondary else colors.textPrimary,
-                modifier = Modifier.alignByBaseline(),
-            )
-            value?.unit?.let {
-                Text(it, style = NbTheme.typography.unit, color = colors.textSecondary, modifier = Modifier.alignByBaseline())
-            }
-        }
-        if (metric.state != MetricState.NotProvided && metric.state != MetricState.AccessOff) {
-            RangeBand(metric.range, metric.value, metric.state)
-        }
-        StatusChip(text.status(metric, source), metric.state.glyph, metric.state.tone)
-        Text(text.detail(metric, source), style = NbTheme.typography.body, color = colors.textSecondary)
-    }
-    if (series != null && metric.state != MetricState.NotProvided) {
-        PeriodSelector(period, onSelect = onPeriod)
-        val shown = series.copy(points = series.points.takeLast(period.nights))
-        TrendChart(shown, source, selected = selection, onSelect = onSelect, modifier = Modifier.widthIn(max = NbDimens.chartMax))
-        StatsRow(shown, Modifier.widthIn(max = NbDimens.chartMax))
-    }
-}
-
-/**
  * The supporting pane of Large and ExtraLarge Home (`layouts.md` 5.1): "Recent nights", the last 14 nights newest
  * first as History rows; a row opens that night.
  */

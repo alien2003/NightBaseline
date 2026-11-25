@@ -66,6 +66,9 @@ data class HomeState(
         /** States 1-4 except `E-HC-NONE` (nothing is stored there), plus `E-SYNC`. */
         val LAST_RESULT_STATES: Set<NightState> =
             setOf(NightState.HealthConnectUpdate, NightState.Permission, NightState.SourceGone, NightState.NotSynced)
+
+        /** Nights in the history strip. */
+        const val STRIP: Int = 7
     }
 }
 
