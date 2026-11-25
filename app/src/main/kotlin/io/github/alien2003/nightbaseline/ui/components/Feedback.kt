@@ -265,6 +265,7 @@ fun InlineBanner(
     modifier: Modifier = Modifier,
     onAction: () -> Unit = {},
     onDismiss: (() -> Unit)? = null,
+    quietDays: Int = 3,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
@@ -288,7 +289,7 @@ fun InlineBanner(
             }
         }
         Column(Modifier.weight(1f).padding(vertical = NbSpace.s4), verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-            Text(text.banner(kind, source), style = NbTheme.typography.bodySmall, color = colors.textPrimary)
+            Text(text.banner(kind, source, quietDays), style = NbTheme.typography.bodySmall, color = colors.textPrimary)
             text.bannerAction(kind)?.let { label ->
                 NbTextButton(label, onClick = onAction, modifier = Modifier.padding(top = NbSpace.s1))
             }

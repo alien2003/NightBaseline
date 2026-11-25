@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home and Night detail copy that is not in docs/design/states.md yet (same rules as strings.xml: positional
+  pre-formatted arguments, the same %n$s in values-ru/strings_home.xml, calm wording).
+-->
+<resources>
+    <!-- Large / ExtraLarge Home: the supporting pane with the last 14 nights (layouts.md 5.1). -->
+    <string name="home_recent_nights">Recent nights</string>
+    <!-- Night detail: heading above the metric tiles. -->
+    <string name="night_measurements">Measurements</string>
+    <!-- Night detail: how many nights the usual ranges of this night use ({w}). -->
+    <plurals name="night_range_window">
+        <item quantity="one">Usual ranges use the %1$s night before this one.</item>
+        <item quantity="other">Usual ranges use the %1$s nights before this one.</item>
+    </plurals>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Russian copy of values/strings_home.xml, key by key, with the same positional arguments.
+-->
+<resources>
+    <string name="home_recent_nights">Недавние ночи</string>
+    <string name="night_measurements">Показатели</string>
+    <plurals name="night_range_window">
+        <item quantity="one">Обычные диапазоны рассчитаны по %1$s ночи до этой.</item>
+        <item quantity="few">Обычные диапазоны рассчитаны по %1$s ночам до этой.</item>
+        <item quantity="many">Обычные диапазоны рассчитаны по %1$s ночам до этой.</item>
+        <item quantity="other">Обычные диапазоны рассчитаны по %1$s ночи до этой.</item>
+    </plurals>
+</resources>
