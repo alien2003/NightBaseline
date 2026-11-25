@@ -464,7 +464,7 @@ Purpose: every component in both themes and all states on one screen, and the so
 ## 8. Chart accessibility: text summary pattern
 
 Every chart has a visible `ChartSummary` and uses the same text as its content description. The pattern (string
-keys in `states.md` 7.1; Russian in `docs/design/res/values-ru/strings.xml`):
+keys in `states.md` 7.1; Russian in `app/src/main/res/values-ru/strings.xml`):
 
 ```
 {metric}, last {N} nights.                                      chart_summary_header

@@ -28,6 +28,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "NightBaseline"
 
+include(":app")
 include(":core-algo")
 include(":algo-cli")
 include(":data-local")

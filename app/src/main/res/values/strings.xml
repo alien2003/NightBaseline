@@ -1,0 +1,405 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  English copy of every key in docs/design/states.md and docs/design/screens.md. Arguments are positional and
+  always pre-formatted strings (numbers are formatted per locale in code); the same %n$s means the same value in
+  values-ru. Tone: calm, no diagnoses, never "Vitals".
+-->
+<resources>
+    <!-- Navigation -->
+    <string name="nav_home">Last night</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+    <string name="home_title">Last night</string>
+    <string name="home_last_result_heading">Last result: %1$s</string>
+    <string name="home_not_recorded_row">Not recorded by %1$s: %2$s</string>
+    <!-- {range}: the night's dates ("Nov 24–25"); {end_date}: the wake date ("Nov 25"). en shows the range, ru the wake date. -->
+    <string name="night_label">Night of %1$s</string>
+
+    <!-- Metrics -->
+    <string name="metric_sleeping_hr">Sleeping heart rate</string>
+    <string name="metric_sleeping_hr_short">Heart rate</string>
+    <string name="metric_respiratory_rate">Respiratory rate</string>
+    <string name="metric_respiratory_rate_short">Breathing</string>
+    <string name="metric_spo2">Blood oxygen (SpO2)</string>
+    <string name="metric_spo2_short">SpO2</string>
+    <string name="metric_sleep_duration">Sleep duration</string>
+    <string name="metric_sleep_duration_short">Sleep</string>
+    <string name="metric_hrv">Heart rate variability (HRV)</string>
+    <string name="metric_hrv_short">HRV</string>
+    <string name="metric_skin_temperature">Skin temperature</string>
+    <string name="metric_skin_temperature_short">Skin temp.</string>
+
+    <!-- Units -->
+    <string name="unit_bpm">bpm</string>
+    <string name="unit_breaths_per_min">breaths/min</string>
+    <string name="unit_percent">%</string>
+    <string name="unit_ms">ms</string>
+    <string name="unit_celsius">°C</string>
+    <string name="unit_fahrenheit">°F</string>
+    <string name="unit_hours_minutes">%1$s h %2$s min</string>
+
+    <!-- Night states -->
+    <string name="state_loading_body">Reading your nights from Health Connect…</string>
+    <string name="state_l0_title">Learning starts tonight</string>
+    <string name="state_l0_body">Sleep with your device as usual. NightBaseline needs 7 nights with sleep data to learn your usual range.</string>
+    <string name="state_learning_title">Learning your usual range</string>
+    <string name="learning_progress">%1$s of 7 nights</string>
+    <plurals name="state_learning_body">
+        <item quantity="one">%1$s more night with sleep data and NightBaseline starts comparing.</item>
+        <item quantity="other">%1$s more nights with sleep data and NightBaseline starts comparing.</item>
+    </plurals>
+    <string name="state_learning_short_note">Last night was under 3 hours, so it didn\'t count.</string>
+    <string name="state_all_title">All within your usual range</string>
+    <plurals name="state_all_body">
+        <item quantity="one">%1$s measurement compared with your last %2$s nights.</item>
+        <item quantity="other">%1$s measurements compared with your last %2$s nights.</item>
+    </plurals>
+    <string name="state_some_title_one">%1$s moved outside your usual range</string>
+    <plurals name="state_some_title_many">
+        <item quantity="one">%1$s measurement moved outside your usual range</item>
+        <item quantity="other">%1$s measurements moved outside your usual range</item>
+    </plurals>
+    <string name="state_some_body">One measurement on its own often moves. NightBaseline shows it here without a notification.</string>
+    <string name="state_some_body_many">Fewer than %1$s moved, so no notification was sent.</string>
+    <plurals name="state_dev_title">
+        <item quantity="one">%1$s measurement moved outside your usual range</item>
+        <item quantity="other">%1$s measurements moved outside your usual range</item>
+    </plurals>
+    <string name="state_dev_body">%1$s. This is a change compared with your own recent nights, not a diagnosis. A late night, alcohol, travel, hard training or a cold can all do this.</string>
+    <string name="state_source_gone_title">%1$s is no longer on this phone</string>
+    <string name="state_source_gone_body">Choose another app that writes sleep data to Health Connect. Your earlier results stay here.</string>
+    <string name="state_sync_title">%1$s hasn\'t sent last night yet</string>
+    <string name="state_sync_body">Open %1$s so it can sync with Health Connect. NightBaseline checks again on its own.</string>
+    <string name="state_nodata_title">No sleep recorded last night</string>
+    <string name="state_nodata_body">%1$s has no sleep session that ended last night or this morning. Nights without the device are simply skipped.</string>
+    <string name="state_short_title">Short night</string>
+    <string name="state_short_body">%1$s recorded %2$s of sleep. Nights under 3 hours aren\'t compared and don\'t change your usual range.</string>
+    <string name="state_noteval_title">Too few readings last night</string>
+    <string name="state_noteval_body">%1$s recorded your sleep but too few measurements during it to compare. This can happen when the device sits loosely or its battery runs out.</string>
+    <string name="state_perm_title">NightBaseline can\'t read your sleep data</string>
+    <string name="state_perm_body">Health Connect access was turned off. Your earlier results are still here. Turn access back on to continue.</string>
+    <string name="state_hc_update_title">Health Connect needs an update</string>
+    <string name="state_hc_update_body">NightBaseline reads your nights through Health Connect. Install or update it, then come back.</string>
+    <string name="state_hc_none_title">Health Connect isn\'t available here</string>
+    <string name="state_hc_none_body">NightBaseline needs Health Connect, which this phone or profile doesn\'t support. Nothing is read or stored.</string>
+
+    <!-- Actions -->
+    <string name="action_how_it_works">How it works</string>
+    <string name="action_see_metric">See %1$s</string>
+    <string name="action_what_it_means">What this means</string>
+    <string name="action_open_source">Open %1$s</string>
+    <string name="action_check_now">Check now</string>
+    <string name="action_check_again">Check again</string>
+    <string name="action_see_history">See history</string>
+    <string name="action_open_hc_permissions">Turn on access</string>
+    <string name="action_open_hc">Open Health Connect</string>
+    <string name="action_open_store">Install or update</string>
+    <string name="action_about">About NightBaseline</string>
+    <string name="action_allow">Allow</string>
+    <string name="action_choose_source">Choose source</string>
+    <string name="action_turn_on">Turn on</string>
+    <string name="action_show_all">Show all nights</string>
+    <string name="action_next">Next</string>
+    <string name="action_not_now">Not now</string>
+    <string name="action_try_again">Try again</string>
+    <string name="action_done">Done</string>
+    <string name="action_switch">Switch</string>
+    <string name="action_cancel">Cancel</string>
+
+    <!-- Banners -->
+    <string name="banner_read_failed">Health Connect didn\'t answer this morning. NightBaseline tries again later.</string>
+    <string name="banner_wait">Last night isn\'t in yet. %1$s usually syncs after you wake up.</string>
+    <string name="banner_bg">The daily check needs background access. Without it, results appear only when you open the app.</string>
+    <plurals name="banner_source_quiet">
+        <item quantity="one">No new data from %1$s for %2$s day.</item>
+        <item quantity="other">No new data from %1$s for %2$s days.</item>
+    </plurals>
+    <string name="banner_notif_off">Notifications are off. Results show up here, but you won\'t get a morning note.</string>
+    <string name="banner_range_ready">Your usual range is ready. From now on each night is compared with it.</string>
+    <string name="banner_perm_history">Access is off. New nights won\'t appear.</string>
+    <string name="banner_hc_history">Health Connect needs an update. New nights won\'t appear.</string>
+
+    <!-- Metric states -->
+    <string name="status_within">Usual</string>
+    <string name="status_higher">Higher than usual</string>
+    <string name="status_lower">Lower than usual</string>
+    <string name="status_learning">Learning, %1$s of 7</string>
+    <string name="status_no_value">No value last night</string>
+    <string name="status_partial">Partial night</string>
+    <string name="status_not_compared">Not compared</string>
+    <string name="status_not_provided">Not recorded by %1$s</string>
+    <string name="status_access_off">Access off</string>
+    <string name="detail_within">Inside your usual range.</string>
+    <string name="detail_higher">%1$s above your usual range.</string>
+    <string name="detail_lower">%1$s below your usual range.</string>
+    <string name="detail_side_ignored">Higher values of %1$s are shown but don\'t count as a change.</string>
+    <plurals name="detail_learning">
+        <item quantity="one">This measurement needs %1$s more night before it gets a range. It doesn\'t count until then.</item>
+        <item quantity="other">This measurement needs %1$s more nights before it gets a range. It doesn\'t count until then.</item>
+    </plurals>
+    <string name="detail_no_data">%1$s recorded no %2$s during your sleep last night.</string>
+    <string name="detail_too_few">Only %1$s readings during sleep; at least %2$s are needed to compare.</string>
+    <string name="detail_low_coverage">Readings covered %1$s of your sleep; at least %2$s is needed to compare.</string>
+    <string name="detail_not_compared">Short nights aren\'t compared.</string>
+    <string name="detail_not_provided_title">%1$s doesn\'t record %2$s</string>
+    <string name="detail_not_provided_body">%1$s doesn\'t send this measurement to Health Connect. If it starts, NightBaseline picks it up and learns its range automatically.</string>
+    <string name="detail_not_provided_since">No values since %1$s.</string>
+    <string name="detail_access_off">Health Connect access to %1$s is turned off.</string>
+    <string name="detail_waiting_sync">Waiting for %1$s to sync.</string>
+    <plurals name="detail_period_short">
+        <item quantity="one">Showing %1$s night. More appear as they\'re recorded.</item>
+        <item quantity="other">Showing %1$s nights. More appear as they\'re recorded.</item>
+    </plurals>
+    <string name="detail_band_changed">Your usual range shifted on %1$s.</string>
+    <string name="chart_tooltip">%1$s: %2$s, %3$s</string>
+
+    <!-- Chart summary (TalkBack and visible text) -->
+    <plurals name="chart_summary_header">
+        <item quantity="one">%1$s, last %2$s night.</item>
+        <item quantity="other">%1$s, last %2$s nights.</item>
+    </plurals>
+    <string name="chart_summary_range">Your usual range is %1$s to %2$s %3$s.</string>
+    <string name="chart_summary_last">Last night: %1$s %2$s, %3$s.</string>
+    <string name="chart_summary_outside">%1$s of %2$s nights were outside the range, most recently %3$s.</string>
+    <plurals name="chart_summary_all_inside">
+        <item quantity="one">The night was inside the range.</item>
+        <item quantity="other">All %1$s nights were inside the range.</item>
+    </plurals>
+    <string name="chart_summary_extremes">Lowest %1$s on %2$s, highest %3$s on %4$s.</string>
+    <string name="chart_summary_gaps">Nights without a value: %1$s.</string>
+
+    <!-- History -->
+    <string name="history_empty_title">Your nights will appear here</string>
+    <string name="history_empty_body">After each night with sleep data, NightBaseline adds it to this list.</string>
+    <string name="history_filter_empty">No nights moved outside your usual range in this period.</string>
+    <string name="history_status_all">All usual</string>
+    <plurals name="history_status_moved">
+        <item quantity="one">%1$s moved</item>
+        <item quantity="other">%1$s moved</item>
+    </plurals>
+    <string name="history_status_learning">Learning</string>
+    <string name="history_status_short">Short night</string>
+    <string name="history_status_ambiguous">Two long sleeps</string>
+    <string name="state_ambiguous_title">Two long sleeps on one day</string>
+    <string name="state_ambiguous_body">%1$s recorded two sleeps of 3 hours or more for this day, so it isn\'t clear which one was the night. This day isn\'t compared and doesn\'t change your usual range.</string>
+    <string name="history_status_nodata">No data</string>
+    <string name="history_status_few">Too few readings</string>
+
+    <!-- Notification channels and notifications -->
+    <string name="channel_night_results_name">Night results</string>
+    <string name="channel_night_results_desc">A note in the morning when two or more measurements move outside your usual range.</string>
+    <string name="channel_data_access_name">Problems reading data</string>
+    <string name="channel_data_access_desc">When NightBaseline can\'t read your nights, for example after access was turned off.</string>
+    <plurals name="notif_dev_title">
+        <item quantity="one">%1$s measurement moved outside your usual range</item>
+        <item quantity="other">%1$s measurements moved outside your usual range</item>
+    </plurals>
+    <string name="notif_dev_body">%1$s. %2$s.</string>
+    <plurals name="notif_list_more">
+        <item quantity="one">and %1$s more</item>
+        <item quantity="other">and %1$s more</item>
+    </plurals>
+    <string name="notif_dev_body_long">%1$s%2$sThis compares the night with your own recent nights and isn\'t a diagnosis. Not a medical device.</string>
+    <string name="notif_higher_prefix">Higher than usual: %1$s. </string>
+    <string name="notif_lower_prefix">Lower than usual: %1$s. </string>
+    <string name="notif_public_title">NightBaseline</string>
+    <string name="notif_public_body">Last night\'s result is ready.</string>
+    <string name="notif_perm_title">NightBaseline can\'t read your sleep data</string>
+    <string name="notif_perm_body">Health Connect access was turned off. Tap to turn it back on.</string>
+    <string name="notif_hc_title">Health Connect needs an update</string>
+    <string name="notif_hc_body">Tap to see how to continue.</string>
+    <plurals name="notif_quiet_title">
+        <item quantity="one">No new data from %1$s for %2$s day</item>
+        <item quantity="other">No new data from %1$s for %2$s days</item>
+    </plurals>
+    <plurals name="notif_quiet_title_public">
+        <item quantity="one">No new data from your source for %1$s day</item>
+        <item quantity="other">No new data from your source for %1$s days</item>
+    </plurals>
+    <string name="notif_quiet_body">Tap to check your source.</string>
+    <string name="notif_bg_title">The morning check needs background access</string>
+    <string name="notif_bg_body">Tap to allow it in Health Connect.</string>
+    <string name="notif_source_gone_title">%1$s is no longer on this phone</string>
+    <string name="notif_source_gone_title_public">Your source is no longer on this phone</string>
+    <string name="notif_source_gone_body">Tap to choose another source.</string>
+    <string name="notif_ready_title">Your usual range is ready</string>
+    <string name="notif_ready_body">From tonight on, each night is compared with it.</string>
+
+    <!-- Onboarding -->
+    <string name="onb_welcome_title">NightBaseline</string>
+    <string name="onb_welcome_body">Notices when your night measurements move outside your usual range.</string>
+    <string name="onb_point_daily">Reads once a day, after you wake up</string>
+    <string name="onb_point_own">Compares each night with your own recent nights</string>
+    <string name="onb_point_local">Everything stays on this phone. No internet access.</string>
+    <string name="onb_start">Get started</string>
+    <string name="onb_how_title">How it works</string>
+    <string name="onb_how_body">The first 7 nights teach NightBaseline your usual range for each measurement. After that, you get a note when two or more move outside it on the same night.</string>
+    <string name="onb_source_title">Where your nights come from</string>
+    <string name="onb_source_body">Any app that writes sleep and heart rate to Health Connect works. Pick the one your watch or ring uses.</string>
+    <string name="source_last_sync">Last sleep: %1$s</string>
+    <string name="onb_use_source">Use %1$s</string>
+    <string name="onb_nosource_title">No sleep data in Health Connect yet</string>
+    <string name="onb_nosource_body">Let your watch or ring app share sleep and heart rate with Health Connect, then check again.</string>
+    <string name="onb_perm_title">Allow reading in Health Connect</string>
+    <string name="onb_perm_body">NightBaseline only reads. It never writes, changes or shares your data.</string>
+    <string name="onb_perm_sleep">Sleep: when you slept and for how long</string>
+    <string name="onb_perm_hr">Heart rate during sleep</string>
+    <string name="onb_perm_rr">Respiratory rate</string>
+    <string name="onb_perm_spo2">Blood oxygen (SpO2)</string>
+    <string name="onb_perm_hrv">Heart rate variability, if your source records it</string>
+    <string name="onb_perm_skin">Skin temperature, if your source records it</string>
+    <string name="onb_perm_background">In the background, so the morning check runs without opening the app</string>
+    <string name="onb_perm_history">Past data, so up to 60 earlier nights can be used right away (optional)</string>
+    <string name="onb_perm_allow">Allow in Health Connect</string>
+    <string name="onb_perm_denied_title">Sleep and heart rate are needed</string>
+    <string name="onb_perm_denied_body">Without them there is nothing to compare. Other measurements are optional.</string>
+    <string name="onb_perm_partial">Some measurements are off. You can turn them on later in Settings.</string>
+    <string name="onb_notif_title">A calm note in the morning</string>
+    <string name="onb_notif_body">Only when two or more measurements move outside your usual range on the same night.</string>
+    <string name="onb_notif_allow">Allow notifications</string>
+    <plurals name="onb_ready_history_title">
+        <item quantity="one">Found %1$s past night</item>
+        <item quantity="other">Found %1$s past nights</item>
+    </plurals>
+    <string name="onb_ready_history_body">Your usual range is ready. Last night is already compared.</string>
+    <string name="onb_ready_learn_title">Learning starts tonight</string>
+    <plurals name="onb_ready_learn_body">
+        <item quantity="one">%1$s of 7 nights is already there.</item>
+        <item quantity="other">%1$s of 7 nights are already there.</item>
+    </plurals>
+
+    <!-- Settings -->
+    <string name="settings_source">Source</string>
+    <string name="settings_last_read">Last read %1$s</string>
+    <string name="settings_never_read">Not read yet</string>
+    <string name="settings_notif_blocked">Turned off in system settings</string>
+    <string name="settings_sens_preview_learning">A preview appears after the learning period.</string>
+    <string name="sens_fewer">Fewer notes</string>
+    <string name="sens_fewer_desc">Only larger changes count, and three measurements must move.</string>
+    <string name="sens_balanced">Balanced</string>
+    <string name="sens_balanced_desc">Recommended. Two measurements must move.</string>
+    <string name="sens_more">More notes</string>
+    <string name="sens_more_desc">Smaller changes count too. Two measurements must move.</string>
+    <plurals name="sens_preview">
+        <item quantity="one">With this setting, %1$s of your last %2$s nights would have sent a note.</item>
+        <item quantity="other">With this setting, %1$s of your last %2$s nights would have sent a note.</item>
+    </plurals>
+    <string name="source_change_title">Switch to %1$s?</string>
+    <string name="source_change_body">Devices measure a little differently, so NightBaseline learns your usual range again from %1$s\'s nights. Your history stays.</string>
+    <string name="settings_theme">Theme</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="settings_glass">Glass effects</string>
+    <string name="glass_auto">Automatic</string>
+    <string name="glass_off">Off</string>
+    <string name="glass_off_battery">Off now: battery saver is on</string>
+    <string name="glass_off_transparency">Off now: reduce transparency is on</string>
+    <string name="glass_off_animations">Off now: animations are off</string>
+    <string name="glass_off_unsupported">Not available on this Android version</string>
+    <string name="glass_off_device">Off on this device to keep scrolling smooth</string>
+
+    <!-- Range explainer and disclaimer -->
+    <string name="explainer_title">How your usual range works</string>
+    <string name="explainer_range">For each measurement, NightBaseline takes your last 14 to 28 nights and finds the middle value. Your usual range is that middle value plus or minus how much your nights normally vary. Unusual single nights barely move it.</string>
+    <string name="explainer_learning">It needs 7 nights to start. Nights shorter than 3 hours and nights without readings are left out.</string>
+    <string name="explainer_outside">A night counts as outside when it is clearly away from your middle value, both compared with your normal variation and by a minimum amount, so tiny changes don\'t count.</string>
+    <string name="explainer_meaning_title">What \"outside your usual range\" means</string>
+    <string name="explainer_meaning">It means a measurement was different from your own recent nights. It isn\'t a diagnosis. One measurement often moves on its own; when two or more move on the same night, NightBaseline sends a note. Late meals, alcohol, travel, hard training, a cold, new medication or how the device sits can all play a part.</string>
+    <string name="explainer_care">If you feel unwell or are worried, talk to a health professional.</string>
+    <string name="disclaimer_short">Not a medical device.</string>
+    <string name="disclaimer_full">NightBaseline is not a medical device. It doesn\'t diagnose, treat or prevent any condition and can\'t tell you whether you are ill. It only compares your night measurements with your own recent nights.</string>
+    <string name="footer_about_link">About</string>
+
+    <!-- Accessibility -->
+    <string name="a11y_tile">%1$s: %2$s. %3$s. Usual range %4$s to %5$s.</string>
+    <string name="a11y_tile_learning">%1$s: %2$s. Learning your usual range, %3$s of 7 nights.</string>
+    <string name="a11y_tile_missing">%1$s: %2$s. %3$s</string>
+    <string name="a11y_summary">%1$s. %2$s. %3$s</string>
+    <string name="a11y_history_day">%1$s: %2$s</string>
+    <string name="a11y_learning_progress">%1$s of 7 nights collected</string>
+    <string name="a11y_prev_night">Previous night</string>
+    <string name="a11y_next_night">Next night</string>
+    <string name="a11y_onb_step">Step %1$s of 6</string>
+    <string name="a11y_chart_point">%1$s: %2$s, %3$s</string>
+    <string name="chart_tooltip_no_value">%1$s: no value</string>
+    <string name="chart_tooltip_short">%1$s: short night, not compared</string>
+    <string name="onb_step">Step %1$s of 6</string>
+    <string name="a11y_history_strip">Last 7 nights: %1$s. Opens History.</string>
+    <plurals name="a11y_period">
+        <item quantity="one">%1$s night</item>
+        <item quantity="other">%1$s nights</item>
+    </plurals>
+    <string name="a11y_back">Back</string>
+    <string name="a11y_close">Close</string>
+    <string name="a11y_dismiss">Dismiss</string>
+    <string name="a11y_range_info">How the range works</string>
+    <string name="a11y_prev_month">Previous month</string>
+    <string name="a11y_next_month">Next month</string>
+
+    <!-- Other screen copy (states.md section 10) -->
+    <string name="action_more">More</string>
+    <string name="action_see_all">See all</string>
+    <string name="action_learn_more">Learn more</string>
+    <string name="action_range_info">How the range works</string>
+    <string name="action_reset">Reset</string>
+    <string name="home_strip_title">Last 7 nights</string>
+    <string name="home_strip_title_14">Last 14 nights</string>
+    <string name="home_already_visible">Already visible</string>
+    <string name="home_expect_title">What to expect</string>
+    <string name="home_expect_body">After 7 nights each measurement gets its usual range. The range keeps adjusting over the next weeks and uses up to 28 nights. Notes start after the learning period.</string>
+    <plurals name="period_nights">
+        <item quantity="one">%1$s night</item>
+        <item quantity="other">%1$s nights</item>
+    </plurals>
+    <plurals name="stats_inside">
+        <item quantity="one">Inside your usual range: %1$s of %2$s night</item>
+        <item quantity="other">Inside your usual range: %1$s of %2$s nights</item>
+    </plurals>
+    <string name="stats_range">Usual range: %1$s–%2$s</string>
+    <string name="stats_median">Middle value: %1$s</string>
+    <string name="detail_computed_title">How your usual range is computed</string>
+    <string name="detail_source_line">Measured by %1$s. Last sync %2$s.</string>
+    <string name="history_title">History</string>
+    <string name="history_view_list">List</string>
+    <string name="history_view_calendar">Calendar</string>
+    <string name="history_filter_all">All</string>
+    <string name="history_filter_moved">Moved</string>
+    <string name="history_filter_gaps">Learning and gaps</string>
+    <string name="history_legend_title">What the marks mean</string>
+    <string name="source_picker_title">Choose a source</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_group_source">Data source</string>
+    <string name="settings_hc_permissions">Health Connect permissions</string>
+    <string name="settings_last_read_title">Last read</string>
+    <string name="settings_setup_again">Set up again</string>
+    <string name="settings_group_notifications">Notifications</string>
+    <string name="settings_notif_results">Night results</string>
+    <string name="settings_notif_problems">Problems reading data</string>
+    <string name="settings_group_sensitivity">Sensitivity</string>
+    <string name="settings_group_appearance">Appearance</string>
+    <string name="settings_motion_note">Motion follows the system \"Remove animations\" setting.</string>
+    <string name="settings_group_about">About</string>
+    <string name="settings_about">About NightBaseline</string>
+    <string name="settings_group_debug">Debug</string>
+    <string name="settings_catalog">Component catalog</string>
+    <string name="settings_synthetic">Show synthetic data</string>
+    <string name="sens_advanced">Advanced</string>
+    <string name="sens_window">Range window</string>
+    <plurals name="sens_window_value">
+        <item quantity="one">%1$s night</item>
+        <item quantity="other">%1$s nights</item>
+    </plurals>
+    <string name="sens_use_metric">Use for comparison</string>
+    <string name="sens_reset">Reset to default</string>
+    <string name="sens_reset_title">Reset sensitivity?</string>
+    <string name="sens_reset_body">Sensitivity goes back to Balanced and the range window to 28 nights.</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_local">Your data stays on this phone. NightBaseline has no internet access.</string>
+    <string name="about_any_source">Works with any app that writes to Health Connect.</string>
+    <string name="about_licenses">Open-source licenses</string>
+    <string name="about_source_code">Source code: %1$s</string>
+    <string name="widget_waiting">Waiting for sync</string>
+    <string name="widget_update_needed">Update needed</string>
+    <string name="widget_choose_source">Choose source</string>
+</resources>

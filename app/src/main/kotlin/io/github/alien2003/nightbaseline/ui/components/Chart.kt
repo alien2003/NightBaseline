@@ -1,0 +1,579 @@
+// Chart geometry uses fractions of the plot area; naming every fraction adds nothing.
+@file:Suppress("MagicNumber")
+
+package io.github.alien2003.nightbaseline.ui.components
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.algo.MetricId
+import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.material.nbClickable
+import io.github.alien2003.nightbaseline.ui.material.solidCard
+import io.github.alien2003.nightbaseline.ui.material.solidTooltip
+import io.github.alien2003.nightbaseline.ui.model.ChartPeriod
+import io.github.alien2003.nightbaseline.ui.model.ChartPointUi
+import io.github.alien2003.nightbaseline.ui.model.MetricGlyph
+import io.github.alien2003.nightbaseline.ui.model.MetricSeriesUi
+import io.github.alien2003.nightbaseline.ui.model.MetricState
+import io.github.alien2003.nightbaseline.ui.model.MetricUi
+import io.github.alien2003.nightbaseline.ui.model.UiText
+import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.theme.NbColors
+import io.github.alien2003.nightbaseline.ui.theme.NbDimens
+import io.github.alien2003.nightbaseline.ui.theme.NbShapes
+import io.github.alien2003.nightbaseline.ui.theme.NbSpace
+import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import kotlin.math.roundToInt
+
+/**
+ * The 7 / 30 / 90 nights segmented control (`screens.md` 4): a `surface.3` pill track with a `primaryContainer`
+ * capsule that moves with `spring.selection`; the selected label is bold too (selection is never colour alone). Each
+ * segment is a 48 dp+ tab (`a11y_period`).
+ */
+@Composable
+fun PeriodSelector(
+    selected: ChartPeriod,
+    onSelect: (ChartPeriod) -> Unit,
+    modifier: Modifier = Modifier,
+    forced: Pair<ChartPeriod, ForcedInteraction>? = null,
+) {
+    val text = rememberUiText()
+    val colors = NbTheme.colors
+    val motion = NbTheme.motion
+    val bounds = remember { mutableStateMapOf<ChartPeriod, Pair<Float, Float>>() }
+    Box(
+        modifier
+            .background(colors.surface3, NbShapes.pill)
+            .padding(NbSpace.s1),
+    ) {
+        val current = bounds[selected]
+        if (current != null) {
+            val x by animateFloatAsState(current.first, motion.selection(), label = "periodX")
+            val w by animateFloatAsState(current.second, motion.selection(), label = "periodW")
+            Canvas(Modifier.matchParentSize()) {
+                drawRoundRect(
+                    colors.primaryContainer,
+                    topLeft = Offset(x, 0f),
+                    size = Size(w, size.height),
+                    cornerRadius = CornerRadius(size.height / 2),
+                )
+            }
+        }
+        Row(Modifier.selectableGroup()) {
+            ChartPeriod.entries.forEach { period ->
+                val isSelected = period == selected
+                val label = text.plural(R.plurals.period_nights, period.nights, text.int(period.nights))
+                Box(
+                    Modifier
+                        .sizeIn(minWidth = NbDimens.targetMin, minHeight = NbDimens.targetMin)
+                        .onPlaced { coordinates -> bounds[period] = coordinates.positionInParent().x to coordinates.size.width.toFloat() }
+                        .nbClickable(
+                            onClick = { onSelect(period) },
+                            shape = NbShapes.pill,
+                            role = Role.Tab,
+                            forced = forced?.takeIf { it.first == period }?.second,
+                        ).semantics {
+                            this.selected = isSelected
+                            contentDescription = text.plural(R.plurals.a11y_period, period.nights, text.int(period.nights))
+                        }.padding(horizontal = NbSpace.s5, vertical = NbSpace.s3),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label,
+                        style = NbTheme.typography.label.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold),
+                        color = if (isSelected) colors.onPrimaryContainer else colors.textSecondary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Builds the visible text summary of a chart that is also its content description (`screens.md` 8): header, range,
+ * last night, outside count (or all inside), extremes, gaps (omitted when 0). Numbers and dates use the locale.
+ */
+fun UiText.chartSummary(
+    series: MetricSeriesUi,
+    source: String,
+): String {
+    val metric = series.metric
+    val points = series.points
+    val n = points.size
+    val parts = mutableListOf(plural(R.plurals.chart_summary_header, n, name(metric), int(n)))
+    val unit = unit(metric).orEmpty()
+
+    fun clean(s: String) = s.replace(" .", ".").replace(" ,", ",")
+    // Same precision as the tile, so a value just outside never reads like the range edge.
+    val d = points.lastOrNull()?.let { decimals(MetricUi(metric, it.state, it.value, it.range)) }
+    points.lastOrNull { it.range != null }?.range?.let { r ->
+        parts += clean(string(R.string.chart_summary_range, bare(metric, r.low, d), bare(metric, r.high, d), unit))
+    }
+    points.lastOrNull()?.let { last ->
+        if (last.value != null) {
+            val status = status(MetricUi(metric, last.state, last.value, last.range), source).lowercase(locale)
+            parts += clean(string(R.string.chart_summary_last, bare(metric, last.value, d), unit, status))
+        }
+    }
+    val outside = points.filter { it.state.moved }
+    if (outside.isNotEmpty()) {
+        parts += string(R.string.chart_summary_outside, int(outside.size), int(n), dateShort(outside.last().date))
+    } else if (points.any { it.state.compared }) {
+        parts += plural(R.plurals.chart_summary_all_inside, n, int(n))
+    }
+    val valued = points.filter { it.value != null }
+    val min = valued.minByOrNull { it.value!! }
+    val max = valued.maxByOrNull { it.value!! }
+    if (min != null && max != null) {
+        parts +=
+            string(
+                R.string.chart_summary_extremes,
+                bare(metric, min.value!!),
+                dateShort(min.date),
+                bare(metric, max.value!!),
+                dateShort(max.date),
+            )
+    }
+    val gaps = points.count { it.value == null }
+    if (gaps > 0) parts += string(R.string.chart_summary_gaps, int(gaps))
+    return parts.joinToString(" ")
+}
+
+/** Announcement / tooltip text of one chart point (`chart_tooltip*`, `a11y_chart_point`). */
+fun UiText.chartPoint(
+    metric: MetricId,
+    point: ChartPointUi,
+    source: String,
+): String {
+    val date = dateShort(point.date)
+    return when {
+        point.value == null -> {
+            string(R.string.chart_tooltip_no_value, date)
+        }
+
+        point.state == MetricState.NotCompared -> {
+            string(R.string.chart_tooltip_short, date)
+        }
+
+        else -> {
+            string(
+                R.string.chart_tooltip,
+                date,
+                value(metric, point.value).text,
+                status(MetricUi(metric, point.state, point.value, point.range), source),
+            )
+        }
+    }
+}
+
+/**
+ * The per-night trend chart (`screens.md` 4, 7.3) for 7 / 30 / 90 nights on a solid card: the usual range as it was
+ * on each night (stepped band), one point per night (no line, so missing nights stay gaps), hollow points while
+ * learning or not compared, triangles for values outside. Tap selects the nearest night, a horizontal drag scrubs,
+ * Left / Right keys step; the selection shows a `chart.guide` line and the solid [ChartTooltip]. One TalkBack node
+ * whose description is [chartSummary], with "Previous night" / "Next night" actions; band and axes are decorative.
+ */
+@Suppress("CyclomaticComplexMethod") // Drawing, gestures, keys and accessibility of one chart node belong together.
+@Composable
+fun TrendChart(
+    series: MetricSeriesUi,
+    source: String,
+    selected: Int?,
+    onSelect: (Int?) -> Unit,
+    modifier: Modifier = Modifier,
+    height: Dp = NbDimens.chartHeightCompact,
+) {
+    val text = rememberUiText()
+    val colors = NbTheme.colors
+    val measurer = rememberTextMeasurer()
+    val axisStyle = NbTheme.typography.numericAxis.copy(color = colors.textSecondary)
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val points = series.points
+    val summary = remember(series, text) { text.chartSummary(series, source) }
+    val currentSelect by rememberUpdatedState(onSelect)
+    val last = points.lastIndex
+    val step = { delta: Int -> currentSelect(((selected ?: last) + delta).coerceIn(0, last)) }
+    val domain = remember(series) { domainOf(points) }
+    val selectedText = selected?.let { points.getOrNull(it) }?.let { text.chartPoint(series.metric, it, source) }
+    val prev = text.string(R.string.a11y_prev_night)
+    val next = text.string(R.string.a11y_next_night)
+    Column(
+        modifier
+            .fillMaxWidth()
+            .widthIn(max = NbDimens.chartMax)
+            .solidCard(NbShapes.l)
+            .padding(NbSpace.s4),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(height)
+                .semantics {
+                    contentDescription = summary
+                    selectedText?.let { stateDescription = it }
+                    customActions =
+                        listOf(
+                            CustomAccessibilityAction(prev) {
+                                step(-1)
+                                true
+                            },
+                            CustomAccessibilityAction(next) {
+                                step(1)
+                                true
+                            },
+                        )
+                }.onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.DirectionLeft -> step(if (rtl) 1 else -1).let { true }
+                        Key.DirectionRight -> step(if (rtl) -1 else 1).let { true }
+                        Key.MoveHome -> currentSelect(0).let { true }
+                        Key.MoveEnd -> currentSelect(last).let { true }
+                        else -> false
+                    }
+                }.focusable(),
+        ) {
+            Canvas(
+                Modifier
+                    .matchParentSize()
+                    .clearAndSetSemantics {}
+                    .pointerInput(points.size, rtl) {
+                        detectTapGestures { offset -> currentSelect(indexAt(offset.x, size.width.toFloat(), points.size, rtl)) }
+                    }.pointerInput(points.size, rtl) {
+                        detectHorizontalDragGestures { change, _ ->
+                            currentSelect(indexAt(change.position.x, size.width.toFloat(), points.size, rtl))
+                        }
+                    },
+            ) {
+                val plot = PlotArea(this, points.size, domain, rtl, axisWidth = 36.dp.toPx(), axisHeight = 20.dp.toPx())
+                drawGrid(plot, colors, measurer, axisStyle) { text.bare(series.metric, it) }
+                drawBand(plot, points, colors)
+                selected?.let { drawGuide(plot, it, colors) }
+                drawPoints(plot, points, colors, selected)
+                drawDateAxis(plot, points, measurer, axisStyle, text)
+            }
+            val selectedPoint = selected?.let { points.getOrNull(it) }
+            if (selectedPoint != null) {
+                TooltipPlacer(fraction = xFraction(points.indexOf(selectedPoint), points.size, rtl)) {
+                    ChartTooltip(series.metric, selectedPoint, source)
+                }
+            }
+        }
+        Text(
+            summary,
+            style = NbTheme.typography.bodySmall,
+            color = colors.textSecondary,
+            modifier =
+                Modifier
+                    .padding(
+                        top = NbSpace.s4,
+                    ).clearAndSetSemantics {
+                    },
+        )
+    }
+}
+
+/** The solid tooltip over the chart (never glass): date, value + unit, status glyph and label. Not its own node. */
+@Composable
+fun ChartTooltip(
+    metric: MetricId,
+    point: ChartPointUi,
+    source: String,
+    modifier: Modifier = Modifier,
+) {
+    val text = rememberUiText()
+    val colors = NbTheme.colors
+    Column(
+        modifier
+            .solidTooltip(NbShapes.m)
+            .padding(horizontal = NbSpace.s4, vertical = NbSpace.s3)
+            .clearAndSetSemantics {},
+        verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
+    ) {
+        Text(text.dateShort(point.date), style = NbTheme.typography.caption, color = colors.textSecondary)
+        val value = point.value?.let { text.value(metric, it).text }
+        Text(value ?: text.string(R.string.status_no_value), style = NbTheme.typography.numericSmall, color = colors.textPrimary)
+        if (point.value != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
+                MetricGlyphIcon(point.state.glyph, colors.markerColor(point.state), size = 12.dp)
+                Text(
+                    text.status(MetricUi(metric, point.state, point.value, point.range), source),
+                    style = NbTheme.typography.caption,
+                    color = colors.textPrimary,
+                )
+            }
+        }
+    }
+}
+
+/** Places its single child horizontally centred on [fraction] of the width, clamped inside, at the top. */
+@Composable
+private fun TooltipPlacer(
+    fraction: Float,
+    content: @Composable () -> Unit,
+) {
+    Layout(content = content, modifier = Modifier.fillMaxWidth()) { measurables, constraints ->
+        val placeable = measurables.first().measure(constraints.copy(minWidth = 0, minHeight = 0))
+        val width = constraints.maxWidth
+        layout(width, placeable.height) {
+            val x = (width * fraction - placeable.width / 2f).roundToInt().coerceIn(0, (width - placeable.width).coerceAtLeast(0))
+            placeable.place(x, 0)
+        }
+    }
+}
+
+/**
+ * The stats row under a chart (`screens.md` 7.3): nights inside the range (k of N), the usual range, the middle value.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun StatsRow(
+    series: MetricSeriesUi,
+    modifier: Modifier = Modifier,
+) {
+    val text = rememberUiText()
+    val compared = series.points.filter { it.state.compared }
+    val inside = compared.count { !it.state.moved }
+    val range = series.points.lastOrNull { it.range != null }?.range
+    FlowRow(
+        modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(NbSpace.s3),
+        verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
+    ) {
+        StatBox(text.plural(R.plurals.stats_inside, compared.size, text.int(inside), text.int(compared.size)))
+        range?.let {
+            StatBox(text.string(R.string.stats_range, text.bare(series.metric, it.low), text.value(series.metric, it.high).text))
+            StatBox(text.string(R.string.stats_median, text.value(series.metric, it.median).text))
+        }
+    }
+}
+
+@Composable
+private fun StatBox(label: String) {
+    Box(
+        Modifier
+            .background(NbTheme.colors.surface2, NbShapes.m)
+            .padding(horizontal = NbSpace.s4, vertical = NbSpace.s3),
+    ) {
+        Text(label, style = NbTheme.typography.numericSmall.copy(fontWeight = FontWeight.Normal), color = NbTheme.colors.textPrimary)
+    }
+}
+
+private class Domain(
+    val min: Double,
+    val max: Double,
+)
+
+private fun domainOf(points: List<ChartPointUi>): Domain {
+    val values = points.flatMap { listOfNotNull(it.value, it.range?.low, it.range?.high) }
+    if (values.isEmpty()) return Domain(0.0, 1.0)
+    val lo = values.min()
+    val hi = values.max()
+    val pad = ((hi - lo).takeIf { it > 0 } ?: 1.0) * 0.12
+    return Domain(lo - pad, hi + pad)
+}
+
+private class PlotArea(
+    scope: DrawScope,
+    val count: Int,
+    val domain: Domain,
+    val rtl: Boolean,
+    axisWidth: Float,
+    axisHeight: Float,
+) {
+    val left = if (rtl) 0f else axisWidth
+    val right = scope.size.width - if (rtl) axisWidth else 0f
+    val top = 8f * scope.density
+    val bottom = scope.size.height - axisHeight
+    val step = (right - left) / count.coerceAtLeast(1)
+
+    fun x(index: Int): Float {
+        val i = if (rtl) count - 1 - index else index
+        return left + step * (i + 0.5f)
+    }
+
+    fun y(value: Double): Float = (bottom - (value - domain.min) / (domain.max - domain.min) * (bottom - top)).toFloat()
+}
+
+private fun xFraction(
+    index: Int,
+    count: Int,
+    rtl: Boolean,
+): Float {
+    val i = if (rtl) count - 1 - index else index
+    return (i + 0.5f) / count.coerceAtLeast(1)
+}
+
+private fun indexAt(
+    x: Float,
+    width: Float,
+    count: Int,
+    rtl: Boolean,
+): Int {
+    val raw = ((x / width) * count).toInt().coerceIn(0, count - 1)
+    return if (rtl) count - 1 - raw else raw
+}
+
+private fun DrawScope.drawGrid(
+    plot: PlotArea,
+    colors: NbColors,
+    measurer: TextMeasurer,
+    style: TextStyle,
+    label: (Double) -> String,
+) {
+    val ticks = 3
+    repeat(ticks) { i ->
+        val value = plot.domain.min + (plot.domain.max - plot.domain.min) * (i + 0.5) / ticks
+        val y = plot.y(value)
+        drawLine(colors.chartGrid, Offset(plot.left, y), Offset(plot.right, y), strokeWidth = 1f * density)
+        val text = measurer.measure(label(value), style)
+        val x = if (plot.rtl) plot.right + 4f * density else plot.left - text.size.width - 6f * density
+        drawText(text, topLeft = Offset(x.coerceAtLeast(0f), y - text.size.height / 2f))
+    }
+}
+
+private fun DrawScope.drawBand(
+    plot: PlotArea,
+    points: List<ChartPointUi>,
+    colors: NbColors,
+) {
+    val edge = NbDimens.bandEdgeStroke.toPx()
+    points.forEachIndexed { i, p ->
+        val r = p.range ?: return@forEachIndexed
+        val x0 = plot.x(i) - plot.step / 2
+        val top = plot.y(r.high)
+        val bottom = plot.y(r.low)
+        // One extra pixel overlaps the neighbour, so no anti-aliased seam shows between nights.
+        drawRect(colors.bandFill, topLeft = Offset(x0, top), size = Size(plot.step + 1f, bottom - top))
+        drawLine(colors.bandEdge, Offset(x0, top), Offset(x0 + plot.step, top), strokeWidth = edge)
+        drawLine(colors.bandEdge, Offset(x0, bottom), Offset(x0 + plot.step, bottom), strokeWidth = edge)
+        // Vertical joins where the band steps between nights.
+        val prev = points.getOrNull(i - 1)?.range
+        if (prev != null) {
+            val xi = if (plot.rtl) x0 + plot.step else x0
+            drawLine(colors.bandEdge, Offset(xi, plot.y(prev.high)), Offset(xi, top), strokeWidth = edge)
+            drawLine(colors.bandEdge, Offset(xi, plot.y(prev.low)), Offset(xi, bottom), strokeWidth = edge)
+        }
+    }
+}
+
+private fun DrawScope.drawGuide(
+    plot: PlotArea,
+    index: Int,
+    colors: NbColors,
+) {
+    val x = plot.x(index)
+    drawLine(
+        colors.chartGuide,
+        Offset(x, plot.top),
+        Offset(x, plot.bottom),
+        strokeWidth = 1.5f * density,
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f * density, 3f * density)),
+    )
+}
+
+private fun DrawScope.drawPoints(
+    plot: PlotArea,
+    points: List<ChartPointUi>,
+    colors: NbColors,
+    selected: Int?,
+) {
+    // Point size shrinks with the period so 90 nights stay legible.
+    val box = (plot.step * 0.8f).coerceIn(5f * density, 12f * density)
+    points.forEachIndexed { i, p ->
+        val v = p.value ?: return@forEachIndexed
+        val center = Offset(plot.x(i), plot.y(v))
+        val scale = if (i == selected) 1.4f else 1f
+        val size = box * scale
+        drawCircle(colors.markerHalo, radius = size * 0.5f + NbDimens.markerHalo.toPx() * 0.5f, center = center)
+        when (p.state) {
+            MetricState.Higher -> {
+                drawMetricGlyph(MetricGlyph.TriangleUp, colors.statusMoved, center, size * 1.1f)
+            }
+
+            MetricState.Lower -> {
+                drawMetricGlyph(MetricGlyph.TriangleDown, colors.statusMoved, center, size * 1.1f)
+            }
+
+            MetricState.Within, MetricState.SideIgnoredHigher, MetricState.SideIgnoredLower -> {
+                drawCircle(colors.chartPoint, radius = size * 0.4f, center = center)
+            }
+
+            else -> {
+                drawCircle(colors.chartPoint, radius = size * 0.34f, center = center, style = Stroke(width = 1.5f * density))
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawDateAxis(
+    plot: PlotArea,
+    points: List<ChartPointUi>,
+    measurer: TextMeasurer,
+    style: TextStyle,
+    text: UiText,
+) {
+    if (points.isEmpty()) return
+    listOf(0, points.lastIndex).distinct().forEach { i ->
+        val label = measurer.measure(text.dateShort(points[i].date), style)
+        val x = (plot.x(i) - label.size.width / 2f).coerceIn(0f, size.width - label.size.width)
+        drawText(label, topLeft = Offset(x, plot.bottom + 4f * density))
+    }
+}

@@ -8,13 +8,13 @@ action and where it leads, icon/shape cue) and the copy. Screen structure and co
 
 - Every visible string has a resource key (`snake_case`). The English text is in the tables below and becomes
   `res/values/strings.xml`.
-- **Russian copy:** the `ru` column of every table is kept in `docs/design/res/values-ru/strings.xml`, keyed by the
-  same key. It is not inline here because ADR 0002 (enforced by `tools/check-language.sh` and the pre-commit hook)
-  allows Cyrillic only in `res/values-ru*` resources and `README.ru.md`; that file is the draft of the app's `ru`
-  localization and moves into the app module once `{name}` placeholders are converted to positional format
-  arguments. This file therefore contains no Cyrillic at all (review round 0). Each key in the tables below must exist
-  in both files (a later unit test compares the key sets; until then, the `ru` column below shows "yes" when the key
-  is drafted).
+- **Russian copy:** the `ru` column of every table is kept in `app/src/main/res/values-ru/strings.xml` (moved from
+  the design draft), keyed by the same key; English is in `app/src/main/res/values/strings.xml`. Placeholders are
+  positional (`%1$s`), always pre-formatted strings, with the same position for the same name in both languages; the
+  `{name}` forms below are the readable names. It is not inline here because ADR 0002 (enforced by
+  `tools/check-language.sh` and the pre-commit hook) allows Cyrillic only in `res/values-ru*` resources and
+  `README.ru.md`. This file therefore contains no Cyrillic at all (review round 0). Each key in the tables below
+  exists in both files (`StringResourcesTest` compares the key sets); the `ru` column shows "yes".
 - Tone: calm, plain, second person, no diagnoses, no exclamation marks, never "Vitals", never "alert"/"warning"/
   "abnormal"/"danger". Core phrase: "moved outside your usual range" (ru: the same phrase family, see the values-ru draft).
 - Placeholders: `{source}` source app label from the package manager; `{metric}` metric display name; `{n}`, `{k}`

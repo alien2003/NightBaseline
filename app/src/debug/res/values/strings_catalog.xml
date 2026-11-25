@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only labels of the component catalog (screens.md 7.10). Not shipped, not translated. -->
+<resources>
+    <string name="catalog_title" translatable="false">Component catalog</string>
+    <string name="catalog_theme" translatable="false">Theme</string>
+    <string name="catalog_effects" translatable="false">Effects</string>
+    <string name="catalog_glass" translatable="false">Glass</string>
+    <string name="catalog_solid" translatable="false">Solid</string>
+    <string name="catalog_font" translatable="false">Font scale</string>
+    <string name="catalog_grayscale" translatable="false">Grayscale</string>
+    <string name="catalog_reduced_motion" translatable="false">Reduced motion</string>
+    <string name="catalog_metrics" translatable="false">Metrics</string>
+    <string name="catalog_page" translatable="false">Page</string>
+</resources>

@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Draft of the app's Russian localization (the "ru" column of docs/design/states.md and docs/design/screens.md).
-  Kept here because ADR 0002 allows Cyrillic only in res/values-ru* and README.ru.md. Keys match states.md.
-  Placeholders use {name} while in draft; they become positional format arguments when moved into the app module.
+  Russian localization (the "ru" column of docs/design/states.md and docs/design/screens.md), moved here from
+  docs/design/res/values-ru/strings.xml. Arguments are positional and match res/values/strings.xml key by key.
   Tone: calm, no diagnoses, never "Vitals".
 -->
 <resources>
@@ -11,10 +10,10 @@
     <string name="nav_history">История</string>
     <string name="nav_settings">Настройки</string>
     <string name="home_title">Прошлая ночь</string>
-    <string name="home_last_result_heading">Последний результат: {night_label}</string>
-    <string name="home_not_recorded_row">{source} не записывает: {metric_list}</string>
+    <string name="home_last_result_heading">Последний результат: %1$s</string>
+    <string name="home_not_recorded_row">%1$s не записывает: %2$s</string>
     <!-- en "Night of Nov 24–25"; ru uses the wake date -->
-    <string name="night_label">Ночь на {end_date}</string>
+    <string name="night_label">Ночь на %2$s</string>
 
     <!-- Metrics -->
     <string name="metric_sleeping_hr">Пульс во сне</string>
@@ -37,54 +36,54 @@
     <string name="unit_ms">мс</string>
     <string name="unit_celsius">°C</string>
     <string name="unit_fahrenheit">°F</string>
-    <string name="unit_hours_minutes">{h} ч {m} мин</string>
+    <string name="unit_hours_minutes">%1$s ч %2$s мин</string>
 
     <!-- Night states -->
     <string name="state_loading_body">Читаем ваши ночи из Health Connect…</string>
     <string name="state_l0_title">Обучение начнётся этой ночью</string>
     <string name="state_l0_body">Спите с устройством как обычно. NightBaseline нужно 7 ночей с данными о сне, чтобы узнать ваш обычный диапазон.</string>
     <string name="state_learning_title">Узнаём ваш обычный диапазон</string>
-    <string name="learning_progress">{n} из 7 ночей</string>
+    <string name="learning_progress">%1$s из 7 ночей</string>
     <plurals name="state_learning_body">
-        <item quantity="one">Ещё {left} ночь с данными о сне, и NightBaseline начнёт сравнивать.</item>
-        <item quantity="few">Ещё {left} ночи с данными о сне, и NightBaseline начнёт сравнивать.</item>
-        <item quantity="many">Ещё {left} ночей с данными о сне, и NightBaseline начнёт сравнивать.</item>
-        <item quantity="other">Ещё {left} ночи с данными о сне, и NightBaseline начнёт сравнивать.</item>
+        <item quantity="one">Ещё %1$s ночь с данными о сне, и NightBaseline начнёт сравнивать.</item>
+        <item quantity="few">Ещё %1$s ночи с данными о сне, и NightBaseline начнёт сравнивать.</item>
+        <item quantity="many">Ещё %1$s ночей с данными о сне, и NightBaseline начнёт сравнивать.</item>
+        <item quantity="other">Ещё %1$s ночи с данными о сне, и NightBaseline начнёт сравнивать.</item>
     </plurals>
     <string name="state_learning_short_note">Прошлая ночь была короче 3 часов, поэтому не засчитана.</string>
     <string name="state_all_title">Всё в пределах обычного диапазона</string>
     <plurals name="state_all_body">
-        <item quantity="one">{n} показатель сравнён с вашими последними {w} ночами.</item>
-        <item quantity="few">{n} показателя сравнены с вашими последними {w} ночами.</item>
-        <item quantity="many">{n} показателей сравнены с вашими последними {w} ночами.</item>
-        <item quantity="other">{n} показателя сравнены с вашими последними {w} ночами.</item>
+        <item quantity="one">%1$s показатель сравнён с вашими последними %2$s ночами.</item>
+        <item quantity="few">%1$s показателя сравнены с вашими последними %2$s ночами.</item>
+        <item quantity="many">%1$s показателей сравнены с вашими последними %2$s ночами.</item>
+        <item quantity="other">%1$s показателя сравнены с вашими последними %2$s ночами.</item>
     </plurals>
-    <string name="state_some_title_one">{metric}: вне обычного диапазона</string>
+    <string name="state_some_title_one">%1$s: вне обычного диапазона</string>
     <plurals name="state_some_title_many">
-        <item quantity="one">{k} показатель вышел за пределы обычного диапазона</item>
-        <item quantity="few">{k} показателя вышли за пределы обычного диапазона</item>
-        <item quantity="many">{k} показателей вышли за пределы обычного диапазона</item>
-        <item quantity="other">{k} показателя вышли за пределы обычного диапазона</item>
+        <item quantity="one">%1$s показатель вышел за пределы обычного диапазона</item>
+        <item quantity="few">%1$s показателя вышли за пределы обычного диапазона</item>
+        <item quantity="many">%1$s показателей вышли за пределы обычного диапазона</item>
+        <item quantity="other">%1$s показателя вышли за пределы обычного диапазона</item>
     </plurals>
     <string name="state_some_body">Один показатель сам по себе часто меняется. NightBaseline показывает это здесь, без уведомления.</string>
-    <string name="state_some_body_many">Изменилось меньше {threshold}, поэтому уведомления не было.</string>
+    <string name="state_some_body_many">Изменилось меньше %1$s, поэтому уведомления не было.</string>
     <plurals name="state_dev_title">
-        <item quantity="one">{k} показатель вышел за пределы обычного диапазона</item>
-        <item quantity="few">{k} показателя вышли за пределы обычного диапазона</item>
-        <item quantity="many">{k} показателей вышли за пределы обычного диапазона</item>
-        <item quantity="other">{k} показателя вышли за пределы обычного диапазона</item>
+        <item quantity="one">%1$s показатель вышел за пределы обычного диапазона</item>
+        <item quantity="few">%1$s показателя вышли за пределы обычного диапазона</item>
+        <item quantity="many">%1$s показателей вышли за пределы обычного диапазона</item>
+        <item quantity="other">%1$s показателя вышли за пределы обычного диапазона</item>
     </plurals>
-    <string name="state_dev_body">{metric_list}. Это изменение по сравнению с вашими недавними ночами, а не диагноз. Так бывает после позднего отхода ко сну, алкоголя, перелёта, тяжёлой тренировки или простуды.</string>
-    <string name="state_source_gone_title">{source} больше нет на этом телефоне</string>
+    <string name="state_dev_body">%1$s. Это изменение по сравнению с вашими недавними ночами, а не диагноз. Так бывает после позднего отхода ко сну, алкоголя, перелёта, тяжёлой тренировки или простуды.</string>
+    <string name="state_source_gone_title">%1$s больше нет на этом телефоне</string>
     <string name="state_source_gone_body">Выберите другое приложение, которое записывает данные о сне в Health Connect. Прежние результаты останутся здесь.</string>
-    <string name="state_sync_title">{source} ещё не передал прошлую ночь</string>
-    <string name="state_sync_body">Откройте {source}, чтобы он синхронизировался с Health Connect. NightBaseline проверит ещё раз сам.</string>
+    <string name="state_sync_title">%1$s ещё не передал прошлую ночь</string>
+    <string name="state_sync_body">Откройте %1$s, чтобы он синхронизировался с Health Connect. NightBaseline проверит ещё раз сам.</string>
     <string name="state_nodata_title">Сон прошлой ночью не записан</string>
-    <string name="state_nodata_body">В {source} нет сна, закончившегося ночью или утром. Ночи без устройства просто пропускаются.</string>
+    <string name="state_nodata_body">В %1$s нет сна, закончившегося ночью или утром. Ночи без устройства просто пропускаются.</string>
     <string name="state_short_title">Короткая ночь</string>
-    <string name="state_short_body">{source} записал {duration} сна. Ночи короче 3 часов не сравниваются и не меняют ваш обычный диапазон.</string>
+    <string name="state_short_body">%1$s записал %2$s сна. Ночи короче 3 часов не сравниваются и не меняют ваш обычный диапазон.</string>
     <string name="state_noteval_title">Слишком мало измерений прошлой ночью</string>
-    <string name="state_noteval_body">{source} записал сон, но измерений во время него слишком мало для сравнения. Так бывает, если устройство сидело свободно или разрядилось.</string>
+    <string name="state_noteval_body">%1$s записал сон, но измерений во время него слишком мало для сравнения. Так бывает, если устройство сидело свободно или разрядилось.</string>
     <string name="state_perm_title">NightBaseline не может прочитать данные о сне</string>
     <string name="state_perm_body">Доступ в Health Connect был выключен. Прежние результаты сохранены. Включите доступ, чтобы продолжить.</string>
     <string name="state_hc_update_title">Health Connect нужно обновить</string>
@@ -94,9 +93,9 @@
 
     <!-- Actions -->
     <string name="action_how_it_works">Как это работает</string>
-    <string name="action_see_metric">Открыть: {metric}</string>
+    <string name="action_see_metric">Открыть: %1$s</string>
     <string name="action_what_it_means">Что это значит</string>
-    <string name="action_open_source">Открыть {source}</string>
+    <string name="action_open_source">Открыть %1$s</string>
     <string name="action_check_now">Проверить сейчас</string>
     <string name="action_check_again">Проверить снова</string>
     <string name="action_see_history">Открыть историю</string>
@@ -117,13 +116,13 @@
 
     <!-- Banners -->
     <string name="banner_read_failed">Health Connect не ответил утром. NightBaseline попробует ещё раз позже.</string>
-    <string name="banner_wait">Прошлой ночи пока нет. {source} обычно синхронизируется после пробуждения.</string>
+    <string name="banner_wait">Прошлой ночи пока нет. %1$s обычно синхронизируется после пробуждения.</string>
     <string name="banner_bg">Утренней проверке нужен фоновый доступ. Без него результаты появятся, только когда вы откроете приложение.</string>
     <plurals name="banner_source_quiet">
-        <item quantity="one">Нет новых данных от {source} уже {n} день.</item>
-        <item quantity="few">Нет новых данных от {source} уже {n} дня.</item>
-        <item quantity="many">Нет новых данных от {source} уже {n} дней.</item>
-        <item quantity="other">Нет новых данных от {source} уже {n} дня.</item>
+        <item quantity="one">Нет новых данных от %1$s уже %2$s день.</item>
+        <item quantity="few">Нет новых данных от %1$s уже %2$s дня.</item>
+        <item quantity="many">Нет новых данных от %1$s уже %2$s дней.</item>
+        <item quantity="other">Нет новых данных от %1$s уже %2$s дня.</item>
     </plurals>
     <string name="banner_notif_off">Уведомления выключены. Результаты будут здесь, но утренней заметки не будет.</string>
     <string name="banner_range_ready">Ваш обычный диапазон готов. Теперь каждая ночь сравнивается с ним.</string>
@@ -134,58 +133,58 @@
     <string name="status_within">Как обычно</string>
     <string name="status_higher">Выше обычного</string>
     <string name="status_lower">Ниже обычного</string>
-    <string name="status_learning">Обучение, {n} из 7</string>
+    <string name="status_learning">Обучение, %1$s из 7</string>
     <string name="status_no_value">Нет значения за ночь</string>
     <string name="status_partial">Неполная ночь</string>
     <string name="status_not_compared">Не сравнивается</string>
-    <string name="status_not_provided">{source} не записывает</string>
+    <string name="status_not_provided">%1$s не записывает</string>
     <string name="status_access_off">Доступ выключен</string>
     <string name="detail_within">В пределах вашего обычного диапазона.</string>
-    <string name="detail_higher">На {delta} выше вашего обычного диапазона.</string>
-    <string name="detail_lower">На {delta} ниже вашего обычного диапазона.</string>
-    <string name="detail_side_ignored">Более высокие значения показателя «{metric}» показываются, но не считаются изменением.</string>
+    <string name="detail_higher">На %1$s выше вашего обычного диапазона.</string>
+    <string name="detail_lower">На %1$s ниже вашего обычного диапазона.</string>
+    <string name="detail_side_ignored">Более высокие значения показателя «%1$s» показываются, но не считаются изменением.</string>
     <plurals name="detail_learning">
-        <item quantity="one">Этому показателю нужна ещё {left} ночь, чтобы получить диапазон. До этого он не учитывается.</item>
-        <item quantity="few">Этому показателю нужны ещё {left} ночи, чтобы получить диапазон. До этого он не учитывается.</item>
-        <item quantity="many">Этому показателю нужно ещё {left} ночей, чтобы получить диапазон. До этого он не учитывается.</item>
-        <item quantity="other">Этому показателю нужно ещё {left} ночи, чтобы получить диапазон. До этого он не учитывается.</item>
+        <item quantity="one">Этому показателю нужна ещё %1$s ночь, чтобы получить диапазон. До этого он не учитывается.</item>
+        <item quantity="few">Этому показателю нужны ещё %1$s ночи, чтобы получить диапазон. До этого он не учитывается.</item>
+        <item quantity="many">Этому показателю нужно ещё %1$s ночей, чтобы получить диапазон. До этого он не учитывается.</item>
+        <item quantity="other">Этому показателю нужно ещё %1$s ночи, чтобы получить диапазон. До этого он не учитывается.</item>
     </plurals>
-    <string name="detail_no_data">{source} не записал показатель «{metric}» во время сна прошлой ночью.</string>
-    <string name="detail_too_few">Во время сна только {k} измерений, а для сравнения нужно не меньше {min}.</string>
-    <string name="detail_low_coverage">Измерения охватили {p} сна, а для сравнения нужно не меньше {min}.</string>
+    <string name="detail_no_data">%1$s не записал показатель «%2$s» во время сна прошлой ночью.</string>
+    <string name="detail_too_few">Во время сна только %1$s измерений, а для сравнения нужно не меньше %2$s.</string>
+    <string name="detail_low_coverage">Измерения охватили %1$s сна, а для сравнения нужно не меньше %2$s.</string>
     <string name="detail_not_compared">Короткие ночи не сравниваются.</string>
-    <string name="detail_not_provided_title">{source} не записывает показатель «{metric}»</string>
-    <string name="detail_not_provided_body">{source} не передаёт этот показатель в Health Connect. Если начнёт, NightBaseline подхватит его и сам узнает его диапазон.</string>
-    <string name="detail_not_provided_since">Значений нет с {date}.</string>
-    <string name="detail_access_off">Доступ Health Connect к показателю «{metric}» выключен.</string>
-    <string name="detail_waiting_sync">Ждём синхронизации {source}.</string>
+    <string name="detail_not_provided_title">%1$s не записывает показатель «%2$s»</string>
+    <string name="detail_not_provided_body">%1$s не передаёт этот показатель в Health Connect. Если начнёт, NightBaseline подхватит его и сам узнает его диапазон.</string>
+    <string name="detail_not_provided_since">Значений нет с %1$s.</string>
+    <string name="detail_access_off">Доступ Health Connect к показателю «%1$s» выключен.</string>
+    <string name="detail_waiting_sync">Ждём синхронизации %1$s.</string>
     <plurals name="detail_period_short">
-        <item quantity="one">Показана {n} ночь. Новые появятся по мере записи.</item>
-        <item quantity="few">Показаны {n} ночи. Новые появятся по мере записи.</item>
-        <item quantity="many">Показано {n} ночей. Новые появятся по мере записи.</item>
-        <item quantity="other">Показано {n} ночи. Новые появятся по мере записи.</item>
+        <item quantity="one">Показана %1$s ночь. Новые появятся по мере записи.</item>
+        <item quantity="few">Показаны %1$s ночи. Новые появятся по мере записи.</item>
+        <item quantity="many">Показано %1$s ночей. Новые появятся по мере записи.</item>
+        <item quantity="other">Показано %1$s ночи. Новые появятся по мере записи.</item>
     </plurals>
-    <string name="detail_band_changed">Ваш обычный диапазон сместился {date}.</string>
-    <string name="chart_tooltip">{date}: {value}, {status}</string>
+    <string name="detail_band_changed">Ваш обычный диапазон сместился %1$s.</string>
+    <string name="chart_tooltip">%1$s: %2$s, %3$s</string>
 
     <!-- Chart summary (TalkBack and visible text) -->
     <plurals name="chart_summary_header">
-        <item quantity="one">{metric}, последняя {n} ночь.</item>
-        <item quantity="few">{metric}, последние {n} ночи.</item>
-        <item quantity="many">{metric}, последние {n} ночей.</item>
-        <item quantity="other">{metric}, последние {n} ночи.</item>
+        <item quantity="one">%1$s, последняя %2$s ночь.</item>
+        <item quantity="few">%1$s, последние %2$s ночи.</item>
+        <item quantity="many">%1$s, последние %2$s ночей.</item>
+        <item quantity="other">%1$s, последние %2$s ночи.</item>
     </plurals>
-    <string name="chart_summary_range">Ваш обычный диапазон: от {low} до {high} {unit}.</string>
-    <string name="chart_summary_last">Прошлая ночь: {value} {unit}, {status}.</string>
-    <string name="chart_summary_outside">Вне диапазона {k} из {n} ночей, последний раз {date}.</string>
+    <string name="chart_summary_range">Ваш обычный диапазон: от %1$s до %2$s %3$s.</string>
+    <string name="chart_summary_last">Прошлая ночь: %1$s %2$s, %3$s.</string>
+    <string name="chart_summary_outside">Вне диапазона %1$s из %2$s ночей, последний раз %3$s.</string>
     <plurals name="chart_summary_all_inside">
-        <item quantity="one">{n} ночь в пределах диапазона.</item>
-        <item quantity="few">Все {n} ночи в пределах диапазона.</item>
-        <item quantity="many">Все {n} ночей в пределах диапазона.</item>
-        <item quantity="other">Все {n} ночи в пределах диапазона.</item>
+        <item quantity="one">%1$s ночь в пределах диапазона.</item>
+        <item quantity="few">Все %1$s ночи в пределах диапазона.</item>
+        <item quantity="many">Все %1$s ночей в пределах диапазона.</item>
+        <item quantity="other">Все %1$s ночи в пределах диапазона.</item>
     </plurals>
-    <string name="chart_summary_extremes">Минимум {min} ({date_min}), максимум {max} ({date_max}).</string>
-    <string name="chart_summary_gaps">Ночей без значения: {g}.</string>
+    <string name="chart_summary_extremes">Минимум %1$s (%2$s), максимум %3$s (%4$s).</string>
+    <string name="chart_summary_gaps">Ночей без значения: %1$s.</string>
 
     <!-- History -->
     <string name="history_empty_title">Здесь появятся ваши ночи</string>
@@ -193,16 +192,16 @@
     <string name="history_filter_empty">За этот период ни одна ночь не выходила за пределы обычного диапазона.</string>
     <string name="history_status_all">Всё как обычно</string>
     <plurals name="history_status_moved">
-        <item quantity="one">Изменился {k}</item>
-        <item quantity="few">Изменились {k}</item>
-        <item quantity="many">Изменились {k}</item>
-        <item quantity="other">Изменились {k}</item>
+        <item quantity="one">Изменился %1$s</item>
+        <item quantity="few">Изменились %1$s</item>
+        <item quantity="many">Изменились %1$s</item>
+        <item quantity="other">Изменились %1$s</item>
     </plurals>
     <string name="history_status_learning">Обучение</string>
     <string name="history_status_short">Короткая ночь</string>
     <string name="history_status_ambiguous">Два долгих сна</string>
     <string name="state_ambiguous_title">Два долгих сна за один день</string>
-    <string name="state_ambiguous_body">{source} записал два сна по 3 часа и больше за этот день, поэтому непонятно, какой из них был ночным. Этот день не сравнивается и не меняет ваш обычный диапазон.</string>
+    <string name="state_ambiguous_body">%1$s записал два сна по 3 часа и больше за этот день, поэтому непонятно, какой из них был ночным. Этот день не сравнивается и не меняет ваш обычный диапазон.</string>
     <string name="history_status_nodata">Нет данных</string>
     <string name="history_status_few">Мало измерений</string>
 
@@ -212,21 +211,21 @@
     <string name="channel_data_access_name">Проблемы с чтением данных</string>
     <string name="channel_data_access_desc">Когда NightBaseline не может прочитать ваши ночи, например после выключения доступа.</string>
     <plurals name="notif_dev_title">
-        <item quantity="one">{k} показатель вышел за пределы обычного диапазона</item>
-        <item quantity="few">{k} показателя вышли за пределы обычного диапазона</item>
-        <item quantity="many">{k} показателей вышли за пределы обычного диапазона</item>
-        <item quantity="other">{k} показателя вышли за пределы обычного диапазона</item>
+        <item quantity="one">%1$s показатель вышел за пределы обычного диапазона</item>
+        <item quantity="few">%1$s показателя вышли за пределы обычного диапазона</item>
+        <item quantity="many">%1$s показателей вышли за пределы обычного диапазона</item>
+        <item quantity="other">%1$s показателя вышли за пределы обычного диапазона</item>
     </plurals>
-    <string name="notif_dev_body">{metric_list}. {night_label}.</string>
+    <string name="notif_dev_body">%1$s. %2$s.</string>
     <plurals name="notif_list_more">
-        <item quantity="one">и ещё {n}</item>
-        <item quantity="few">и ещё {n}</item>
-        <item quantity="many">и ещё {n}</item>
-        <item quantity="other">и ещё {n}</item>
+        <item quantity="one">и ещё %1$s</item>
+        <item quantity="few">и ещё %1$s</item>
+        <item quantity="many">и ещё %1$s</item>
+        <item quantity="other">и ещё %1$s</item>
     </plurals>
-    <string name="notif_dev_body_long">{higher_part}{lower_part}Это сравнение с вашими недавними ночами, а не диагноз. Не медицинское изделие.</string>
-    <string name="notif_higher_prefix">Выше обычного: {list}. </string>
-    <string name="notif_lower_prefix">Ниже обычного: {list}. </string>
+    <string name="notif_dev_body_long">%1$s%2$sЭто сравнение с вашими недавними ночами, а не диагноз. Не медицинское изделие.</string>
+    <string name="notif_higher_prefix">Выше обычного: %1$s. </string>
+    <string name="notif_lower_prefix">Ниже обычного: %1$s. </string>
     <string name="notif_public_title">NightBaseline</string>
     <string name="notif_public_body">Результат прошлой ночи готов.</string>
     <string name="notif_perm_title">NightBaseline не может прочитать данные о сне</string>
@@ -234,21 +233,21 @@
     <string name="notif_hc_title">Health Connect нужно обновить</string>
     <string name="notif_hc_body">Нажмите, чтобы узнать, как продолжить.</string>
     <plurals name="notif_quiet_title">
-        <item quantity="one">Нет новых данных от {source} уже {n} день</item>
-        <item quantity="few">Нет новых данных от {source} уже {n} дня</item>
-        <item quantity="many">Нет новых данных от {source} уже {n} дней</item>
-        <item quantity="other">Нет новых данных от {source} уже {n} дня</item>
+        <item quantity="one">Нет новых данных от %1$s уже %2$s день</item>
+        <item quantity="few">Нет новых данных от %1$s уже %2$s дня</item>
+        <item quantity="many">Нет новых данных от %1$s уже %2$s дней</item>
+        <item quantity="other">Нет новых данных от %1$s уже %2$s дня</item>
     </plurals>
     <plurals name="notif_quiet_title_public">
-        <item quantity="one">Нет новых данных от источника уже {n} день</item>
-        <item quantity="few">Нет новых данных от источника уже {n} дня</item>
-        <item quantity="many">Нет новых данных от источника уже {n} дней</item>
-        <item quantity="other">Нет новых данных от источника уже {n} дня</item>
+        <item quantity="one">Нет новых данных от источника уже %1$s день</item>
+        <item quantity="few">Нет новых данных от источника уже %1$s дня</item>
+        <item quantity="many">Нет новых данных от источника уже %1$s дней</item>
+        <item quantity="other">Нет новых данных от источника уже %1$s дня</item>
     </plurals>
     <string name="notif_quiet_body">Нажмите, чтобы проверить источник.</string>
     <string name="notif_bg_title">Утренней проверке нужен фоновый доступ</string>
     <string name="notif_bg_body">Нажмите, чтобы разрешить его в Health Connect.</string>
-    <string name="notif_source_gone_title">{source} больше нет на этом телефоне</string>
+    <string name="notif_source_gone_title">%1$s больше нет на этом телефоне</string>
     <string name="notif_source_gone_title_public">Вашего источника больше нет на этом телефоне</string>
     <string name="notif_source_gone_body">Нажмите, чтобы выбрать другой источник.</string>
     <string name="notif_ready_title">Ваш обычный диапазон готов</string>
@@ -265,8 +264,8 @@
     <string name="onb_how_body">За первые 7 ночей NightBaseline узнаёт ваш обычный диапазон для каждого показателя. После этого вы получите заметку, если за одну ночь два или больше показателя выйдут за его пределы.</string>
     <string name="onb_source_title">Откуда берутся ваши ночи</string>
     <string name="onb_source_body">Подойдёт любое приложение, которое пишет сон и пульс в Health Connect. Выберите то, которым пользуются ваши часы или кольцо.</string>
-    <string name="source_last_sync">Последний сон: {date}</string>
-    <string name="onb_use_source">Использовать {source}</string>
+    <string name="source_last_sync">Последний сон: %1$s</string>
+    <string name="onb_use_source">Использовать %1$s</string>
     <string name="onb_nosource_title">В Health Connect пока нет данных о сне</string>
     <string name="onb_nosource_body">Разрешите приложению часов или кольца передавать сон и пульс в Health Connect, затем проверьте снова.</string>
     <string name="onb_perm_title">Разрешите чтение в Health Connect</string>
@@ -287,23 +286,23 @@
     <string name="onb_notif_body">Только если за одну ночь два или больше показателя выйдут за пределы обычного диапазона.</string>
     <string name="onb_notif_allow">Разрешить уведомления</string>
     <plurals name="onb_ready_history_title">
-        <item quantity="one">Найдена {n} прошлая ночь</item>
-        <item quantity="few">Найдены {n} прошлые ночи</item>
-        <item quantity="many">Найдено {n} прошлых ночей</item>
-        <item quantity="other">Найдено {n} прошлой ночи</item>
+        <item quantity="one">Найдена %1$s прошлая ночь</item>
+        <item quantity="few">Найдены %1$s прошлые ночи</item>
+        <item quantity="many">Найдено %1$s прошлых ночей</item>
+        <item quantity="other">Найдено %1$s прошлой ночи</item>
     </plurals>
     <string name="onb_ready_history_body">Ваш обычный диапазон готов. Прошлая ночь уже сравнена.</string>
     <string name="onb_ready_learn_title">Обучение начнётся этой ночью</string>
     <plurals name="onb_ready_learn_body">
-        <item quantity="one">{n} из 7 ночей уже есть.</item>
-        <item quantity="few">{n} из 7 ночей уже есть.</item>
-        <item quantity="many">{n} из 7 ночей уже есть.</item>
-        <item quantity="other">{n} из 7 ночей уже есть.</item>
+        <item quantity="one">%1$s из 7 ночей уже есть.</item>
+        <item quantity="few">%1$s из 7 ночей уже есть.</item>
+        <item quantity="many">%1$s из 7 ночей уже есть.</item>
+        <item quantity="other">%1$s из 7 ночей уже есть.</item>
     </plurals>
 
     <!-- Settings -->
     <string name="settings_source">Источник</string>
-    <string name="settings_last_read">Прочитано {time}</string>
+    <string name="settings_last_read">Прочитано %1$s</string>
     <string name="settings_never_read">Ещё не прочитано</string>
     <string name="settings_notif_blocked">Выключено в настройках системы</string>
     <string name="settings_sens_preview_learning">Предпросмотр появится после периода обучения.</string>
@@ -314,13 +313,13 @@
     <string name="sens_more">Чаще</string>
     <string name="sens_more_desc">Учитываются и небольшие изменения. Должны измениться два показателя.</string>
     <plurals name="sens_preview">
-        <item quantity="one">С этой настройкой заметка пришла бы в {k} из последних {n} ночей.</item>
-        <item quantity="few">С этой настройкой заметка пришла бы в {k} из последних {n} ночей.</item>
-        <item quantity="many">С этой настройкой заметка пришла бы в {k} из последних {n} ночей.</item>
-        <item quantity="other">С этой настройкой заметка пришла бы в {k} из последних {n} ночей.</item>
+        <item quantity="one">С этой настройкой заметка пришла бы в %1$s из последних %2$s ночей.</item>
+        <item quantity="few">С этой настройкой заметка пришла бы в %1$s из последних %2$s ночей.</item>
+        <item quantity="many">С этой настройкой заметка пришла бы в %1$s из последних %2$s ночей.</item>
+        <item quantity="other">С этой настройкой заметка пришла бы в %1$s из последних %2$s ночей.</item>
     </plurals>
-    <string name="source_change_title">Переключиться на {source}?</string>
-    <string name="source_change_body">Устройства измеряют немного по-разному, поэтому NightBaseline заново узнает ваш обычный диапазон по ночам из {source}. История сохранится.</string>
+    <string name="source_change_title">Переключиться на %1$s?</string>
+    <string name="source_change_body">Устройства измеряют немного по-разному, поэтому NightBaseline заново узнает ваш обычный диапазон по ночам из %1$s. История сохранится.</string>
     <string name="settings_theme">Тема</string>
     <string name="theme_system">Как в системе</string>
     <string name="theme_light">Светлая</string>
@@ -347,25 +346,25 @@
     <string name="footer_about_link">О приложении</string>
 
     <!-- Accessibility -->
-    <string name="a11y_tile">{metric}: {value}. {status}. Обычный диапазон от {low} до {high}.</string>
-    <string name="a11y_tile_learning">{metric}: {value}. Узнаём обычный диапазон, {n} из 7 ночей.</string>
-    <string name="a11y_tile_missing">{metric}: {status}. {detail}</string>
-    <string name="a11y_summary">{night_label}. {title}. {body}</string>
-    <string name="a11y_history_day">{date}: {status}</string>
-    <string name="a11y_learning_progress">Собрано {n} из 7 ночей</string>
+    <string name="a11y_tile">%1$s: %2$s. %3$s. Обычный диапазон от %4$s до %5$s.</string>
+    <string name="a11y_tile_learning">%1$s: %2$s. Узнаём обычный диапазон, %3$s из 7 ночей.</string>
+    <string name="a11y_tile_missing">%1$s: %2$s. %3$s</string>
+    <string name="a11y_summary">%1$s. %2$s. %3$s</string>
+    <string name="a11y_history_day">%1$s: %2$s</string>
+    <string name="a11y_learning_progress">Собрано %1$s из 7 ночей</string>
     <string name="a11y_prev_night">Предыдущая ночь</string>
     <string name="a11y_next_night">Следующая ночь</string>
-    <string name="a11y_onb_step">Шаг {n} из 6</string>
-    <string name="a11y_chart_point">{date}: {value}, {status}</string>
-    <string name="chart_tooltip_no_value">{date}: нет значения</string>
-    <string name="chart_tooltip_short">{date}: короткая ночь, не сравнивается</string>
-    <string name="onb_step">Шаг {n} из 6</string>
-    <string name="a11y_history_strip">Последние 7 ночей: {list}. Открывает историю.</string>
+    <string name="a11y_onb_step">Шаг %1$s из 6</string>
+    <string name="a11y_chart_point">%1$s: %2$s, %3$s</string>
+    <string name="chart_tooltip_no_value">%1$s: нет значения</string>
+    <string name="chart_tooltip_short">%1$s: короткая ночь, не сравнивается</string>
+    <string name="onb_step">Шаг %1$s из 6</string>
+    <string name="a11y_history_strip">Последние 7 ночей: %1$s. Открывает историю.</string>
     <plurals name="a11y_period">
-        <item quantity="one">{n} ночь</item>
-        <item quantity="few">{n} ночи</item>
-        <item quantity="many">{n} ночей</item>
-        <item quantity="other">{n} ночи</item>
+        <item quantity="one">%1$s ночь</item>
+        <item quantity="few">%1$s ночи</item>
+        <item quantity="many">%1$s ночей</item>
+        <item quantity="other">%1$s ночи</item>
     </plurals>
     <string name="a11y_back">Назад</string>
     <string name="a11y_close">Закрыть</string>
@@ -386,21 +385,21 @@
     <string name="home_expect_title">Чего ожидать</string>
     <string name="home_expect_body">Через 7 ночей у каждого показателя появится обычный диапазон. В следующие недели он продолжит уточняться и будет использовать до 28 ночей. Заметки начнутся после периода обучения.</string>
     <plurals name="period_nights">
-        <item quantity="one">{n} ночь</item>
-        <item quantity="few">{n} ночи</item>
-        <item quantity="many">{n} ночей</item>
-        <item quantity="other">{n} ночи</item>
+        <item quantity="one">%1$s ночь</item>
+        <item quantity="few">%1$s ночи</item>
+        <item quantity="many">%1$s ночей</item>
+        <item quantity="other">%1$s ночи</item>
     </plurals>
     <plurals name="stats_inside">
-        <item quantity="one">В обычном диапазоне: {k} из {n} ночи</item>
-        <item quantity="few">В обычном диапазоне: {k} из {n} ночей</item>
-        <item quantity="many">В обычном диапазоне: {k} из {n} ночей</item>
-        <item quantity="other">В обычном диапазоне: {k} из {n} ночи</item>
+        <item quantity="one">В обычном диапазоне: %1$s из %2$s ночи</item>
+        <item quantity="few">В обычном диапазоне: %1$s из %2$s ночей</item>
+        <item quantity="many">В обычном диапазоне: %1$s из %2$s ночей</item>
+        <item quantity="other">В обычном диапазоне: %1$s из %2$s ночи</item>
     </plurals>
-    <string name="stats_range">Обычный диапазон: {low}–{high}</string>
-    <string name="stats_median">Среднее значение: {value}</string>
+    <string name="stats_range">Обычный диапазон: %1$s–%2$s</string>
+    <string name="stats_median">Среднее значение: %1$s</string>
     <string name="detail_computed_title">Как считается ваш обычный диапазон</string>
-    <string name="detail_source_line">Измерено: {source}. Последняя синхронизация {time}.</string>
+    <string name="detail_source_line">Измерено: %1$s. Последняя синхронизация %2$s.</string>
     <string name="history_title">История</string>
     <string name="history_view_list">Список</string>
     <string name="history_view_calendar">Календарь</string>
@@ -428,20 +427,20 @@
     <string name="sens_advanced">Дополнительно</string>
     <string name="sens_window">Окно диапазона</string>
     <plurals name="sens_window_value">
-        <item quantity="one">{n} ночь</item>
-        <item quantity="few">{n} ночи</item>
-        <item quantity="many">{n} ночей</item>
-        <item quantity="other">{n} ночи</item>
+        <item quantity="one">%1$s ночь</item>
+        <item quantity="few">%1$s ночи</item>
+        <item quantity="many">%1$s ночей</item>
+        <item quantity="other">%1$s ночи</item>
     </plurals>
     <string name="sens_use_metric">Использовать для сравнения</string>
     <string name="sens_reset">Сбросить по умолчанию</string>
     <string name="sens_reset_title">Сбросить чувствительность?</string>
     <string name="sens_reset_body">Чувствительность вернётся к «Сбалансированно», а окно диапазона — к 28 ночам.</string>
-    <string name="about_version">Версия {version}</string>
+    <string name="about_version">Версия %1$s</string>
     <string name="about_local">Ваши данные остаются на этом телефоне. У NightBaseline нет доступа к интернету.</string>
     <string name="about_any_source">Работает с любым приложением, которое записывает данные в Health Connect.</string>
     <string name="about_licenses">Лицензии открытого ПО</string>
-    <string name="about_source_code">Исходный код: {url}</string>
+    <string name="about_source_code">Исходный код: %1$s</string>
     <string name="widget_waiting">Ждём синхронизации</string>
     <string name="widget_update_needed">Нужно обновление</string>
     <string name="widget_choose_source">Выберите источник</string>

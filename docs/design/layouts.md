@@ -677,8 +677,10 @@ Target: Tier 3 fully, Tier 2 keyboard/mouse items (`large-screens.md` section 9-
 Rendered on the JVM (Robolectric, as decided in ADR 0001) with qualifiers `w<W>dp-h<H>dp-<density>` and a
 fake `LayoutInputs` for folds (posture cannot be produced by Robolectric; the fold is injected through the same
 `LayoutInputs` used in production, so the layout code path is identical). Glass via `RenderEffect` needs API 31+;
-whether Robolectric's native graphics renders Haze blur is **[hypothesis]**; if not, glass screenshots come from
-an emulator run and Robolectric renders the fallback variant only.
+Robolectric's native graphics (SDK 35) with `robolectric.pixelCopyRenderMode=hardware` does render the Haze blur
+**[verified 2026-11-25: `HazeBlurProbeTest`, stripes blurred to mid grey while the backdrop halves stay apart]**, so
+the JVM screenshots include real glass; the probe fails if that ever changes, and then Robolectric renders the
+fallback variant only.
 
 | Id | Represents | W x H dp | Density | Posture / fold | Mode |
 |---|---|---|---|---|---|
@@ -733,4 +735,4 @@ on every build, so:
 - Actual inner-screen density used by the owner (520 physical or an override) **[hypothesis]**.
 - Haze blur cost on the inner screen at two panes plus rail (frame timing during scroll and fold transition);
   ADR 0003 requires the measurement before release.
-- Robolectric support for `RenderEffect` blur in screenshots **[hypothesis]**.
+- ~~Robolectric support for `RenderEffect` blur in screenshots~~ verified: it renders (`HazeBlurProbeTest`).
