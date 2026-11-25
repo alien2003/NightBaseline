@@ -53,6 +53,7 @@ import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.TonalButton
+import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.history.CompactNightSummary
 import io.github.alien2003.nightbaseline.ui.home.BlockHeading
 import io.github.alien2003.nightbaseline.ui.home.FitColumn
@@ -372,7 +373,7 @@ private fun BookNight(
                 .padding(start = layout.gutter)
                 .width(startWidth)
                 .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberPaneScrollState())
                 .padding(top = top, bottom = bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {

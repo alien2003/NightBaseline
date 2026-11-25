@@ -1,6 +1,7 @@
 package io.github.alien2003.nightbaseline.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,13 +24,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -52,8 +58,11 @@ import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 /**
  * The top bar (`screens.md` 4, `layouts.md` 4.3). Transparent over the solid window background while content rests;
  * `material.glass.topBar` (progressive blur, tint) once content scrolls under it, with the tint at full strength
- * after [NbDimens.topBarTintDistance], before content reaches the title. In the fallback the fill is the window
- * background plus a `separator` hairline. Under reduced motion the tint switches at the threshold without a fade.
+ * after [NbDimens.topBarTintDistance], before content reaches the title. The title row itself gets an opaque
+ * `solid.topBar` backing at the same time, so text never sits directly on blur (only the status-bar strip shows the
+ * progressive glass). Content in any pane registered through [rememberPaneScrollState] counts as scrolled under. In
+ * the fallback the fill is the window background plus a `separator` hairline. Under reduced motion the tint switches
+ * at the threshold without a fade.
  *
  * @param scrolledUnder how far content has moved under the bar's bottom edge (0 at rest).
  * @param large the large-title variant of top-level screens (`type.largeTitle` at rest, collapsing to `type.title`).
@@ -74,9 +83,15 @@ fun ShellTopBar(
 ) {
     val colors = NbTheme.colors
     val motion = NbTheme.motion
-    val fraction = (scrolledUnder / NbDimens.topBarTintDistance).coerceIn(0f, 1f)
+    // Any pane that scrolls on its own (second pane, supporting pane) also counts as content under the bar.
+    val paneScroll = LocalPaneScrolls.current?.maxScroll ?: 0
+    val under = maxOf(scrolledUnder, with(LocalDensity.current) { paneScroll.toDp() })
+    val fraction = (under / NbDimens.topBarTintDistance).coerceIn(0f, 1f)
     val target = if (motion.reduced) (if (fraction > 0f) 1f else 0f) else fraction
     val strength by animateFloatAsState(target, motion.crossfade(), label = "topBarTint")
+    // The title row's solid backing follows the scroll offset directly (no fade lag): it is opaque before content
+    // can reach the title, so text never sits directly on blur (principles.md, tokens.md 7.1).
+    val backing = maxOf(strength, target)
     val barHeight = if (large) lerp(NbDimens.topBarLarge, NbDimens.topBarCollapsed, collapse) else height
     val titleStyle =
         if (large) lerp(NbTheme.typography.largeTitle, NbTheme.typography.title, collapse) else NbTheme.typography.title
@@ -89,6 +104,7 @@ fun ShellTopBar(
         Row(
             Modifier
                 .fillMaxWidth()
+                .background(colors.solidTopBar.copy(alpha = backing))
                 .sizeIn(minHeight = barHeight)
                 .padding(horizontal = NbSpace.s2),
             verticalAlignment = if (large && collapse < 1f) Alignment.Bottom else Alignment.CenterVertically,
@@ -123,6 +139,41 @@ fun ShellTopBar(
             )
         }
     }
+}
+
+/**
+ * Scroll states of panes that scroll on their own beside the main column (two-pane detail, supporting and book
+ * panes). [AppScaffold][io.github.alien2003.nightbaseline.ui.shell.AppScaffold] provides one; [ShellTopBar] treats
+ * the furthest scrolled pane as content under the bar.
+ */
+class PaneScrolls {
+    private val states = mutableStateListOf<ScrollState>()
+
+    /** The largest scroll offset of the registered panes, px. */
+    val maxScroll: Int get() = states.maxOfOrNull { it.value } ?: 0
+
+    internal fun add(state: ScrollState) {
+        states += state
+    }
+
+    internal fun remove(state: ScrollState) {
+        states -= state
+    }
+}
+
+/** The [PaneScrolls] of the current shell, null outside it. */
+val LocalPaneScrolls = staticCompositionLocalOf<PaneScrolls?> { null }
+
+/** A saved [ScrollState] for a pane beside the main column, registered with the shell's [PaneScrolls]. */
+@Composable
+fun rememberPaneScrollState(): ScrollState {
+    val state = rememberScrollState()
+    val panes = LocalPaneScrolls.current
+    DisposableEffect(panes, state) {
+        panes?.add(state)
+        onDispose { panes?.remove(state) }
+    }
+    return state
 }
 
 /**

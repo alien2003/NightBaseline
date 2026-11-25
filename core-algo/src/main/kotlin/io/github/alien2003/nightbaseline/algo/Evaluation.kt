@@ -16,7 +16,10 @@ data class Baseline(
     val spread: Double,
     /** Nights in the window. */
     val nights: Int,
-    /** Lower edge of the range: `median − z · spread`, at most `median − minAbsDeviation`. */
+    /**
+     * Lower edge of the range: `median − z · spread`, at most `median − minAbsDeviation`; for sleep duration never
+     * below [AlgoParams.minNightMinutes] (shorter nights are short nights, not compared).
+     */
     val low: Double,
     /** Upper edge of the range. */
     val high: Double,
@@ -120,7 +123,9 @@ object Evaluator {
         val median = Stats.median(values)
         val spread = maxOf(Stats.robustSd(values), spec.minSpread)
         val half = maxOf(params.zThreshold * spread, spec.minAbsDeviation)
-        return Baseline(spec.id, median, spread, values.size, median - half, median + half)
+        // A sleep length under the short-night limit is never compared, so the range never reaches below it.
+        val low = if (spec.aggregation == Aggregation.SLEEP_MINUTES) maxOf(median - half, params.minNightMinutes) else median - half
+        return Baseline(spec.id, median, spread, values.size, low, median + half)
     }
 
     /** Valid nights before [date] within the lookback, newest first. */

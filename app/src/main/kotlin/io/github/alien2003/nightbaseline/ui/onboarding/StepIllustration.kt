@@ -29,6 +29,9 @@ import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 /** Height of the step illustration (`layouts.md` 5.5). */
 internal val IllustrationHeight: Dp = 160.dp
 
+/** Height of the step illustration in the start column of the wide modes (two columns, card, book). */
+internal val IllustrationHeightWide: Dp = 240.dp
+
 /** Kinds of the step illustration. */
 internal enum class Illustration {
     /** Every point inside the band. */
@@ -56,13 +59,14 @@ internal fun OnboardingState.illustration(): Illustration =
 internal fun StepIllustration(
     kind: Illustration,
     modifier: Modifier = Modifier,
+    height: Dp = IllustrationHeight,
 ) {
     val colors = NbTheme.colors
     Box(
         modifier
             .fillMaxWidth()
             .widthIn(max = 480.dp)
-            .height(IllustrationHeight)
+            .height(height)
             .solidCard(NbShapes.l)
             .clearAndSetSemantics {},
     ) {

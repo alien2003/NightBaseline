@@ -27,8 +27,8 @@
     <string name="notif_public_title">NightBaseline</string>
     <string name="notif_public_body">Результат прошлой ночи готов.</string>
 
-    <!-- ru uses the wake date: argument 2. -->
-    <string name="night_label">Ночь на %2$s</string>
+    <!-- ru: evening (argument 3) and wake date (argument 2). -->
+    <string name="night_label">Ночь с %3$s на %2$s</string>
 
     <string name="notif_perm_title">NightBaseline не может прочитать данные о сне</string>
     <string name="notif_perm_body">Доступ в Health Connect был выключен. Нажмите, чтобы включить снова.</string>

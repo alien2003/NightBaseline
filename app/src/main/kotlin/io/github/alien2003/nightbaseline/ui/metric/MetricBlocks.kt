@@ -82,10 +82,11 @@ internal fun UiText.usualRange(metric: MetricUi): String? {
 
 /** The metric-specific "which side counts" line, or null when both sides count. */
 internal fun UiText.sideLine(state: MetricDetailState): String? =
-    when (state.countedSide) {
-        Sensitivity.LOW -> string(R.string.metric_side_low_only, name(state.metric.metric))
-        Sensitivity.HIGH -> string(R.string.metric_side_high_only, name(state.metric.metric))
-        Sensitivity.BOTH -> null
+    when {
+        state.countedSide == Sensitivity.LOW -> string(R.string.metric_side_low_only, name(state.metric.metric))
+        state.countedSide == Sensitivity.HIGH -> string(R.string.metric_side_high_only, name(state.metric.metric))
+        state.wideSleepRange -> string(R.string.detail_sleep_range_wide)
+        else -> null
     }
 
 /** The big value + unit of the anchor night (a dash when there is none). */
@@ -195,7 +196,7 @@ internal fun HeaderCard(
 }
 
 /** The anchor night's label ("Night of Nov 24–25"). */
-internal fun UiText.nightLabelOf(state: MetricDetailState): String = nightLabel(state.anchorDate.minusDays(1), state.anchorDate)
+internal fun UiText.nightLabelOf(state: MetricDetailState): String = nightLabel(state.anchorDate)
 
 /** The screen-level problem card (`E-SOURCE-GONE`, `E-PERM`, `E-HC-UPDATE`); null for the inline ones. */
 @Composable

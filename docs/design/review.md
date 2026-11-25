@@ -218,3 +218,29 @@ Findings to fix:
 5. Sleep duration range on real data reads "2 h 33 min – 11 h 30 min": correct for a very variable person but its lower
    edge is below the 3 h short-night cut-off. Clamp the lower edge to the short-night limit and explain the width.
 6. Onboarding on the wide inner screen: the start pane (step and illustration) floats in empty space.
+
+### Round 2 fixes
+
+1. Top bar: once content is under it, the title row gets an opaque `solid.topBar` backing driven directly by the
+   scroll offset (full after 8 dp, before content reaches the title); only the status-bar strip keeps the progressive
+   glass. Panes that scroll on their own (two-pane Home detail and supporting panes, Book start panes of Metric and
+   Night detail, Settings list pane, Learning end pane) register with the shell (`rememberPaneScrollState`), so they
+   also drive the tint. Metric detail starts its content below the measured bar bottom (status bar + bar) + 12 dp.
+   New `-scrolled` screenshots of Metric detail show content part-way under the bar.
+2. Fold / unfold hand-over keeps the chart period and the selected night: `MetricRoute` carries `period` and `point`
+   (Home's detail pane to the pushed screen), and the pushed screen hands both back to Home (`SELECT_PERIOD`,
+   `SELECT_POINT`). `NavigationTest` reproduces the hand-over with 90 nights in both directions.
+3. `explainer_range` (en, ru) now says the last 28 nights with readings from the past 60 days, at least 7.
+4. One night label everywhere: `NightLabel` (:work) always names the evening before the wake date to the wake date in
+   the locale's short range form ("Nov 24 – 25" en-US, "24–25 Nov" en-GB; ru "evening to wake date" form), used by
+   Home, Night detail, Metric detail, History, Learning and the notification. Sleep that started after midnight no
+   longer produces a single-date label.
+5. Sleep duration: `Baseline.low` never goes below `minNightMinutes` (3 h) in :core-algo (test added; statuses do not
+   change, shorter nights are never compared). A range wider than 6 h adds `detail_sleep_range_wide` to the Metric
+   detail explainer (new `DurationWide` screenshot sample).
+6. Onboarding (Medium, WideShort, Book, card): the two columns form one block, top-aligned (step indicator level with
+   the title), centred vertically in the window and scrolling as one; the illustration is 240 dp tall there.
+7. Sensitivity copy: `sens_fewer_desc`, `sens_balanced_desc`, `sens_more_desc` (en, ru) now say that the presets only
+   change how big a change must be (fewer / more notes) and that two measurements must move for all three, matching
+   `SensitivityLevel` (z 3.0 / 2.5 / 2.0) and ALGORITHM.md; "Fewer notes" uses `sens_fewer_desc` again and the
+   interim `setup_sens_fewer_desc` is removed. `screens.md` 7.7 lists the z values per preset.

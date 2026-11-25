@@ -2,9 +2,7 @@ package io.github.alien2003.nightbaseline.ui.model
 
 import android.content.res.Resources
 import android.icu.text.DateFormat
-import android.icu.text.DateIntervalFormat
 import android.icu.text.ListFormatter
-import android.icu.util.DateInterval
 import android.icu.util.TimeZone
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
@@ -15,6 +13,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalResources
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.algo.MetricId
+import io.github.alien2003.nightbaseline.work.notify.NightLabel
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -297,20 +296,16 @@ class UiText(
         }
     }
 
-    /** "Night of Nov 24–25" (en) / the wake-date form (ru). */
-    fun nightLabel(night: NightUi): String = nightLabel(night.startDate, night.wakeDate)
+    /** "Night of Nov 24 – 25" (en-US), "Night of 24–25 Nov" (en-GB), the evening-to-wake form in ru. */
+    fun nightLabel(night: NightUi): String = nightLabel(night.wakeDate)
 
-    /** Night label from its start and wake dates. */
-    fun nightLabel(
-        start: LocalDate,
-        wake: LocalDate,
-    ): String {
-        val interval =
-            DateIntervalFormat.getInstance(SKELETON_SHORT, locale).apply { timeZone = TimeZone.GMT_ZONE }
-        val from = start.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() + NOON_MS
-        val to = wake.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() + NOON_MS
-        val range = if (start == wake) dateShort(wake) else interval.format(DateInterval(from, to))
-        return string(R.string.night_label, range, dateLong(wake))
+    /**
+     * The one night label ([NightLabel], shared with the notification): always the evening before [wake] to [wake],
+     * whatever time the sleep started (a sleep that began after midnight is still the night of 24–25 Nov).
+     */
+    fun nightLabel(wake: LocalDate): String {
+        val (range, wakeLong, start) = NightLabel.args(wake, locale)
+        return string(R.string.night_label, range, wakeLong, start)
     }
 
     /** "Nov 25". */

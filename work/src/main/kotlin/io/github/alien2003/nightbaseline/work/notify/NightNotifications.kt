@@ -18,7 +18,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alien2003.nightbaseline.algo.MetricId
 import io.github.alien2003.nightbaseline.work.R
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.Locale
 import javax.inject.Inject
@@ -86,26 +85,12 @@ object NoticeText {
         }
     }
 
-    /**
-     * `night_label` of the night that ends on [wakeDate]: argument 1 is the range from the previous day ("Nov 24–25",
-     * en), argument 2 the wake date alone (day and month name, used by ru).
-     */
+    /** `night_label` of the night that ends on [wakeDate], the same label the app's screens show ([NightLabel]). */
     fun nightLabel(
         res: Resources,
         wakeDate: String,
         locale: Locale,
-    ): String {
-        val end = LocalDate.parse(wakeDate)
-        val start = end.minusDays(1)
-        val monthDay = DateTimeFormatter.ofPattern("MMM d", locale)
-        val range =
-            if (start.month == end.month) {
-                "${start.format(monthDay)}–${end.dayOfMonth}"
-            } else {
-                "${start.format(monthDay)}–${end.format(monthDay)}"
-            }
-        return res.getString(R.string.night_label, range, end.format(DateTimeFormatter.ofPattern("d MMMM", locale)))
-    }
+    ): String = NightLabel.format(res, LocalDate.parse(wakeDate), locale)
 }
 
 /**

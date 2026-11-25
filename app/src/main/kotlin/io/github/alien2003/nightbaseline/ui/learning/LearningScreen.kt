@@ -37,6 +37,7 @@ import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.TonalButton
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
@@ -168,7 +169,7 @@ private fun TwoPaneLearning(
                 .padding(end = layout.gutter + padding.calculateEndPadding(direction)),
         ) {
             val columns = if (maxWidth >= TwoColumnMin) 2 else 1
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).then(vertical)) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberPaneScrollState()).then(vertical)) {
                 AlreadyVisible(state, columns, actions)
             }
         }

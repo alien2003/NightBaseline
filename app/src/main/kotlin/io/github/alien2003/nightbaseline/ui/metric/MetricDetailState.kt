@@ -1,6 +1,7 @@
 package io.github.alien2003.nightbaseline.ui.metric
 
 import androidx.compose.runtime.Immutable
+import io.github.alien2003.nightbaseline.algo.MetricId
 import io.github.alien2003.nightbaseline.algo.Sensitivity
 import io.github.alien2003.nightbaseline.ui.model.ChartPeriod
 import io.github.alien2003.nightbaseline.ui.model.ChartPointUi
@@ -80,7 +81,21 @@ data class MetricDetailState(
     /** True when there is something to chart (any stored value or range in the period). */
     val hasChart: Boolean
         get() = shownPoints.any { it.value != null || it.range != null } || (learning && series != null)
+
+    /**
+     * Sleep duration whose usual range spans more than [WIDE_SLEEP_RANGE_MINUTES]: the person's sleep length varies a
+     * lot, so only big changes are noticed (`detail_sleep_range_wide`).
+     */
+    val wideSleepRange: Boolean
+        get() {
+            if (metric.metric != MetricId.SLEEP_DURATION) return false
+            val range = metric.range ?: series?.points?.lastOrNull { it.range != null }?.range ?: return false
+            return range.high - range.low > WIDE_SLEEP_RANGE_MINUTES
+        }
 }
+
+/** From this width (6 h) a sleep duration range counts as very wide. */
+const val WIDE_SLEEP_RANGE_MINUTES: Double = 360.0
 
 /** Robust spread of a range: the band is the median plus or minus about two spreads (`AlgoParams` z = 2). */
 private const val BAND_SPREADS = 4.0

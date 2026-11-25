@@ -9,6 +9,8 @@
     <!-- ExplainerCard line for metrics where only one side counts (SpO2: lower; respiratory rate: higher). -->
     <string name="metric_side_low_only">Only lower values of %1$s count. Higher values are shown but never counted.</string>
     <string name="metric_side_high_only">Only higher values of %1$s count. Lower values are shown but never counted.</string>
+    <!-- ExplainerCard line for sleep duration when its usual range spans more than 6 hours. -->
+    <string name="detail_sleep_range_wide">Your sleep length varies a lot from night to night, so your usual range is wide and only big changes are noticed.</string>
     <!-- Header sentence of M-SIDE-IGNORED on the low side (detail_side_ignored covers the high side). -->
     <string name="metric_detail_side_ignored_lower">Lower values of %1$s are shown but don\'t count as a change.</string>
     <!-- Source line when the last sync time is not known. -->

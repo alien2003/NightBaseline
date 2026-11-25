@@ -62,6 +62,7 @@ import io.github.alien2003.nightbaseline.ui.components.TonalButton
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.chartPoint
 import io.github.alien2003.nightbaseline.ui.components.chartSummary
+import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.components.tone
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
@@ -103,7 +104,8 @@ fun MetricDetailScreen(
 ) {
     val text = rememberUiText()
     val density = LocalDensity.current
-    var barHeight by remember { mutableStateOf(topBarHeight(layout.mode)) }
+    // The measured bottom edge of the bar (status bar + bar, grown with the font scale); content starts below it.
+    var barBottom by remember { mutableStateOf(0.dp) }
     val showTopBar = layout.mode != LayoutMode.Glance && layout.mode != LayoutMode.Tabletop
     AppScaffold(
         layout = layout,
@@ -112,12 +114,11 @@ fun MetricDetailScreen(
         modifier = modifier,
         topBar = { padding ->
             if (showTopBar) {
-                val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
                 Box(
                     Modifier
                         .padding(start = padding.calculateStartPadding(LocalLayoutDirection.current))
                         .testTag(METRIC_TOP_BAR_TAG)
-                        .onSizeChanged { barHeight = with(density) { it.height.toDp() } - statusBar },
+                        .onSizeChanged { barBottom = with(density) { it.height.toDp() } },
                 ) {
                     ShellTopBar(
                         title = text.name(state.metric.metric),
@@ -139,7 +140,8 @@ fun MetricDetailScreen(
         },
         overlay = { if (state.explainerOpen) ExplainerOverlay(state, layout, actions) },
     ) { padding ->
-        val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + barHeight + NbSpace.s3
+        val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val top = maxOf(barBottom, statusBar + topBarHeight(layout.mode)) + NbSpace.s3
         when (layout.mode) {
             LayoutMode.Glance -> GlanceDetail(state, actions, padding, scroll)
             LayoutMode.Tabletop -> TabletopDetail(state, layout, actions, padding, scroll)
@@ -556,7 +558,7 @@ private fun BookDetail(
             Modifier
                 .width(startWidth)
                 .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberPaneScrollState())
                 .padding(start = layout.gutter, top = top, bottom = padding.calculateBottomPadding() + NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {

@@ -12,7 +12,7 @@
     <string name="home_title">Last night</string>
     <string name="home_last_result_heading">Last result: %1$s</string>
     <string name="home_not_recorded_row">Not recorded by %1$s: %2$s</string>
-    <!-- {range}: the night's dates ("Nov 24–25"); {end_date}: the wake date ("Nov 25"). en shows the range, ru the wake date. -->
+    <!-- NightLabel: %1$s the date range from the evening before ("Nov 24 – 25"), %2$s the wake date ("November 25"), %3$s the evening (day, or day and month). en shows the range, ru uses 3 and 2. -->
     <string name="night_label">Night of %1$s</string>
 
     <!-- Metrics -->
@@ -275,11 +275,11 @@
     <string name="settings_notif_blocked">Turned off in system settings</string>
     <string name="settings_sens_preview_learning">A preview appears after the learning period.</string>
     <string name="sens_fewer">Fewer notes</string>
-    <string name="sens_fewer_desc">Only larger changes count, and three measurements must move.</string>
+    <string name="sens_fewer_desc">Only larger changes count, so you get fewer notes. Two measurements still need to move.</string>
     <string name="sens_balanced">Balanced</string>
-    <string name="sens_balanced_desc">Recommended. Two measurements must move.</string>
+    <string name="sens_balanced_desc">Recommended. Clear changes count. Two measurements need to move.</string>
     <string name="sens_more">More notes</string>
-    <string name="sens_more_desc">Smaller changes count too. Two measurements must move.</string>
+    <string name="sens_more_desc">Smaller changes count too, so you get more notes. Two measurements still need to move.</string>
     <plurals name="sens_preview">
         <item quantity="one">With this setting, %1$s of your last %2$s nights would have sent a note.</item>
         <item quantity="other">With this setting, %1$s of your last %2$s nights would have sent a note.</item>
@@ -301,7 +301,7 @@
 
     <!-- Range explainer and disclaimer -->
     <string name="explainer_title">How your usual range works</string>
-    <string name="explainer_range">For each measurement, NightBaseline takes your last 14 to 28 nights and finds the middle value. Your usual range is that middle value plus or minus how much your nights normally vary. Unusual single nights barely move it.</string>
+    <string name="explainer_range">For each measurement, NightBaseline takes your last 28 nights with readings (from the past 60 days, at least 7) and finds the middle value. Your usual range is that middle value plus or minus how much your nights normally vary. Unusual single nights barely move it.</string>
     <string name="explainer_learning">It needs 7 nights to start. Nights shorter than 3 hours and nights without readings are left out.</string>
     <string name="explainer_outside">A night counts as outside when it is clearly away from your middle value, both compared with your normal variation and by a minimum amount, so tiny changes don\'t count.</string>
     <string name="explainer_meaning_title">What \"outside your usual range\" means</string>

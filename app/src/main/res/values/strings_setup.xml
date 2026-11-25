@@ -36,7 +36,6 @@
     <string name="setup_notif_results_summary">A note in the morning when two or more measurements move.</string>
     <string name="setup_notif_problems_summary">For example when access to Health Connect was turned off.</string>
     <string name="setup_sens_intro">Choose how readily a measurement counts as outside your usual range.</string>
-    <string name="setup_sens_fewer_desc">Only larger changes count. Two measurements must still move.</string>
     <string name="setup_glass_on_now">On now</string>
     <string name="setup_glass_off_user">Plain surfaces everywhere</string>
     <string name="setup_group_privacy">Data and privacy</string>

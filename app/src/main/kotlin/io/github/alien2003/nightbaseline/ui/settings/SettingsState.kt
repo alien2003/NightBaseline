@@ -21,7 +21,7 @@ enum class SensitivityPreset(
     @param:StringRes val description: Int,
 ) {
     /** z 3.0: only larger changes. */
-    Fewer(3.0, R.string.sens_fewer, R.string.setup_sens_fewer_desc),
+    Fewer(3.0, R.string.sens_fewer, R.string.sens_fewer_desc),
 
     /** z 2.5: the default. */
     Balanced(2.5, R.string.sens_balanced, R.string.sens_balanced_desc),

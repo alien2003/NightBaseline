@@ -32,7 +32,6 @@
     <string name="setup_notif_results_summary">Заметка утром, когда два показателя или больше выходят за пределы.</string>
     <string name="setup_notif_problems_summary">Например, когда доступ к Health Connect выключен.</string>
     <string name="setup_sens_intro">Выберите, насколько легко показатель считается вышедшим за обычный диапазон.</string>
-    <string name="setup_sens_fewer_desc">Учитываются только заметные изменения. Выйти за пределы по-прежнему должны два показателя.</string>
     <string name="setup_glass_on_now">Сейчас включены</string>
     <string name="setup_glass_off_user">Везде простые поверхности</string>
     <string name="setup_group_privacy">Данные и конфиденциальность</string>

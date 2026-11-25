@@ -12,8 +12,8 @@
     <string name="home_title">Прошлая ночь</string>
     <string name="home_last_result_heading">Последний результат: %1$s</string>
     <string name="home_not_recorded_row">%1$s не записывает: %2$s</string>
-    <!-- en "Night of Nov 24–25"; ru uses the wake date -->
-    <string name="night_label">Ночь на %2$s</string>
+    <!-- en "Night of Nov 24 – 25"; ru: evening (argument 3) and wake date (argument 2) -->
+    <string name="night_label">Ночь с %3$s на %2$s</string>
 
     <!-- Metrics -->
     <string name="metric_sleeping_hr">Пульс во сне</string>
@@ -307,11 +307,11 @@
     <string name="settings_notif_blocked">Выключено в настройках системы</string>
     <string name="settings_sens_preview_learning">Предпросмотр появится после периода обучения.</string>
     <string name="sens_fewer">Реже</string>
-    <string name="sens_fewer_desc">Учитываются только более заметные изменения, и должны измениться три показателя.</string>
+    <string name="sens_fewer_desc">Учитываются только более заметные изменения, поэтому заметок меньше. Измениться по-прежнему должны два показателя.</string>
     <string name="sens_balanced">Сбалансированно</string>
-    <string name="sens_balanced_desc">Рекомендуется. Должны измениться два показателя.</string>
+    <string name="sens_balanced_desc">Рекомендуется. Учитываются явные изменения. Измениться должны два показателя.</string>
     <string name="sens_more">Чаще</string>
-    <string name="sens_more_desc">Учитываются и небольшие изменения. Должны измениться два показателя.</string>
+    <string name="sens_more_desc">Учитываются и небольшие изменения, поэтому заметок больше. Измениться по-прежнему должны два показателя.</string>
     <plurals name="sens_preview">
         <item quantity="one">С этой настройкой заметка пришла бы в %1$s из последних %2$s ночей.</item>
         <item quantity="few">С этой настройкой заметка пришла бы в %1$s из последних %2$s ночей.</item>
@@ -335,7 +335,7 @@
 
     <!-- Range explainer and disclaimer -->
     <string name="explainer_title">Как работает обычный диапазон</string>
-    <string name="explainer_range">Для каждого показателя NightBaseline берёт ваши последние 14–28 ночей и находит среднее (медианное) значение. Обычный диапазон — это оно плюс-минус то, насколько ваши ночи обычно различаются. Отдельные необычные ночи почти не сдвигают его.</string>
+    <string name="explainer_range">Для каждого показателя NightBaseline берёт ваши последние 28 ночей с данными (за последние 60 дней, минимум 7) и находит среднее (медианное) значение. Обычный диапазон — это оно плюс-минус то, насколько ваши ночи обычно различаются. Отдельные необычные ночи почти не сдвигают его.</string>
     <string name="explainer_learning">Для начала нужно 7 ночей. Ночи короче 3 часов и ночи без измерений не учитываются.</string>
     <string name="explainer_outside">Ночь считается вне диапазона, если значение заметно отличается от вашего среднего — и с учётом обычного разброса, и не меньше чем на минимальную величину, поэтому мелкие колебания не считаются.</string>
     <string name="explainer_meaning_title">Что значит «вне обычного диапазона»</string>

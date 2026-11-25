@@ -196,6 +196,13 @@ class MetricScreenshotsTest(
             }
         } else {
             write(name, stitched(scroll))
+            if (sample == MetricSample.Higher && scroll.maxValue > 0) {
+                // Content part-way under the top bar: the title row must stay on its opaque backing.
+                val px = device.dpi / 160f
+                compose.runOnIdle { runBlocking { scroll.scrollTo((SCROLLED_DP * px).roundToInt().coerceAtMost(scroll.maxValue)) } }
+                idle()
+                write("$name-scrolled", compose.onRoot().captureToImage().asAndroidBitmap())
+            }
         }
     }
 
@@ -351,6 +358,7 @@ class MetricScreenshotsTest(
         private const val PNG_QUALITY = 100
         private const val NAV_HISTORY = "History"
         private const val BAR_ZONE_DP = 160
+        private const val SCROLLED_DP = 90
         private val PLACEHOLDER = Regex("""%(\d+\$)?[-#+0,(]*\d*(\.\d+)?[a-zA-Z]""")
 
         /** States rendered on every window. */

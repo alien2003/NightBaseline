@@ -12,6 +12,7 @@ import io.github.alien2003.nightbaseline.ui.model.MetricSeriesUi
 import io.github.alien2003.nightbaseline.ui.model.MetricState
 import io.github.alien2003.nightbaseline.ui.model.MetricUi
 import io.github.alien2003.nightbaseline.ui.model.NightState
+import io.github.alien2003.nightbaseline.ui.model.RangeUi
 import io.github.alien2003.nightbaseline.ui.sample.SampleData
 
 /** Metric detail states of `states.md` 4, 5 and 7.1 that the screenshot tests and previews render. */
@@ -30,6 +31,9 @@ enum class MetricSample {
 
     /** Sleep duration within its range (hour ticks). */
     Duration,
+
+    /** Very variable sleep duration: the range starts at the 3 h short-night limit and spans more than 6 h. */
+    DurationWide,
 
     /** `L0`: learning with no night yet. */
     LearningStart,
@@ -88,6 +92,10 @@ object MetricDetailSamples {
     private const val LAST_SYNC = "07:42"
     private val HR = MetricId.SLEEPING_HR
     private const val QUARTER = 90
+    private const val WIDE_LOW = 180.0
+    private const val WIDE_HIGH = 690.0
+    private const val WIDE_MEDIAN = 420.0
+    private val WIDE_VALUES = listOf(300.0, 420.0, 560.0, 250.0, 480.0, 650.0, 390.0)
 
     /** The state of [sample]. */
     @Suppress("CyclomaticComplexMethod", "LongMethod") // One line per state of the catalogue.
@@ -112,6 +120,21 @@ object MetricDetailSamples {
 
             MetricSample.Duration -> {
                 base(SampleData.metric(MetricId.SLEEP_DURATION, MetricState.Within))
+            }
+
+            MetricSample.DurationWide -> {
+                val wide = RangeUi(WIDE_LOW, WIDE_HIGH, WIDE_MEDIAN, nights = 28)
+                val series = SampleData.series(MetricId.SLEEP_DURATION, QUARTER)
+                val points =
+                    series.points.mapIndexed { i, p ->
+                        // The last night matches the header value.
+                        val value = if (i == series.points.lastIndex) WIDE_MEDIAN else WIDE_VALUES[i % WIDE_VALUES.size]
+                        p.copy(range = p.range?.let { wide }, value = p.value?.let { value })
+                    }
+                base(
+                    SampleData.metric(MetricId.SLEEP_DURATION, MetricState.Within).copy(value = WIDE_MEDIAN, range = wide),
+                    series.copy(points = points),
+                )
             }
 
             MetricSample.LearningStart -> {

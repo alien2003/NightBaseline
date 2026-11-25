@@ -89,8 +89,10 @@ Columns: trigger is in section 1; **cue** = glyph and color token; **action** = 
 | `E-SOURCE-GONE` | cloud-with-clock outline, `color.status.info` | `state_source_gone_title`: "{source} is no longer on this phone" | `state_source_gone_body`: "Choose another app that writes sleep data to Health Connect. Your earlier results stay here." | `action_choose_source`: "Choose source" -> Source picker | yes |
 | `E-HC-NONE` | slashed circle, `color.status.neutral` | `state_hc_none_title`: "Health Connect isn't available here" | `state_hc_none_body`: "NightBaseline needs Health Connect, which this phone or profile doesn't support. Nothing is read or stored." | `action_about`: "About NightBaseline" -> About | yes |
 
-Night label and headings: `night_label`: "Night of {start_date}–{end_date}" (en uses "Nov 24–25", ru uses the
-wake-date form, literally "Night to Nov 25"), `home_title`: "Last night", `home_last_result_heading`: "Last result: {night
+Night label and headings: `night_label`: "Night of {start_date}–{end_date}", always the evening before the wake
+date to the wake date, whatever time the sleep started, formatted in one place (`NightLabel` in :work, used by every
+screen and the notification). en uses the locale's short date range ("Nov 24 – 25" in en-US, "24–25 Nov" in en-GB),
+ru the evening-to-wake form, literally "Night from the 24th to Nov 25", `home_title`: "Last night", `home_last_result_heading`: "Last result: {night
 label}". All drafted in ru.
 
 ## 3. Banners (non-blocking, above still-valid content)
@@ -246,7 +248,7 @@ it." Tap -> Home.
 | source row | always | `settings_source`: "Source", value `{source}`; summary `settings_last_read`: "Last read {time}" or `settings_never_read`: "Not read yet" | yes |
 | `ST-NOTIF-BLOCKED` | system permission denied or channel blocked | switch disabled; summary `settings_notif_blocked`: "Turned off in system settings"; row tap -> system notification settings | yes |
 | `ST-SENS-LEARNING` | learning period | sensitivity preview hidden; `settings_sens_preview_learning`: "A preview appears after the learning period." | yes |
-| sensitivity presets | always | `sens_fewer`: "Fewer notes" / `sens_fewer_desc`: "Only larger changes count, and three measurements must move."; `sens_balanced`: "Balanced" / `sens_balanced_desc`: "Recommended. Two measurements must move."; `sens_more`: "More notes" / `sens_more_desc`: "Smaller changes count too. Two measurements must move."; preview `sens_preview` (plurals): "With this setting, {k} of your last {n} nights would have sent a note." | yes |
+| sensitivity presets | always | `sens_fewer`: "Fewer notes" / `sens_fewer_desc`: "Only larger changes count, so you get fewer notes. Two measurements still need to move."; `sens_balanced`: "Balanced" / `sens_balanced_desc`: "Recommended. Clear changes count. Two measurements need to move."; `sens_more`: "More notes" / `sens_more_desc`: "Smaller changes count too, so you get more notes. Two measurements still need to move."; preview `sens_preview` (plurals): "With this setting, {k} of your last {n} nights would have sent a note." | yes |
 | `ST-SOURCE-CHANGE` | person picks another source | `GlassDialog`: `source_change_title`: "Switch to {source}?" / `source_change_body`: "Devices measure a little differently, so NightBaseline learns your usual range again from {source}'s nights. Your history stays." Buttons `action_switch`: "Switch", `action_cancel`: "Cancel". (Proposal: ranges restart per source; confirm in the algorithm ADR.) | yes |
 | appearance | always | `settings_theme`: "Theme" (`theme_system`: "System", `theme_light`: "Light", `theme_dark`: "Dark"); `settings_glass`: "Glass effects" (`glass_auto`: "Automatic", `glass_off`: "Off"); summary when auto resolved to off: `glass_off_battery`: "Off now: battery saver is on", `glass_off_transparency`: "Off now: reduce transparency is on", `glass_off_animations`: "Off now: animations are off", `glass_off_unsupported`: "Not available on this Android version", `glass_off_device`: "Off on this device to keep scrolling smooth" | yes |
 
@@ -255,7 +257,7 @@ it." Tap -> Home.
 | key | en | ru |
 |---|---|---|
 | `explainer_title` | How your usual range works | yes |
-| `explainer_range` | For each measurement, NightBaseline takes your last 14 to 28 nights and finds the middle value. Your usual range is that middle value plus or minus how much your nights normally vary. Unusual single nights barely move it. | yes |
+| `explainer_range` | For each measurement, NightBaseline takes your last 28 nights with readings (from the past 60 days, at least 7) and finds the middle value. Your usual range is that middle value plus or minus how much your nights normally vary. Unusual single nights barely move it. | yes |
 | `explainer_learning` | It needs 7 nights to start. Nights shorter than 3 hours and nights without readings are left out. | yes |
 | `explainer_outside` | A night counts as outside when it is clearly away from your middle value, both compared with your normal variation and by a minimum amount, so tiny changes don't count. | yes |
 | `explainer_meaning_title` | What "outside your usual range" means | yes |

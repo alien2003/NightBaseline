@@ -34,6 +34,8 @@ import dev.chrisbanes.haze.rememberHazeState
 import io.github.alien2003.nightbaseline.ui.components.BarClearance
 import io.github.alien2003.nightbaseline.ui.components.FloatingNavBar
 import io.github.alien2003.nightbaseline.ui.components.FloatingNavRail
+import io.github.alien2003.nightbaseline.ui.components.LocalPaneScrolls
+import io.github.alien2003.nightbaseline.ui.components.PaneScrolls
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.layout.LocalLayoutSpec
@@ -81,7 +83,12 @@ fun AppScaffold(
                 },
             end = system.calculateEndPadding(direction),
         )
-    CompositionLocalProvider(LocalHazeState provides hazeState, LocalLayoutSpec provides layout) {
+    val paneScrolls = remember { PaneScrolls() }
+    CompositionLocalProvider(
+        LocalHazeState provides hazeState,
+        LocalLayoutSpec provides layout,
+        LocalPaneScrolls provides paneScrolls,
+    ) {
         Box(modifier.fillMaxSize().background(NbTheme.colors.background)) {
             // Focus order (layouts.md 10.1): rail -> top bar -> panes in rail layouts, content -> bar with the bar.
             // The rail is composed first for traversal and drawn on top with zIndex (it must stay outside the

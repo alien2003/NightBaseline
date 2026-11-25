@@ -118,8 +118,8 @@ class StringResourcesTest {
         const val RU_DIR = "src/main/res/values-ru"
         const val UNTRANSLATABLE = "strings_untranslatable.xml"
 
-        /** Arguments a key passes although English does not show them: night_label gets the range and the wake date. */
-        val EXTRA_ARGS = mapOf("night_label" to setOf("%2${'$'}s"))
+        /** Arguments a key passes although English does not show them: night_label gets the range, wake date and evening. */
+        val EXTRA_ARGS = mapOf("night_label" to setOf("%2${'$'}s", "%3${'$'}s"))
         val POSITIONAL = Regex("%\\d+\\\$s")
         val ARG = Regex("%(\\d+\\\$)?[-#+0,(]*\\d*(\\.\\d+)?[a-zA-Z]")
     }

@@ -27,7 +27,7 @@
     <string name="notif_public_title">NightBaseline</string>
     <string name="notif_public_body">Last night\'s result is ready.</string>
 
-    <!-- %1$s date range from the previous day ("Nov 24–25"), %2$s wake date alone (used by ru). -->
+    <!-- NightLabel: %1$s the date range from the evening before ("Nov 24 – 25"), %2$s the wake date ("November 25"), %3$s the evening (day, or day and month). en shows the range, ru uses 3 and 2. -->
     <string name="night_label">Night of %1$s</string>
 
     <string name="notif_perm_title">NightBaseline can\'t read your sleep data</string>

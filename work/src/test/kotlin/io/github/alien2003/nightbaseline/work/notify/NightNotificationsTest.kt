@@ -17,6 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.LocalDate
 import java.util.Locale
 
 /** Notification texts (English and Russian) and the posted notifications (docs/design/states.md §6), on Robolectric. */
@@ -37,10 +38,16 @@ class NightNotificationsTest {
     fun englishCopyFollowsTheDesign() {
         val res = app.resources
         assertEquals("2 measurements moved outside your usual range", NoticeText.title(res, two))
-        assertEquals("Heart rate and Breathing. Night of Nov 24–25.", NoticeText.body(res, two, Locale.ENGLISH))
-        assertEquals("Heart rate, Breathing, Skin temp. and 2 more. Night of Nov 24–25.", NoticeText.body(res, five, Locale.ENGLISH))
+        // The range comes from the locale's interval format (ICU may put thin spaces around the dash).
+        assertEquals("Heart rate and Breathing. Night of Nov 24–25.", NoticeText.body(res, two, Locale.US).dash())
+        assertEquals("Heart rate, Breathing, Skin temp. and 2 more. Night of Nov 24–25.", NoticeText.body(res, five, Locale.US).dash())
         // Across a month boundary both months are named.
-        assertEquals("Heart rate and SpO2. Night of Nov 30–Dec 1.", NoticeText.body(res, mixed, Locale.ENGLISH))
+        assertEquals("Heart rate and SpO2. Night of Nov 30–Dec 1.", NoticeText.body(res, mixed, Locale.US).dash())
+        // Day-first English locales get the day-first range, the same label as the app's screens.
+        assertEquals("Night of 24–25 Nov", NightLabel.format(res, LocalDate.of(2026, 11, 25), Locale.UK).dash())
+        // The evening is named whatever time the sleep started: the label depends on the wake date only.
+        assertEquals("24", NightLabel.args(LocalDate.of(2026, 11, 25), Locale.US).third)
+        assertTrue(NightLabel.args(LocalDate.of(2026, 12, 1), Locale.US).third.startsWith("November"))
         assertEquals(
             "Higher than usual: Heart rate. Lower than usual: SpO2. This compares the night with your own recent nights and " +
                 "isn't a diagnosis. Not a medical device.",
@@ -164,6 +171,9 @@ class NightNotificationsTest {
     }
 
     private companion object {
+        /** Drops the (thin) spaces ICU may put around the range dash. */
+        fun String.dash(): String = replace(Regex("[\\s\u2009\u202F]*–[\\s\u2009\u202F]*"), "–")
+
         private fun stem(vararg codePoints: Int) = String(codePoints, 0, codePoints.size)
 
         val RU_STEMS =

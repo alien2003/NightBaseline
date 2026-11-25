@@ -93,6 +93,10 @@ short or ambiguous nights).
 A value outside the range on the side that does not count (e.g. a lower heart rate) is shown as "outside your usual
 range" but never contributes to a notification.
 
+The lower edge of the sleep duration range never goes below the short-night limit (3 h): a shorter night is a short
+night and is not compared, so a lower edge under it would only be misleading. When a person's sleep length varies a
+lot the range is wide (Metric detail then says that only big changes are noticed).
+
 The floors are close to the typical night-to-night variability measured on real data. Without them a very stable
 history makes tiny changes look like deviations; with floors at one measurement step (1 bpm, 0.5 %, 0.5 /min) heart
 rate alone left the range on 16–18 % of nights.

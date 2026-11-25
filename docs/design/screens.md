@@ -295,11 +295,14 @@ Compact, top to bottom:
 5. `ChartSummary` text (always visible, 2–4 lines).
 6. `StatsRow` (`stats_inside`, `stats_range`, `stats_median`): "Inside your usual range: 27 of 30 nights", "Usual
    range: 52–61 bpm", "Middle value: 56 bpm".
-7. `ExplainerCard` "How your usual range is computed": median of your last 14–28 valid nights, plus or minus a robust
+7. `ExplainerCard` "How your usual range is computed": median of your last 28 valid nights within 60 days (at least 7), plus or minus a robust
    spread; nights shorter than 3 hours are left out; a value counts as outside only when it is clearly away from the
    median (both a statistical distance and a minimum absolute difference). Metric-specific line, for example SpO2:
    "Only lower values count for SpO2. Higher values are shown but never counted." Copy: `detail_computed_title`,
-   `explainer_range`, `explainer_learning`, `explainer_outside`, metric line `detail_side_ignored`.
+   `explainer_range`, `explainer_learning`, `explainer_outside`, metric line `detail_side_ignored`. Sleep duration
+   whose range spans more than 6 h (its lower edge never goes below the 3 h short-night limit) gets
+   `detail_sleep_range_wide` as its metric line: "Your sleep length varies a lot from night to night, so your usual
+   range is wide and only big changes are noticed."
 8. `ExplainerCard` "What 'outside your usual range' means": a change compared with your own recent nights, not a
    diagnosis; one measurement moving is common; NightBaseline notifies only when two or more move in the same night;
    common everyday reasons (late meal, alcohol, travel and time zones, intense exercise, a cold, new medication, how
@@ -413,9 +416,10 @@ Compact (grouped solid cards, top bar large title "Settings"):
 6. **Debug** (debug builds only): "Component catalog", "Show synthetic data".
 
 Sensitivity screen: three presets as large radio cards, each with one plain-language line:
-- "Fewer notes": a value must be further from your usual range; 3 measurements must move.
-- "Balanced" (default): defaults of `AlgoParams` (z 2.0, 2 measurements).
-- "More notes": smaller changes count; 2 measurements must move.
+- "Fewer notes": a value must be further from your usual range (z 3.0); 2 measurements must move.
+- "Balanced" (default): defaults of `AlgoParams` (z 2.5, 2 measurements).
+- "More notes": smaller changes count (z 2.0); 2 measurements must move.
+The presets change only the threshold z; the notification rule (two measurements) is the same for all three.
 Below: "Advanced" (collapsed): range window 14–28 nights (stepper), per-metric switches "Use for comparison" for each
 metric the source provides. A preview line: "With these settings, {k} of your last 30 nights would have sent a note."
 (computed locally from stored nights). "Reset to default" -> `GlassDialog` confirmation.

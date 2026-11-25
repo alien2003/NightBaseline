@@ -360,12 +360,17 @@ fun AppNavHost(
                 val route = entry.toRoute<MetricRoute>()
                 val vm: MetricDetailViewModel = appViewModel()
                 val state by vm.ui.collectAsStateWithLifecycle()
-                var selection by rememberSaveable { mutableStateOf<Int?>(null) }
+                var selection by rememberSaveable { mutableStateOf(route.point.takeIf { it >= 0 }) }
                 var explainer by rememberSaveable { mutableStateOf(false) }
                 val scroll = rememberScrollState()
-                // Unfolded into two panes while Home's metric was open: Home's detail pane takes over (layouts.md 8.2).
+                // Unfolded into two panes while Home's metric was open: Home's detail pane takes over (layouts.md 8.2)
+                // with the same period and selected night.
                 FoldBack(layout.twoPanes && route.section == TopLevel.Home.name && route.date == null) {
-                    navController.previousBackStackEntry?.savedStateHandle?.set(SELECT_METRIC, route.metric)
+                    navController.previousBackStackEntry?.savedStateHandle?.let { home ->
+                        state?.period?.let { home[SELECT_PERIOD] = it.name }
+                        home[SELECT_POINT] = selection ?: -1
+                        home[SELECT_METRIC] = route.metric
+                    }
                     navController.popBackStack()
                 }
                 state?.let { s ->
@@ -428,6 +433,12 @@ fun AppNavHost(
 /** Saved-state key on Home's entry: a metric to select in the detail pane after an unfold. */
 const val SELECT_METRIC: String = "select_metric"
 
+/** Saved-state key on Home's entry: the chart period (`ChartPeriod` name) that comes with [SELECT_METRIC]. */
+const val SELECT_PERIOD: String = "select_period"
+
+/** Saved-state key on Home's entry: the selected chart night (index, -1 for none) that comes with [SELECT_METRIC]. */
+const val SELECT_POINT: String = "select_point"
+
 /** Saved-state key on History's entry: a night to select in the detail pane after an unfold. */
 const val SELECT_NIGHT: String = "select_night"
 
@@ -485,13 +496,19 @@ private fun HomeDestination(
         pendingSelect?.let {
             selected = it
             explicit = true
-            entry.savedStateHandle[SELECT_METRIC] = null
+            val handle = entry.savedStateHandle
+            handle.get<String>(SELECT_PERIOD)?.let { p -> ChartPeriod.entries.firstOrNull { e -> e.name == p } }?.let { period = it }
+            selection = handle.get<Int>(SELECT_POINT)?.takeIf { p -> p >= 0 }
+            handle[SELECT_PERIOD] = null
+            handle[SELECT_POINT] = null
+            handle[SELECT_METRIC] = null
         }
     }
-    // Folded from two panes with a metric the person chose: the detail screen is on top (layouts.md 8.2 rule 4).
+    // Folded from two panes with a metric the person chose: the detail screen is on top (layouts.md 8.2 rule 4), with
+    // the pane's period and selected night.
     FoldBack(!layout.twoPanes && explicit && selected != null) {
         explicit = false
-        selected?.let { navController.navigate(MetricRoute(it)) }
+        selected?.let { navController.navigate(MetricRoute(it, period = period.name, point = selection ?: -1)) }
     }
     when (val u = ui) {
         HomeUi.Pending -> {

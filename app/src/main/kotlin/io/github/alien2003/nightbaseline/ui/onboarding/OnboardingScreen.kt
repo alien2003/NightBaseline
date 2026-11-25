@@ -4,15 +4,18 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -176,16 +179,45 @@ private fun CompactStep(
     }
 }
 
-/** The start column of the wide modes: indicator and illustration, or the title in large type without it. */
+/**
+ * The start column of the wide modes: the step indicator on top (level with the title of the end column), then the
+ * illustration at its wide size, or the title in large type without it.
+ */
 @Composable
 private fun StartColumn(
     state: OnboardingState,
     illustration: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(NbSpace.s6, Alignment.CenterVertically)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(NbSpace.s6)) {
         StepIndicator(state.step)
-        if (illustration) StepIllustration(state.illustration()) else Title(state)
+        if (illustration) StepIllustration(state.illustration(), height = IllustrationHeightWide) else Title(state)
+    }
+}
+
+/**
+ * The two columns of Medium, WideShort and Book as one block (`layouts.md` 5.5): both columns start at the same top
+ * edge (indicator level with the title) and the block is centred vertically in the window; it scrolls as one when it
+ * is taller than the window, so the start column never floats on its own.
+ */
+@Composable
+private fun BalancedColumns(
+    scroll: ScrollState,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val minHeight = maxHeight
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(scroll)
+                .heightIn(min = minHeight)
+                .padding(vertical = NbSpace.s7),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, content = content)
+        }
     }
 }
 
@@ -198,22 +230,14 @@ private fun TwoColumnStep(
     scroll: ScrollState,
     illustration: Boolean,
 ) {
-    Row(
-        Modifier.fillMaxSize().padding(horizontal = layout.gutter),
-        horizontalArrangement = Arrangement.spacedBy(NbSpace.s8),
-    ) {
-        StartColumn(state, illustration, Modifier.weight(START_COLUMN_SHARE).fillMaxHeight().verticalScroll(rememberScrollState()))
+    BalancedColumns(scroll, Modifier.padding(horizontal = layout.gutter)) {
+        StartColumn(state, illustration, Modifier.weight(START_COLUMN_SHARE))
+        Spacer(Modifier.width(NbSpace.s8))
         Column(
-            Modifier
-                .weight(1f - START_COLUMN_SHARE)
-                .fillMaxHeight()
-                .verticalScroll(scroll)
-                .padding(vertical = NbSpace.s7),
-            verticalArrangement = Arrangement.spacedBy(NbSpace.s5, Alignment.CenterVertically),
+            Modifier.weight(1f - START_COLUMN_SHARE).widthIn(max = TextColumnMax),
+            verticalArrangement = Arrangement.spacedBy(NbSpace.s5),
         ) {
-            Column(Modifier.widthIn(max = TextColumnMax), verticalArrangement = Arrangement.spacedBy(NbSpace.s5)) {
-                TextAndActions(state, actions, showTitle = illustration)
-            }
+            TextAndActions(state, actions, showTitle = illustration)
         }
     }
 }
@@ -235,7 +259,7 @@ private fun CardStep(
                 .solidCard(NbShapes.xl)
                 .padding(NbSpace.s8),
             horizontalArrangement = Arrangement.spacedBy(NbSpace.s8),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             StartColumn(state, illustration, Modifier.weight(START_COLUMN_SHARE))
             Column(
@@ -297,26 +321,12 @@ private fun BookStep(
     illustration: Boolean,
 ) {
     val fold = layout.verticalFold
-    val startWidth = (fold?.positionDp ?: (layout.widthDp / 2)).dp - NbDimens.hingeClearance - layout.gutter
-    Row(Modifier.fillMaxSize().padding(horizontal = layout.gutter)) {
-        StartColumn(
-            state,
-            illustration,
-            Modifier
-                .width(startWidth)
-                .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = NbSpace.s7),
-        )
-        Spacer(Modifier.width(NbDimens.hingeClearance * 2))
-        Column(
-            Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .verticalScroll(scroll)
-                .padding(vertical = NbSpace.s7),
-            verticalArrangement = Arrangement.spacedBy(NbSpace.s5, Alignment.CenterVertically),
-        ) {
+    val startWidth =
+        (fold?.positionDp ?: (layout.widthDp / 2)).dp - (fold?.occludedDp ?: 0f).dp / 2 - NbDimens.hingeClearance - layout.gutter
+    BalancedColumns(scroll, Modifier.padding(horizontal = layout.gutter)) {
+        StartColumn(state, illustration, Modifier.width(startWidth))
+        Spacer(Modifier.width(NbDimens.hingeClearance * 2 + (fold?.occludedDp ?: 0f).dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s5)) {
             TextAndActions(state, actions, showTitle = illustration)
         }
     }

@@ -236,6 +236,26 @@ class EvaluatorTest {
     }
 
     @Test
+    fun `sleep duration range never reaches below the short-night limit`() {
+        // Very variable sleep: 3 h 10 min to 11 h 30 min, median about 7 h; median - 2.5 · spread is far below 3 h.
+        val variable =
+            (0 until 28).map { i ->
+                summary(d0.plusDays(i.toLong()), 55.0, 14.0, 96.0, minutes = listOf(190.0, 300.0, 420.0, 540.0, 690.0)[i % 5])
+            }
+        val day = d0.plusDays(28).toString()
+        val b = Evaluator.baseline(DefaultMetrics.SLEEP_DURATION, day, variable, p)!!
+        assertTrue(b.median - p.zThreshold * b.spread < p.minNightMinutes, "the unclamped edge is below 3 h")
+        assertEquals(p.minNightMinutes, b.low, 1e-9)
+        assertEquals(b.median + p.zThreshold * b.spread, b.high, 1e-9, "the upper edge is unchanged")
+        // Other metrics are not clamped.
+        val hr = Evaluator.baseline(DefaultMetrics.SLEEPING_HR, day, variable, p)!!
+        assertEquals(hr.median - maxOf(p.zThreshold * hr.spread, DefaultMetrics.SLEEPING_HR.minAbsDeviation), hr.low, 1e-9)
+        // A valid night just above the limit stays inside.
+        val e = Evaluator.evaluate(summary(d0.plusDays(28), 55.0, 14.0, 96.0, minutes = 185.0), variable, p)
+        assertEquals(MetricStatus.WITHIN, e.metrics.first { it.metric == MetricId.SLEEP_DURATION }.status)
+    }
+
+    @Test
     fun `sleep duration alone never notifies but shows`() {
         val e = Evaluator.evaluate(summary(d0.plusDays(20), 56.0, 14.2, 96.5, minutes = 250.0), history, p)
         assertEquals(MetricStatus.BELOW, e.metrics.first { it.metric == MetricId.SLEEP_DURATION }.status)

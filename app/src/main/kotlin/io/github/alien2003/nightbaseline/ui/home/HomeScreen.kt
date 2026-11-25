@@ -54,6 +54,7 @@ import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.history.CompactNightSummary
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
@@ -439,7 +440,7 @@ private fun TwoPaneHome(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberPaneScrollState())
                 .padding(end = if (supporting) 0.dp else endGutter, top = top, bottom = bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -451,7 +452,7 @@ private fun TwoPaneHome(
                 Modifier
                     .width(SUPPORTING_PANE)
                     .fillMaxHeight()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(rememberPaneScrollState())
                     .padding(end = layout.gutter, top = top, bottom = bottom),
                 verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
             ) {
@@ -542,7 +543,7 @@ private fun WideShortHome(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberPaneScrollState())
                 .padding(top = top, bottom = bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {

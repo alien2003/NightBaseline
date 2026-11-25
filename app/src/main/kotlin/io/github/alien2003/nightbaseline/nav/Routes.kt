@@ -27,7 +27,10 @@ data class NightRoute(
     val section: String = TopLevel.History.name,
 )
 
-/** `metric/{metricId}?date&period`: Metric detail of [metric] anchored at [date] (null: last night). */
+/**
+ * `metric/{metricId}?date&period`: Metric detail of [metric] anchored at [date] (null: last night). [period] and
+ * [point] carry the chart period and selected night over from Home's detail pane when a fold hands it over.
+ */
 @Serializable
 data class MetricRoute(
     /** `MetricId.key`. */
@@ -36,6 +39,10 @@ data class MetricRoute(
     val date: String? = null,
     /** `TopLevel` name selected in the bar or rail. */
     val section: String = TopLevel.Home.name,
+    /** `ChartPeriod` name, or null for the default period. */
+    val period: String? = null,
+    /** Index of the selected chart night in the period, or -1 for none. */
+    val point: Int = -1,
 )
 
 /** `onboarding/{step}`: the first run (outside the shell); [step] is an `OnboardingStep` name. */

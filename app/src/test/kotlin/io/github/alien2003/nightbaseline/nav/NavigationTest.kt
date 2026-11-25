@@ -6,6 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
@@ -159,5 +162,26 @@ class NavigationTest {
         idle()
         assertTrue(route(), route().contains("MetricRoute"))
         assertEquals("respiratory_rate", nav.currentBackStackEntry!!.toRoute<MetricRoute>().metric)
+    }
+
+    @Test
+    fun `the chosen period survives the hand-over between the pushed screen and the detail pane`() {
+        launch()
+        compose.runOnIdle { nav.navigate(MetricRoute("respiratory_rate")) }
+        idle()
+        compose.onNode(hasText("90 nights") and isSelectable()).performClick()
+        idle()
+        compose.onNode(hasText("90 nights") and isSelectable()).assertIsSelected()
+        // Unfold: Home's detail pane shows the same metric with 90 nights.
+        compose.runOnIdle { layout.value = expanded }
+        idle()
+        assertTrue(route(), route().contains("HomeRoute"))
+        compose.onNode(hasText("90 nights") and isSelectable()).assertIsSelected()
+        // Fold again: the pushed screen comes back with 90 nights.
+        compose.runOnIdle { layout.value = compact }
+        idle()
+        assertTrue(route(), route().contains("MetricRoute"))
+        assertEquals("Quarter", nav.currentBackStackEntry!!.toRoute<MetricRoute>().period)
+        compose.onNode(hasText("90 nights") and isSelectable()).assertIsSelected()
     }
 }
