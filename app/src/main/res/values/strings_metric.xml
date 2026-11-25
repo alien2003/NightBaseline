@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Metric detail copy that is not in strings.xml (docs/design/screens.md 7.3, states.md 4 and 7.1). Russian in
+  res/values-ru/strings_metric.xml with the same keys and argument positions.
+-->
+<resources>
+    <!-- Value-axis label of sleep duration charts, in hours: "7.5 h". -->
+    <string name="chart_axis_hours">%1$s h</string>
+    <!-- ExplainerCard line for metrics where only one side counts (SpO2: lower; respiratory rate: higher). -->
+    <string name="metric_side_low_only">Only lower values of %1$s count. Higher values are shown but never counted.</string>
+    <string name="metric_side_high_only">Only higher values of %1$s count. Lower values are shown but never counted.</string>
+    <!-- Header sentence of M-SIDE-IGNORED on the low side (detail_side_ignored covers the high side). -->
+    <string name="metric_detail_side_ignored_lower">Lower values of %1$s are shown but don\'t count as a change.</string>
+    <!-- Source line when the last sync time is not known. -->
+    <string name="metric_source_line_no_sync">Measured by %1$s.</string>
+    <!-- L0: the chart has no nights yet. -->
+    <string name="metric_chart_empty">Your nights appear here as %1$s records them.</string>
+    <!-- Heading of the stats block. -->
+    <string name="metric_stats_title">This period</string>
+</resources>
