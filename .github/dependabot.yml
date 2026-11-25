@@ -1,0 +1,31 @@
+# The workflows pin every action to a full commit SHA, with its version in a comment. Dependabot moves the pins (and the
+# comments) to new releases, and proposes Gradle dependency updates from gradle/libs.versions.toml: at most one pull
+# request a month per ecosystem, all updates grouped in it.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # A new release waits a week before it is proposed, so a hijacked release is usually withdrawn before it gets here.
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      gradle:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: build

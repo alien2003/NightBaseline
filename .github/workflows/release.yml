@@ -1,0 +1,62 @@
+name: Release
+
+# Tag push vX.Y.Z or vX.Y.Z-{alpha|beta|rc}.N: builds the signed release APK, verifies it and publishes the GitHub
+# release "NightBaseline X.Y.Z" with NightBaseline-X.Y.Z.apk and SHA256SUMS.txt. A pre-release tag gives a GitHub
+# pre-release. versionName / versionCode come from the tag (.github/scripts/version-from-tag.sh documents the rule);
+# the notes are the tag's CHANGELOG.md section (.github/scripts/changelog-section.sh), or GitHub's generated notes when
+# there is none. Adapted from PulseStages' release.yml.
+#
+# Run workflow (Actions tab), dry_run checked (the default): builds and verifies the signed APK from the selected
+# branch or tag as versionName 0.0.0-dry.<run number>, versionCode 1, then discards it; nothing is published, so this
+# checks the signing secrets before the first tag. With dry_run unchecked on a v* tag, it publishes that tag's release
+# like a tag push.
+#
+# Repository secrets (all required for a release): NIGHTBASELINE_KEYSTORE_BASE64, NIGHTBASELINE_KEYSTORE_PASSWORD,
+# NIGHTBASELINE_KEY_ALIAS, NIGHTBASELINE_KEY_PASSWORD.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: build and verify the signed APK, then discard it; publish nothing"
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dry-run:
+    name: Dry run
+    if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-apks.yml
+    with:
+      publish: false
+    secrets:
+      NIGHTBASELINE_KEYSTORE_BASE64: ${{ secrets.NIGHTBASELINE_KEYSTORE_BASE64 }}
+      NIGHTBASELINE_KEYSTORE_PASSWORD: ${{ secrets.NIGHTBASELINE_KEYSTORE_PASSWORD }}
+      NIGHTBASELINE_KEY_ALIAS: ${{ secrets.NIGHTBASELINE_KEY_ALIAS }}
+      NIGHTBASELINE_KEY_PASSWORD: ${{ secrets.NIGHTBASELINE_KEY_PASSWORD }}
+
+  release:
+    name: Release
+    if: github.event_name == 'push' || inputs.dry_run == false
+    # The ceiling for build-apks.yml: its build job lowers this to contents: read, only its publish job writes.
+    permissions:
+      contents: write
+    uses: ./.github/workflows/build-apks.yml
+    with:
+      publish: true
+    secrets:
+      NIGHTBASELINE_KEYSTORE_BASE64: ${{ secrets.NIGHTBASELINE_KEYSTORE_BASE64 }}
+      NIGHTBASELINE_KEYSTORE_PASSWORD: ${{ secrets.NIGHTBASELINE_KEYSTORE_PASSWORD }}
+      NIGHTBASELINE_KEY_ALIAS: ${{ secrets.NIGHTBASELINE_KEY_ALIAS }}
+      NIGHTBASELINE_KEY_PASSWORD: ${{ secrets.NIGHTBASELINE_KEY_PASSWORD }}

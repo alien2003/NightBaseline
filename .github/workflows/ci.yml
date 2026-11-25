@@ -1,0 +1,148 @@
+name: CI
+
+# Adapted from PulseStages' ci.yml. Unlike PulseStages there is no documentation-only skip: tools/check-language.sh
+# checks every tracked file, docs included, and docs/design/tokens.md is read by tests and by the contrast check, so
+# every push and pull request runs the full CI.
+#
+# Health data never reaches CI (CLAUDE.md, hard rule 5): every test runs on synthetic data, .data/ is git-ignored and
+# never checked out, and the only uploads are test reports, the synthetic screenshot matrix and (main only) the debug
+# APK.
+
+on:
+  push:
+    # Branches only: a tag push is built by the release workflow.
+    branches:
+      - "**"
+  pull_request:
+  # Manual run of the full CI on any branch (Actions tab -> CI -> Run workflow).
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One group per pull request or branch: a new push cancels the run in progress. Every run on main gets a group of its
+  # own (its run id), so runs on main are never cancelled or replaced by a newer push.
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Language and contrast checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this job needs the token, so it is not left in .git/config.
+          persist-credentials: false
+
+      - name: English only (no Cyrillic outside the ru resources and README.ru.md)
+        run: bash tools/check-language.sh
+
+      - name: Contrast of the design tokens
+        run: python3 tools/design/contrast_check.py docs/design/tokens.md
+
+  build:
+    name: Lint, test and assemble
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing in this job needs the token, so it is not left in .git/config.
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          # Fully open-source (MIT) cache implementation on top of actions/cache. Only main writes cache entries
+          # (the action's default); other branches and pull requests read them. The release build uses no cache.
+          cache-provider: basic
+
+      - name: Install missing Android SDK packages
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          # compileSdk 37 is the minor-versioned platform "android-37.0"; AGP 9.4 defaults to build-tools 36.0.0.
+          PACKAGES=()
+          [ -d "$ANDROID_HOME/platforms/android-36" ] || PACKAGES+=("platforms;android-36")
+          [ -d "$ANDROID_HOME/platforms/android-37.0" ] || PACKAGES+=("platforms;android-37.0")
+          [ -d "$ANDROID_HOME/build-tools/36.0.0" ] || PACKAGES+=("build-tools;36.0.0")
+          if [ "${#PACKAGES[@]}" -gt 0 ]; then
+            yes | "$SDKMANAGER" --licenses > /dev/null || true
+            "$SDKMANAGER" "${PACKAGES[@]}"
+          else
+            echo "All required SDK packages are already installed."
+          fi
+
+      - name: Module graph, lint, test and assemble debug
+        run: ./gradlew verifyModuleGraph ktlintCheck detekt test :app:assembleDebug
+
+      # MergedManifestTest (part of "test" above) already fails on INTERNET in the debug and release merged manifests.
+      # This step repeats the check on the release manifest directly, so the rule holds even if the test is changed.
+      - name: No INTERNET permission in the merged release manifest
+        run: |
+          set -euo pipefail
+          manifest=app/build/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml
+          if [ ! -f "$manifest" ]; then
+            echo "::error::$manifest is missing (did AGP move the merged manifest?)"
+            exit 1
+          fi
+          if grep -Eq '"android\.permission\.(INTERNET|ACCESS_NETWORK_STATE)"' "$manifest"; then
+            echo "::error::The merged release manifest requests a network permission"
+            grep -En 'android\.permission\.(INTERNET|ACCESS_NETWORK_STATE)' "$manifest"
+            exit 1
+          fi
+          echo "No network permission in $manifest"
+
+      # The screenshot matrix (CatalogScreenshotsTest, synthetic data only) is rendered into app/build/screenshots by
+      # every test run. Kept 3 days for review.
+      - name: Upload screenshots (synthetic data)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        # A full artifact storage quota must never turn a passing build red.
+        continue-on-error: true
+        with:
+          name: screenshots
+          path: app/build/screenshots/
+          if-no-files-found: ignore
+          retention-days: 3
+
+      # Pushes to main only, kept 2 days: the 500 MB artifact quota of a private repository fills up quickly. Tagged
+      # builds live on the Releases page.
+      - name: Upload debug APK
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        continue-on-error: true
+        with:
+          name: nightbaseline-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 2
+          # Not 0: with minSdk 28 the dex files are stored uncompressed, and zlib shrinks the debug APK to about a third.
+          compression-level: 6
+
+      - name: Upload test and lint reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        continue-on-error: true
+        with:
+          name: build-reports
+          # Build outputs of the Gradle modules only. .data/ is git-ignored and never exists on the runner; it is
+          # excluded anyway.
+          path: |
+            **/build/reports/
+            **/build/test-results/
+            !.data/**
+            !.tooling/**
+          if-no-files-found: ignore
+          retention-days: 7

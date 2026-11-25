@@ -1,0 +1,333 @@
+name: Build APKs
+
+# Builds the signed release APK and verifies it: apksigner signature check, the signing certificate's SHA-256 digest in
+# the log and the job summary, versionName / versionCode, and no network permission in the APK. Adapted from
+# PulseStages' build-apks.yml.
+#
+# Triggers:
+# - workflow_call from release.yml (publish: true, a v* tag): the verified APK is handed to the "publish" job, which
+#   creates the GitHub release "NightBaseline X.Y.Z" with NightBaseline-X.Y.Z.apk and SHA256SUMS.txt.
+# - push to main and manual dispatch (Actions tab -> Build APKs -> Run workflow): a check build, versionName
+#   0.0.0-dry.<run number>, versionCode 1. The release-signed APK never leaves the runner: release-signed APKs come
+#   from v* tags only. Without the signing secrets the check build is skipped with a notice (a tag release fails).
+#
+# Repository secrets (docs/development.md, "Signing secrets"): NIGHTBASELINE_KEYSTORE_BASE64,
+# NIGHTBASELINE_KEYSTORE_PASSWORD, NIGHTBASELINE_KEY_ALIAS, NIGHTBASELINE_KEY_PASSWORD. app/build.gradle.kts reads
+# NIGHTBASELINE_KEYSTORE_PATH, NIGHTBASELINE_KEYSTORE_PASSWORD, NIGHTBASELINE_KEY_ALIAS and NIGHTBASELINE_KEY_PASSWORD
+# from the environment; without all four the release APK is unsigned and this workflow fails.
+#
+# Permissions are set per job: the job that holds the signing key only reads, the job that publishes holds no key.
+# Under workflow_call the caller's permissions are the ceiling, so "publish" gets contents: write only from the release
+# job of release.yml.
+
+on:
+  workflow_call:
+    inputs:
+      publish:
+        description: "true: publish a GitHub release for the v* tag; false: check build, publish nothing"
+        type: boolean
+        required: true
+    # All optional here: the "Decode signing key" step fails (or, for a check build, skips) with the missing names.
+    secrets:
+      NIGHTBASELINE_KEYSTORE_BASE64:
+        required: false
+      NIGHTBASELINE_KEYSTORE_PASSWORD:
+        required: false
+      NIGHTBASELINE_KEY_ALIAS:
+        required: false
+      NIGHTBASELINE_KEY_PASSWORD:
+        required: false
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  apks:
+    name: Build and verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    concurrency:
+      # Never cancelled: a release build must finish once started.
+      group: build-apks-${{ github.ref }}-${{ inputs.publish == true && 'publish' || 'check' }}
+      cancel-in-progress: false
+    outputs:
+      signed: ${{ steps.keys.outputs.available }}
+      version: ${{ steps.version.outputs.name }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      release_cert: ${{ steps.apks.outputs.release_cert }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Gradle and its plugins never need the token, so it is not left in .git/config.
+          persist-credentials: false
+
+      - name: Derive version
+        id: version
+        env:
+          PUBLISH: ${{ inputs.publish == true }}
+        run: |
+          set -euo pipefail
+          if [ "$PUBLISH" = true ]; then
+            if [ "$GITHUB_REF_TYPE" != tag ]; then
+              echo "::error::Publishing needs a v* tag."
+              exit 1
+            fi
+            bash .github/scripts/version-from-tag.sh "$GITHUB_REF_NAME" | tee -a "$GITHUB_OUTPUT"
+          else
+            # Never published. versionCode 1 is below every release, so a release installs over a check build.
+            printf 'name=0.0.0-dry.%s\ncode=1\nprerelease=true\n' "$GITHUB_RUN_NUMBER" | tee -a "$GITHUB_OUTPUT"
+          fi
+
+      - name: Decode signing key
+        id: keys
+        env:
+          PUBLISH: ${{ inputs.publish == true }}
+          NIGHTBASELINE_KEYSTORE_BASE64: ${{ secrets.NIGHTBASELINE_KEYSTORE_BASE64 }}
+          NIGHTBASELINE_KEYSTORE_PASSWORD: ${{ secrets.NIGHTBASELINE_KEYSTORE_PASSWORD }}
+          NIGHTBASELINE_KEY_ALIAS: ${{ secrets.NIGHTBASELINE_KEY_ALIAS }}
+          NIGHTBASELINE_KEY_PASSWORD: ${{ secrets.NIGHTBASELINE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in NIGHTBASELINE_KEYSTORE_BASE64 NIGHTBASELINE_KEYSTORE_PASSWORD NIGHTBASELINE_KEY_ALIAS \
+            NIGHTBASELINE_KEY_PASSWORD; do
+            [ -n "${!name:-}" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            if [ "$PUBLISH" = true ]; then
+              echo "::error::Repository secrets not set: ${missing[*]} (docs/development.md, \"Signing secrets\")"
+              exit 1
+            fi
+            echo "::notice::Signing secrets not set (${missing[*]}): the signed check build is skipped."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          umask 077
+
+          keystore="$RUNNER_TEMP/nightbaseline-release.jks"
+          if ! printf '%s' "$NIGHTBASELINE_KEYSTORE_BASE64" | base64 --decode > "$keystore"; then
+            echo "::error::NIGHTBASELINE_KEYSTORE_BASE64 is not valid base64"
+            exit 1
+          fi
+          chmod 600 "$keystore"
+          # Opens the key entry, so a wrong store password or alias fails here. keytool's error line names neither
+          # password, and the runner masks the alias, which is a secret.
+          if ! listing=$(keytool -list -keystore "$keystore" -storepass:env NIGHTBASELINE_KEYSTORE_PASSWORD \
+            -alias "$NIGHTBASELINE_KEY_ALIAS" 2>&1); then
+            reason=$(grep -m 1 '^keytool error' <<< "$listing" || true)
+            echo "::error::keytool cannot open NIGHTBASELINE_KEY_ALIAS in NIGHTBASELINE_KEYSTORE_BASE64 with NIGHTBASELINE_KEYSTORE_PASSWORD: $reason"
+            exit 1
+          fi
+          echo "NIGHTBASELINE_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 17
+        if: steps.keys.outputs.available == 'true'
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        if: steps.keys.outputs.available == 'true'
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          # No Gradle User Home cache at all: this job resolves and compiles everything itself, so nothing that another
+          # workflow run saved in the cache (dependency jars, build cache entries) can end up in a signed APK.
+          cache-disabled: true
+          cache-provider: basic
+
+      - name: Install missing Android SDK packages
+        if: steps.keys.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          PACKAGES=()
+          [ -d "$ANDROID_HOME/platforms/android-36" ] || PACKAGES+=("platforms;android-36")
+          [ -d "$ANDROID_HOME/platforms/android-37.0" ] || PACKAGES+=("platforms;android-37.0")
+          [ -d "$ANDROID_HOME/build-tools/36.0.0" ] || PACKAGES+=("build-tools;36.0.0")
+          if [ "${#PACKAGES[@]}" -gt 0 ]; then
+            yes | "$SDKMANAGER" --licenses > /dev/null || true
+            "$SDKMANAGER" "${PACKAGES[@]}"
+          fi
+
+      - name: Build signed release APK
+        if: steps.keys.outputs.available == 'true'
+        env:
+          NIGHTBASELINE_KEYSTORE_PASSWORD: ${{ secrets.NIGHTBASELINE_KEYSTORE_PASSWORD }}
+          NIGHTBASELINE_KEY_ALIAS: ${{ secrets.NIGHTBASELINE_KEY_ALIAS }}
+          NIGHTBASELINE_KEY_PASSWORD: ${{ secrets.NIGHTBASELINE_KEY_PASSWORD }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        # No configuration cache: it would store the signing values that are read at configuration time. No build cache
+        # either: every task output of a signed build comes from this run.
+        run: >-
+          ./gradlew --no-configuration-cache --no-build-cache :app:assembleRelease
+          "-PversionName=$VERSION_NAME" "-PversionCode=$VERSION_CODE"
+
+      - name: Verify APK
+        id: apks
+        if: steps.keys.outputs.available == 'true'
+        env:
+          PUBLISH: ${{ inputs.publish == true }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          set -euo pipefail
+          build_tools="$ANDROID_HOME/build-tools/36.0.0"
+          release_apk=app/build/outputs/apk/release/app-release.apk
+
+          # AGP names an unsigned release APK app-release-unsigned.apk.
+          if [ ! -f "$release_apk" ]; then
+            echo "::error::$release_apk is missing: the release APK was built unsigned"
+            ls -l app/build/outputs/apk/release/ || true
+            exit 1
+          fi
+
+          # apksigner fails on an unsigned APK or a broken signature. Its output holds certificate data only.
+          if ! "$build_tools/apksigner" verify --verbose --print-certs "$release_apk"; then
+            echo "::error::$release_apk has no valid signature"
+            exit 1
+          fi
+          signer() { "$build_tools/apksigner" verify --print-certs "$1" | sed -n "s/^Signer #1 certificate $2: //p"; }
+          release_dn=$(signer "$release_apk" DN)
+          release_cert=$(signer "$release_apk" "SHA-256 digest")
+          if [ -z "$release_cert" ]; then
+            echo "::error::apksigner printed no signer certificate"
+            exit 1
+          fi
+          case "$release_dn" in
+            *"CN=Android Debug"*)
+              echo "::error::The release APK is signed with an Android debug key"
+              exit 1
+              ;;
+          esac
+          echo "Release signing certificate SHA-256: $release_cert"
+
+          badging=$("$build_tools/aapt2" dump badging "$release_apk" | sed -n '1p')
+          case "$badging" in
+            *" versionCode='$VERSION_CODE' versionName='$VERSION_NAME' "*) ;;
+            *)
+              echo "::error::$release_apk does not have versionCode $VERSION_CODE and versionName $VERSION_NAME: $badging"
+              exit 1
+              ;;
+          esac
+
+          # Local processing only: the shipped APK must not request network access.
+          permissions=$("$build_tools/aapt2" dump permissions "$release_apk")
+          if grep -Eq "android\.permission\.(INTERNET|ACCESS_NETWORK_STATE)" <<< "$permissions"; then
+            echo "::error::The release APK requests a network permission"
+            grep -E "android\.permission\.(INTERNET|ACCESS_NETWORK_STATE)" <<< "$permissions"
+            exit 1
+          fi
+
+          release_file="NightBaseline-$VERSION_NAME.apk"
+          release_size=$(du -h "$release_apk" | cut -f1)
+          if [ "$PUBLISH" = true ]; then
+            out="$RUNNER_TEMP/apks"
+            mkdir -p "$out"
+            cp "$release_apk" "$out/$release_file"
+            (cd "$out" && sha256sum "$release_file" > SHA256SUMS.txt)
+            echo "dir=$out" >> "$GITHUB_OUTPUT"
+          fi
+          echo "release_cert=$release_cert" >> "$GITHUB_OUTPUT"
+          {
+            echo "### NightBaseline $VERSION_NAME (versionCode $VERSION_CODE)"
+            echo
+            echo "| APK | Size | Signing certificate SHA-256 |"
+            echo "|---|---|---|"
+            echo "| \`$release_file\` | $release_size | \`$release_cert\` |"
+            if [ "$PUBLISH" != true ]; then
+              echo
+              echo "Check build: the release APK was verified, then discarded."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Tag releases only: hands the verified APK to the publish job, which holds no key. The release makes it public
+      # right after, so a 1-day artifact adds no exposure.
+      - name: Hand the APK to the publish job
+        if: ${{ inputs.publish == true }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-apk
+          path: ${{ steps.apks.outputs.dir }}/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 6
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/nightbaseline-release.jks"
+
+  publish:
+    name: Publish GitHub release
+    needs: apks
+    if: ${{ inputs.publish == true && needs.apks.outputs.signed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The only job that can write: creating the release and uploading its assets needs contents: write.
+    permissions:
+      contents: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Only CHANGELOG.md and the scripts are read; gh gets the token through GH_TOKEN.
+          persist-credentials: false
+
+      - name: Download the verified APK
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-apk
+          path: ${{ runner.temp }}/apks
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION_NAME: ${{ needs.apks.outputs.version }}
+          PRERELEASE: ${{ needs.apks.outputs.prerelease }}
+          RELEASE_CERT: ${{ needs.apks.outputs.release_cert }}
+          OUT_DIR: ${{ runner.temp }}/apks
+        # The release text is the CHANGELOG.md section (written by hand, never health data) plus the fixed text below;
+        # nothing in it comes from a measurement, a dataset or a device.
+        run: |
+          set -euo pipefail
+          (cd "$OUT_DIR" && sha256sum -c SHA256SUMS.txt)
+          notes="$RUNNER_TEMP/release-notes.md"
+          section=$(bash .github/scripts/changelog-section.sh "$VERSION_NAME" CHANGELOG.md)
+          {
+            if [ -n "$section" ]; then
+              printf '%s\n\n' "$section"
+            fi
+            cat <<EOF
+          ### Downloads
+
+          | File | Use |
+          |---|---|
+          | \`NightBaseline-$VERSION_NAME.apk\` | Signed release build. Later releases install over it as updates. |
+          | \`SHA256SUMS.txt\` | SHA-256 checksum of the APK: \`sha256sum -c SHA256SUMS.txt\` |
+
+          NightBaseline reads Health Connect on the phone and processes everything locally; the APK has no INTERNET
+          permission. It is not a medical device.
+
+          Release signing certificate SHA-256: \`$RELEASE_CERT\`
+          EOF
+          } > "$notes"
+
+          args=(--verify-tag --title "NightBaseline $VERSION_NAME" --notes-file "$notes")
+          if [ -z "$section" ]; then
+            # No "## [$VERSION_NAME]" section in CHANGELOG.md: GitHub's generated notes follow the downloads table.
+            args+=(--generate-notes)
+          fi
+          if [ "$PRERELEASE" = true ]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            "$OUT_DIR/NightBaseline-$VERSION_NAME.apk" \
+            "$OUT_DIR/SHA256SUMS.txt" \
+            "${args[@]}"
