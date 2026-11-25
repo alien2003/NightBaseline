@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copy of the setup screens (onboarding, learning period, settings) that states.md does not already define.
+  Russian in values-ru/strings_setup.xml with the same keys (checked by SetupStringsTest). Calm wording, positional
+  arguments, no exclamation marks.
+-->
+<resources>
+    <!-- Onboarding -->
+    <string name="setup_action_back">Back</string>
+    <string name="setup_hc_checking">Checking Health Connect…</string>
+    <string name="setup_source_writes">Writes: %1$s</string>
+    <string name="setup_source_no_sleep">No sleep in the last 30 days</string>
+    <string name="setup_perm_core_title">Needed</string>
+    <string name="setup_perm_optional_title">Optional</string>
+    <string name="setup_perm_denied_again_body">Health Connect doesn\'t show the request again. Open Health Connect, find NightBaseline and allow sleep and heart rate there.</string>
+    <string name="setup_notif_allowed">Notifications are allowed.</string>
+    <string name="setup_notif_denied">Notifications stay off. Results still appear in the app, and you can turn notes on later in Settings.</string>
+
+    <!-- Learning period -->
+    <string name="setup_learning_visible_body">Values arrive each morning. The dotted outline marks where each usual range will be.</string>
+    <string name="setup_learning_visible_empty">Values from your first night appear here the next morning.</string>
+    <string name="setup_expect_now">Now</string>
+    <string name="setup_expect_learning">Nights 1 to 7: NightBaseline collects your values. No notes yet.</string>
+    <string name="setup_expect_range">After 7 nights: each measurement gets its usual range.</string>
+    <string name="setup_expect_adjust">Over the next weeks: the range keeps adjusting and uses up to 28 nights.</string>
+    <string name="setup_expect_notes">From then on: a calm note when two or more measurements move outside it on the same night.</string>
+    <string name="setup_expect_step_now">%1$s Now.</string>
+
+    <!-- Settings -->
+    <string name="setup_on">On</string>
+    <string name="setup_off">Off</string>
+    <string name="setup_notif_permission">System permission</string>
+    <string name="setup_notif_perm_allowed">Allowed</string>
+    <string name="setup_notif_perm_not_asked">Not allowed yet. Tap to allow.</string>
+    <string name="setup_notif_perm_blocked">Turned off in system settings. Tap to open them.</string>
+    <string name="setup_notif_results_summary">A note in the morning when two or more measurements move.</string>
+    <string name="setup_notif_problems_summary">For example when access to Health Connect was turned off.</string>
+    <string name="setup_sens_intro">Choose how readily a measurement counts as outside your usual range.</string>
+    <string name="setup_sens_fewer_desc">Only larger changes count. Two measurements must still move.</string>
+    <string name="setup_glass_on_now">On now</string>
+    <string name="setup_glass_off_user">Plain surfaces everywhere</string>
+    <string name="setup_group_privacy">Data and privacy</string>
+    <string name="setup_privacy_local">Stays on this phone</string>
+    <string name="setup_privacy_readonly">Read-only access</string>
+    <string name="setup_privacy_summary">Local only, no internet access</string>
+    <string name="setup_privacy_policy">Privacy policy</string>
+    <string name="setup_privacy_policy_summary">What is read, where it is kept and how to remove it</string>
+    <string name="setup_policy_read_title">What is read</string>
+    <string name="setup_policy_read_body">NightBaseline reads sleep sessions and the measurements taken during them from Health Connect, only from the source you chose, once a day after you wake up.</string>
+    <string name="setup_policy_kept_title">Where it is kept</string>
+    <string name="setup_policy_kept_body">Nightly values, your usual ranges and your settings are stored only in the app\'s private storage on this phone.</string>
+    <string name="setup_policy_shared_title">What is shared</string>
+    <string name="setup_policy_shared_body">Nothing. NightBaseline has no internet access, no account, no analytics and no ads. It never writes, changes or deletes data in Health Connect.</string>
+    <string name="setup_policy_remove_title">How to remove it</string>
+    <string name="setup_policy_remove_body">You can turn off access in Health Connect at any time. Clearing the app\'s storage or uninstalling it deletes everything NightBaseline stored.</string>
+    <string name="setup_about_disclaimer_title">Not a medical device</string>
+    <string name="setup_licenses_intro">NightBaseline is built with these open-source libraries.</string>
+    <string name="setup_licenses_app">NightBaseline itself is released under the Apache License 2.0.</string>
+</resources>

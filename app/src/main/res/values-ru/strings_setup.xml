@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Russian copy of values/strings_setup.xml, key by key, same argument positions. -->
+<resources>
+    <!-- Onboarding -->
+    <string name="setup_action_back">Назад</string>
+    <string name="setup_hc_checking">Проверяем Health Connect…</string>
+    <string name="setup_source_writes">Записывает: %1$s</string>
+    <string name="setup_source_no_sleep">Нет сна за последние 30 дней</string>
+    <string name="setup_perm_core_title">Нужно</string>
+    <string name="setup_perm_optional_title">По желанию</string>
+    <string name="setup_perm_denied_again_body">Health Connect больше не показывает запрос. Откройте Health Connect, найдите NightBaseline и разрешите там сон и пульс.</string>
+    <string name="setup_notif_allowed">Уведомления разрешены.</string>
+    <string name="setup_notif_denied">Уведомления выключены. Результаты всё равно видны в приложении, а заметки можно включить позже в настройках.</string>
+
+    <!-- Learning period -->
+    <string name="setup_learning_visible_body">Значения приходят каждое утро. Пунктир показывает, где будет обычный диапазон каждого показателя.</string>
+    <string name="setup_learning_visible_empty">Значения первой ночи появятся здесь на следующее утро.</string>
+    <string name="setup_expect_now">Сейчас</string>
+    <string name="setup_expect_learning">Ночи с 1 по 7: NightBaseline собирает ваши значения. Заметок пока нет.</string>
+    <string name="setup_expect_range">После 7 ночей: у каждого показателя появится обычный диапазон.</string>
+    <string name="setup_expect_adjust">В следующие недели: диапазон продолжает уточняться и использует до 28 ночей.</string>
+    <string name="setup_expect_notes">Дальше: спокойная заметка, когда за одну ночь два показателя или больше выходят за его пределы.</string>
+    <string name="setup_expect_step_now">%1$s Сейчас.</string>
+
+    <!-- Settings -->
+    <string name="setup_on">Вкл.</string>
+    <string name="setup_off">Выкл.</string>
+    <string name="setup_notif_permission">Разрешение системы</string>
+    <string name="setup_notif_perm_allowed">Разрешено</string>
+    <string name="setup_notif_perm_not_asked">Пока не разрешено. Нажмите, чтобы разрешить.</string>
+    <string name="setup_notif_perm_blocked">Выключено в настройках системы. Нажмите, чтобы открыть их.</string>
+    <string name="setup_notif_results_summary">Заметка утром, когда два показателя или больше выходят за пределы.</string>
+    <string name="setup_notif_problems_summary">Например, когда доступ к Health Connect выключен.</string>
+    <string name="setup_sens_intro">Выберите, насколько легко показатель считается вышедшим за обычный диапазон.</string>
+    <string name="setup_sens_fewer_desc">Учитываются только заметные изменения. Выйти за пределы по-прежнему должны два показателя.</string>
+    <string name="setup_glass_on_now">Сейчас включены</string>
+    <string name="setup_glass_off_user">Везде простые поверхности</string>
+    <string name="setup_group_privacy">Данные и конфиденциальность</string>
+    <string name="setup_privacy_local">Остаются на этом телефоне</string>
+    <string name="setup_privacy_readonly">Доступ только на чтение</string>
+    <string name="setup_privacy_summary">Только на устройстве, без интернета</string>
+    <string name="setup_privacy_policy">Политика конфиденциальности</string>
+    <string name="setup_privacy_policy_summary">Что читается, где хранится и как это удалить</string>
+    <string name="setup_policy_read_title">Что читается</string>
+    <string name="setup_policy_read_body">NightBaseline читает из Health Connect сессии сна и измерения во время них, только от выбранного вами источника, раз в день после пробуждения.</string>
+    <string name="setup_policy_kept_title">Где хранится</string>
+    <string name="setup_policy_kept_body">Ночные значения, ваши обычные диапазоны и настройки хранятся только в личном хранилище приложения на этом телефоне.</string>
+    <string name="setup_policy_shared_title">Что передаётся</string>
+    <string name="setup_policy_shared_body">Ничего. У NightBaseline нет доступа к интернету, аккаунта, аналитики и рекламы. Он никогда не записывает, не меняет и не удаляет данные в Health Connect.</string>
+    <string name="setup_policy_remove_title">Как это удалить</string>
+    <string name="setup_policy_remove_body">Доступ можно выключить в Health Connect в любой момент. Очистка хранилища приложения или его удаление стирает всё, что сохранил NightBaseline.</string>
+    <string name="setup_about_disclaimer_title">Не медицинское изделие</string>
+    <string name="setup_licenses_intro">NightBaseline сделан с помощью этих библиотек с открытым кодом.</string>
+    <string name="setup_licenses_app">Сам NightBaseline распространяется по лицензии Apache 2.0.</string>
+</resources>

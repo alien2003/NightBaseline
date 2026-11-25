@@ -228,14 +228,16 @@ const val DASH: String = "–"
  * `DisclaimerFooter` (`screens.md` 9): "Not a medical device." plus the About link (48 dp target), at the end of Home,
  * Night detail and Metric detail.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DisclaimerFooter(
     onAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    // Wraps the link below the sentence when both do not fit on one line (200 % font, long translations).
+    FlowRow(
         modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
+        itemVerticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         Text(
