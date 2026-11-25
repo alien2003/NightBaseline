@@ -160,6 +160,8 @@ tasks.withType<Test>().configureEach {
     if (recordScreenshots) outputs.upToDateWhen { false }
     // CI runners have less memory: .github/workflows/ci.yml passes -PtestMaxHeap.
     maxHeapSize = providers.gradleProperty("testMaxHeap").getOrElse("3g")
+    // Robolectric's native graphics keeps memory outside the Java heap; CI starts a fresh JVM per test class.
+    forkEvery = providers.gradleProperty("testForkEvery").map(String::toLong).getOrElse(0L)
 }
 
 androidComponents {
