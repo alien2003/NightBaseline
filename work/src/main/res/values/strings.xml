@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification texts of the daily run. Keys and English copy from docs/design/states.md §6 (the design's {name}
+     placeholders converted to positional arguments). Calm wording: no values, no diagnoses, never "Vitals".
+     Keep the key set in sync with values-ru/strings.xml. -->
+<resources>
+    <string name="channel_night_results_name">Night results</string>
+    <string name="channel_night_results_desc">A note in the morning when two or more measurements move outside your usual range.</string>
+    <string name="channel_data_access_name">Problems reading data</string>
+    <string name="channel_data_access_desc">When NightBaseline can\'t read your nights, for example after access was turned off.</string>
+
+    <plurals name="notif_dev_title">
+        <item quantity="one">%1$d measurement moved outside your usual range</item>
+        <item quantity="other">%1$d measurements moved outside your usual range</item>
+    </plurals>
+    <!-- %1$s metric list, %2$s night label. -->
+    <string name="notif_dev_body">%1$s. %2$s.</string>
+    <plurals name="notif_list_more">
+        <item quantity="one">and %1$d more</item>
+        <item quantity="other">and %1$d more</item>
+    </plurals>
+    <!-- Joins the last name of a short list: "Heart rate and Breathing". Not in states.md (implementation detail). -->
+    <string name="notif_list_and">%1$s and %2$s</string>
+    <!-- %1$s higher part, %2$s lower part (each empty or ending with a space). -->
+    <string name="notif_dev_body_long">%1$s%2$sThis compares the night with your own recent nights and isn\'t a diagnosis. Not a medical device.</string>
+    <string name="notif_higher_prefix">"Higher than usual: %1$s. "</string>
+    <string name="notif_lower_prefix">"Lower than usual: %1$s. "</string>
+    <string name="notif_public_title">NightBaseline</string>
+    <string name="notif_public_body">Last night\'s result is ready.</string>
+
+    <!-- %1$s date range from the previous day ("Nov 24–25"), %2$s wake date alone (used by ru). -->
+    <string name="night_label">Night of %1$s</string>
+
+    <string name="notif_perm_title">NightBaseline can\'t read your sleep data</string>
+    <string name="notif_perm_body">Health Connect access was turned off. Tap to turn it back on.</string>
+    <string name="notif_hc_title">Health Connect needs an update</string>
+    <string name="notif_hc_body">Tap to see how to continue.</string>
+    <string name="notif_bg_title">The morning check needs background access</string>
+    <string name="notif_bg_body">Tap to allow it in Health Connect.</string>
+    <!-- Not in states.md §6.2 yet: repeated read failures (B-READ-FAILED) on the data_access channel. -->
+    <string name="notif_read_failed_title">NightBaseline couldn\'t read your sleep data</string>
+    <string name="notif_read_failed_body">It will try again later. Tap to check now.</string>
+
+    <string name="metric_sleeping_hr_short">Heart rate</string>
+    <string name="metric_respiratory_rate_short">Breathing</string>
+    <string name="metric_spo2_short">SpO2</string>
+    <string name="metric_sleep_duration_short">Sleep</string>
+    <string name="metric_hrv_short">HRV</string>
+    <string name="metric_skin_temperature_short">Skin temp.</string>
+    <!-- A metric added after this build (no name yet). -->
+    <string name="metric_other_short">Other</string>
+</resources>

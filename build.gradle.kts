@@ -47,8 +47,9 @@ subprojects {
         config.setFrom(detektConfigFile)
         // Every source set (main, test, androidTest, ...); detekt skips build/ by default.
         source.setFrom(files("src"))
-        if (path == ":core-algo") {
-            // The public API of :core-algo must carry KDoc (Undocumented* rules on src/main).
+        if (path in listOf(":core-algo", ":data-local", ":data-hc", ":work")) {
+            // The public API of :core-algo and the Android library modules must carry KDoc (Undocumented* rules on
+            // src/main).
             config.setFrom(detektConfigFile, detektPublicApiConfigFile)
         }
     }

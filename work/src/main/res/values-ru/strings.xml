@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Russian notification texts, from docs/design/res/values-ru/strings.xml (placeholders converted to positional
+     arguments). Keep the key set in sync with values/strings.xml. -->
+<resources>
+    <string name="channel_night_results_name">Результаты ночи</string>
+    <string name="channel_night_results_desc">Заметка утром, если два или больше показателя вышли за пределы обычного диапазона.</string>
+    <string name="channel_data_access_name">Проблемы с чтением данных</string>
+    <string name="channel_data_access_desc">Когда NightBaseline не может прочитать ваши ночи, например после выключения доступа.</string>
+
+    <plurals name="notif_dev_title">
+        <item quantity="one">%1$d показатель вышел за пределы обычного диапазона</item>
+        <item quantity="few">%1$d показателя вышли за пределы обычного диапазона</item>
+        <item quantity="many">%1$d показателей вышли за пределы обычного диапазона</item>
+        <item quantity="other">%1$d показателя вышли за пределы обычного диапазона</item>
+    </plurals>
+    <string name="notif_dev_body">%1$s. %2$s.</string>
+    <plurals name="notif_list_more">
+        <item quantity="one">и ещё %1$d</item>
+        <item quantity="few">и ещё %1$d</item>
+        <item quantity="many">и ещё %1$d</item>
+        <item quantity="other">и ещё %1$d</item>
+    </plurals>
+    <string name="notif_list_and">%1$s и %2$s</string>
+    <string name="notif_dev_body_long">%1$s%2$sЭто сравнение с вашими недавними ночами, а не диагноз. Не медицинское изделие.</string>
+    <string name="notif_higher_prefix">"Выше обычного: %1$s. "</string>
+    <string name="notif_lower_prefix">"Ниже обычного: %1$s. "</string>
+    <string name="notif_public_title">NightBaseline</string>
+    <string name="notif_public_body">Результат прошлой ночи готов.</string>
+
+    <!-- ru uses the wake date: argument 2. -->
+    <string name="night_label">Ночь на %2$s</string>
+
+    <string name="notif_perm_title">NightBaseline не может прочитать данные о сне</string>
+    <string name="notif_perm_body">Доступ в Health Connect был выключен. Нажмите, чтобы включить снова.</string>
+    <string name="notif_hc_title">Health Connect нужно обновить</string>
+    <string name="notif_hc_body">Нажмите, чтобы узнать, как продолжить.</string>
+    <string name="notif_bg_title">Утренней проверке нужен фоновый доступ</string>
+    <string name="notif_bg_body">Нажмите, чтобы разрешить его в Health Connect.</string>
+    <string name="notif_read_failed_title">NightBaseline не удалось прочитать данные о сне</string>
+    <string name="notif_read_failed_body">Попробуем снова позже. Нажмите, чтобы проверить сейчас.</string>
+
+    <string name="metric_sleeping_hr_short">Пульс</string>
+    <string name="metric_respiratory_rate_short">Дыхание</string>
+    <string name="metric_spo2_short">SpO2</string>
+    <string name="metric_sleep_duration_short">Сон</string>
+    <string name="metric_hrv_short">HRV</string>
+    <string name="metric_skin_temperature_short">Темп. кожи</string>
+    <string name="metric_other_short">Другое</string>
+</resources>
