@@ -10,6 +10,7 @@ import androidx.health.connect.client.time.TimeRangeFilter
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.Writer
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -43,28 +44,8 @@ class Exporter(
         val filter = TimeRangeFilter.between(Instant.parse("2010-01-01T00:00:00Z"), Instant.now().plusSeconds(DAY_S))
         val types = JSONObject()
         for (type in RECORD_TYPES) {
-            val info = JSONObject()
-            types.put(type.name, info)
-            if (type.permission !in granted) {
-                info.put("status", "NOT_GRANTED")
-                continue
-            }
-            if (type.name == "skin_temperature" && !skinAvailable) {
-                info.put("status", "FEATURE_UNAVAILABLE")
-                continue
-            }
-            try {
-                dumpType(type, filter, File(dir, "${type.name}.jsonl"), info)
-                info.put("status", "OK")
-            } catch (e: Exception) {
-                info.put("status", "ERROR")
-                info.put("error", "${e.javaClass.simpleName}: ${e.message}")
-            }
+            types.put(type.name, exportType(type, granted, skinAvailable, filter, dir))
         }
-        val hcVersion =
-            runCatching {
-                context.packageManager.getPackageInfo("com.google.android.apps.healthdata", 0).longVersionCode
-            }.getOrNull()
         val manifest =
             JSONObject()
                 .put("format", "nightbaseline-hc-dump")
@@ -73,8 +54,8 @@ class Exporter(
                 .put("startedAtMs", startedAt)
                 .put("finishedAtMs", System.currentTimeMillis())
                 .put("zoneId", ZoneId.systemDefault().id)
-                .put("device", JSONObject().put("manufacturer", Build.MANUFACTURER).put("model", Build.MODEL).put("sdkInt", Build.VERSION.SDK_INT).put("release", Build.VERSION.RELEASE).put("display", Build.DISPLAY))
-                .put("healthConnectApkVersionCode", hcVersion)
+                .put("device", deviceInfo())
+                .put("healthConnectApkVersionCode", healthConnectVersion())
                 .put("historyFeatureAvailable", historyAvailable)
                 .put("skinTemperatureFeatureAvailable", skinAvailable)
                 .put("grantedPermissions", JSONArray(granted.sorted()))
@@ -84,11 +65,70 @@ class Exporter(
         return dir
     }
 
-    private suspend fun dumpType(type: RecordType, filter: TimeRangeFilter, out: File, info: JSONObject) {
+    /**
+     * Dumps one type into [dir] and returns its manifest entry; a failure is recorded there, never thrown.
+     * Suppression reason: this debug tool must record any failure of one type (HC, IO, encoding) and still export the
+     * other types, so the catch is deliberately generic.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun exportType(
+        type: RecordType,
+        granted: Set<String>,
+        skinAvailable: Boolean,
+        filter: TimeRangeFilter,
+        dir: File,
+    ): JSONObject {
+        val info = JSONObject()
+        when {
+            type.permission !in granted -> {
+                info.put("status", "NOT_GRANTED")
+            }
+
+            type.name == "skin_temperature" && !skinAvailable -> {
+                info.put("status", "FEATURE_UNAVAILABLE")
+            }
+
+            else -> {
+                try {
+                    dumpType(type, filter, File(dir, "${type.name}.jsonl"), info)
+                    info.put("status", "OK")
+                } catch (e: Exception) {
+                    info.put("status", "ERROR")
+                    info.put("error", "${e.javaClass.simpleName}: ${e.message}")
+                }
+            }
+        }
+        return info
+    }
+
+    private fun deviceInfo(): JSONObject =
+        JSONObject()
+            .put("manufacturer", Build.MANUFACTURER)
+            .put("model", Build.MODEL)
+            .put("sdkInt", Build.VERSION.SDK_INT)
+            .put("release", Build.VERSION.RELEASE)
+            .put("display", Build.DISPLAY)
+
+    private fun healthConnectVersion(): Long? =
+        runCatching {
+            context.packageManager.getPackageInfo("com.google.android.apps.healthdata", 0).longVersionCode
+        }.getOrNull()
+
+    /** Running totals of one type's dump. */
+    private class TypeStats {
         var count = 0
         var minTime = Long.MAX_VALUE
         var maxTime = Long.MIN_VALUE
         val origins = JSONObject()
+    }
+
+    private suspend fun dumpType(
+        type: RecordType,
+        filter: TimeRangeFilter,
+        out: File,
+        info: JSONObject,
+    ) {
+        val stats = TypeStats()
         out.bufferedWriter().use { w ->
             var pageToken: String? = null
             do {
@@ -102,28 +142,35 @@ class Exporter(
                             pageToken = pageToken,
                         ),
                     )
-                for (r in response.records) {
-                    val o = encodeCommon(r)
-                    type.encode(r, o)
-                    w.write(o.toString())
-                    w.write("\n")
-                    count++
-                    val t = o.optLong("time", o.optLong("start"))
-                    if (t < minTime) minTime = t
-                    if (t > maxTime) maxTime = t
-                    val origin = r.metadata.dataOrigin.packageName
-                    origins.put(origin, origins.optInt(origin) + 1)
-                }
-                progress("${type.name}: $count")
+                response.records.forEach { r -> writeRecord(type, r, w, stats) }
+                progress("${type.name}: ${stats.count}")
                 pageToken = response.pageToken
             } while (!pageToken.isNullOrEmpty())
         }
-        info.put("count", count)
-        if (count > 0) {
-            info.put("firstMs", minTime)
-            info.put("lastMs", maxTime)
+        info.put("count", stats.count)
+        if (stats.count > 0) {
+            info.put("firstMs", stats.minTime)
+            info.put("lastMs", stats.maxTime)
         }
-        info.put("origins", origins)
+        info.put("origins", stats.origins)
+    }
+
+    private fun writeRecord(
+        type: RecordType,
+        r: Record,
+        w: Writer,
+        stats: TypeStats,
+    ) {
+        val o = encodeCommon(r)
+        type.encode(r, o)
+        w.write(o.toString())
+        w.write("\n")
+        stats.count++
+        val t = o.optLong("time", o.optLong("start"))
+        if (t < stats.minTime) stats.minTime = t
+        if (t > stats.maxTime) stats.maxTime = t
+        val origin = r.metadata.dataOrigin.packageName
+        stats.origins.put(origin, stats.origins.optInt(origin) + 1)
     }
 
     private fun encodeCommon(r: Record): JSONObject {

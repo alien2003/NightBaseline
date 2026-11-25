@@ -13,7 +13,10 @@ import java.time.ZoneOffset
  */
 object NightSelector {
     /** The main nights, ordered by date. */
-    fun select(sessions: List<SleepSession>, params: AlgoParams): List<NightCandidate> {
+    fun select(
+        sessions: List<SleepSession>,
+        params: AlgoParams,
+    ): List<NightCandidate> {
         val clusters = cluster(sessions.filter { it.endMs > it.startMs }.sortedBy { it.startMs }, params.mergeGapMinutes)
         return clusters
             .mapNotNull { c ->
@@ -29,7 +32,10 @@ object NightSelector {
             .sortedBy { it.date }
     }
 
-    private fun cluster(sorted: List<SleepSession>, gapMin: Double): List<List<SleepSession>> {
+    private fun cluster(
+        sorted: List<SleepSession>,
+        gapMin: Double,
+    ): List<List<SleepSession>> {
         val out = mutableListOf<MutableList<SleepSession>>()
         var curEnd = Long.MIN_VALUE
         for (s in sorted) {

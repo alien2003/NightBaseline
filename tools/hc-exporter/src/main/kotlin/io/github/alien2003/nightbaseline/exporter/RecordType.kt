@@ -25,19 +25,32 @@ class RecordType(
     val permission: String = HealthPermission.getReadPermission(kClass)
 }
 
-private fun instant(o: JSONObject, time: java.time.Instant, offset: java.time.ZoneOffset?) {
+private fun instant(
+    o: JSONObject,
+    time: java.time.Instant,
+    offset: java.time.ZoneOffset?,
+) {
     o.put("time", time.toEpochMilli())
     o.put("zoneOffsetS", offset?.totalSeconds)
 }
 
-private fun interval(o: JSONObject, start: java.time.Instant, end: java.time.Instant, startOffset: java.time.ZoneOffset?, endOffset: java.time.ZoneOffset?) {
+private fun interval(
+    o: JSONObject,
+    start: java.time.Instant,
+    end: java.time.Instant,
+    startOffset: java.time.ZoneOffset?,
+    endOffset: java.time.ZoneOffset?,
+) {
     o.put("start", start.toEpochMilli())
     o.put("end", end.toEpochMilli())
     o.put("startZoneOffsetS", startOffset?.totalSeconds)
     o.put("endZoneOffsetS", endOffset?.totalSeconds)
 }
 
-private fun pairs(list: List<Pair<Long, Number>>): JSONArray = JSONArray().apply { list.forEach { (t, v) -> put(JSONArray().put(t).put(v)) } }
+private fun pairs(list: List<Pair<Long, Number>>): JSONArray =
+    JSONArray().apply {
+        list.forEach { (t, v) -> put(JSONArray().put(t).put(v)) }
+    }
 
 /**
  * Every type the exporter reads. Free text (titles, notes) is never exported. Adding a type here is all it takes for
@@ -48,7 +61,14 @@ val RECORD_TYPES: List<RecordType> =
         RecordType("sleep", SleepSessionRecord::class) { r, o ->
             r as SleepSessionRecord
             interval(o, r.startTime, r.endTime, r.startZoneOffset, r.endZoneOffset)
-            o.put("stages", JSONArray().apply { r.stages.forEach { s -> put(JSONArray().put(s.startTime.toEpochMilli()).put(s.endTime.toEpochMilli()).put(s.stage)) } })
+            o.put(
+                "stages",
+                JSONArray().apply {
+                    r.stages.forEach { s ->
+                        put(JSONArray().put(s.startTime.toEpochMilli()).put(s.endTime.toEpochMilli()).put(s.stage))
+                    }
+                },
+            )
         },
         RecordType("heart_rate", HeartRateRecord::class) { r, o ->
             r as HeartRateRecord

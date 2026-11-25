@@ -56,7 +56,11 @@ object MetricExtractor {
      * Summarises [night]. [providedChannels] lists the channels the source writes at all (a channel absent there
      * gives [MissingReason.NOT_PROVIDED] rather than [MissingReason.NO_DATA]).
      */
-    fun summarize(night: NightInput, providedChannels: Set<ChannelId>, params: AlgoParams): NightSummary {
+    fun summarize(
+        night: NightInput,
+        providedChannels: Set<ChannelId>,
+        params: AlgoParams,
+    ): NightSummary {
         val values = params.metrics.associate { spec -> spec.id to extract(spec, night, providedChannels) }
         return NightSummary(
             date = night.date,
@@ -68,7 +72,13 @@ object MetricExtractor {
         )
     }
 
-    private fun extract(spec: MetricSpec, night: NightInput, provided: Set<ChannelId>): MetricValue {
+    // Early returns per missing reason read more clearly than one nested expression.
+    @Suppress("ReturnCount")
+    private fun extract(
+        spec: MetricSpec,
+        night: NightInput,
+        provided: Set<ChannelId>,
+    ): MetricValue {
         if (spec.aggregation == Aggregation.SLEEP_MINUTES) {
             return MetricValue(spec.id, night.asleepMinutes, 0, 1.0)
         }
@@ -96,8 +106,12 @@ object MetricExtractor {
     }
 
     /** Share of [binMin]-minute bins of the night's sessions that contain at least one sample. */
-    internal fun coverage(samples: List<Sample>, night: NightInput, binMin: Int): Double {
-        val binMs = binMin * 60_000L
+    internal fun coverage(
+        samples: List<Sample>,
+        night: NightInput,
+        binMin: Int,
+    ): Double {
+        val binMs = (binMin * MS_PER_MIN).toLong()
         var total = 0
         var covered = 0
         for (s in night.sessions) {

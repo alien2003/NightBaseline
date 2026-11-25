@@ -32,28 +32,45 @@ data class AlgoParams(
     /** Problems with these parameters; empty when valid. */
     fun validate(): List<String> =
         buildList {
-            if (windowNights !in 7..90) add("windowNights must be in 7..90")
-            if (minNights !in 3..windowNights) add("minNights must be in 3..windowNights")
+            if (windowNights !in WINDOW_NIGHTS_RANGE) add("windowNights must be in 7..90")
+            if (minNights !in MIN_NIGHTS_FLOOR..windowNights) add("minNights must be in 3..windowNights")
             if (lookbackDays < windowNights) add("lookbackDays must be >= windowNights")
-            if (zThreshold !in 1.0..5.0) add("zThreshold must be in 1.0..5.0")
-            if (minDeviatingMetrics !in 1..6) add("minDeviatingMetrics must be in 1..6")
-            if (minNightMinutes !in 0.0..600.0) add("minNightMinutes must be in 0..600")
-            if (mergeGapMinutes !in 0.0..240.0) add("mergeGapMinutes must be in 0..240")
-            if (wakeWindowStartHour !in 0..23 || wakeWindowEndHour !in 1..24 || wakeWindowStartHour >= wakeWindowEndHour) {
+            if (zThreshold !in Z_THRESHOLD_RANGE) add("zThreshold must be in 1.0..5.0")
+            if (minDeviatingMetrics !in MIN_DEVIATING_RANGE) add("minDeviatingMetrics must be in 1..6")
+            if (minNightMinutes !in MIN_NIGHT_MINUTES_RANGE) add("minNightMinutes must be in 0..600")
+            if (mergeGapMinutes !in MERGE_GAP_MINUTES_RANGE) add("mergeGapMinutes must be in 0..240")
+            if (wakeWindowStartHour !in 0 until HOURS_PER_DAY ||
+                wakeWindowEndHour !in 1..HOURS_PER_DAY ||
+                wakeWindowStartHour >= wakeWindowEndHour
+            ) {
                 add("wake window must satisfy 0 <= start < end <= 24")
             }
             if (metrics.map { it.id }.toSet().size != metrics.size) add("metric ids must be unique")
-            metrics.forEach { m ->
-                if (m.minSpread <= 0.0) add("${m.id.key}: minSpread must be > 0")
-                if (m.minAbsDeviation < 0.0) add("${m.id.key}: minAbsDeviation must be >= 0")
-                if (m.plausibleMin >= m.plausibleMax) add("${m.id.key}: plausible range is empty")
-                if (m.minCoverage !in 0.0..1.0) add("${m.id.key}: minCoverage must be in 0..1")
-                if (m.coverageBinMin <= 0) add("${m.id.key}: coverageBinMin must be > 0")
-                if ((m.aggregation == Aggregation.SLEEP_MINUTES) != (m.channel == null)) {
-                    add("${m.id.key}: only SLEEP_MINUTES has no channel")
-                }
+            metrics.forEach { addAll(metricProblems(it)) }
+        }
+
+    private fun metricProblems(m: MetricSpec): List<String> =
+        buildList {
+            if (m.minSpread <= 0.0) add("${m.id.key}: minSpread must be > 0")
+            if (m.minAbsDeviation < 0.0) add("${m.id.key}: minAbsDeviation must be >= 0")
+            if (m.plausibleMin >= m.plausibleMax) add("${m.id.key}: plausible range is empty")
+            if (m.minCoverage !in 0.0..1.0) add("${m.id.key}: minCoverage must be in 0..1")
+            if (m.coverageBinMin <= 0) add("${m.id.key}: coverageBinMin must be > 0")
+            if ((m.aggregation == Aggregation.SLEEP_MINUTES) != (m.channel == null)) {
+                add("${m.id.key}: only SLEEP_MINUTES has no channel")
             }
         }
+
+    /** Accepted ranges of the parameters (checked by [validate]). */
+    companion object {
+        private val WINDOW_NIGHTS_RANGE = 7..90
+        private const val MIN_NIGHTS_FLOOR = 3
+        private val Z_THRESHOLD_RANGE = 1.0..5.0
+        private val MIN_DEVIATING_RANGE = 1..6
+        private val MIN_NIGHT_MINUTES_RANGE = 0.0..600.0
+        private val MERGE_GAP_MINUTES_RANGE = 0.0..240.0
+        private const val HOURS_PER_DAY = 24
+    }
 }
 
 /** Built-in metric definitions (initial values; see ALGORITHM.md for how they were chosen). */
@@ -61,49 +78,97 @@ object DefaultMetrics {
     /** Sleeping heart rate. */
     val SLEEPING_HR =
         MetricSpec(
-            id = MetricId.SLEEPING_HR, channel = ChannelId.HEART_RATE, aggregation = Aggregation.MEDIAN,
-            sensitivity = Sensitivity.BOTH, minSpread = 1.0, minAbsDeviation = 3.0,
-            plausibleMin = 25.0, plausibleMax = 200.0, minSamples = 30, coverageBinMin = 10, minCoverage = 0.6,
+            id = MetricId.SLEEPING_HR,
+            channel = ChannelId.HEART_RATE,
+            aggregation = Aggregation.MEDIAN,
+            sensitivity = Sensitivity.BOTH,
+            minSpread = 1.0,
+            minAbsDeviation = 3.0,
+            plausibleMin = 25.0,
+            plausibleMax = 200.0,
+            minSamples = 30,
+            coverageBinMin = 10,
+            minCoverage = 0.6,
         )
 
     /** Respiratory rate. */
     val RESPIRATORY_RATE =
         MetricSpec(
-            id = MetricId.RESPIRATORY_RATE, channel = ChannelId.RESPIRATORY_RATE, aggregation = Aggregation.MEDIAN,
-            sensitivity = Sensitivity.BOTH, minSpread = 0.3, minAbsDeviation = 1.0,
-            plausibleMin = 4.0, plausibleMax = 40.0, minSamples = 6, coverageBinMin = 30, minCoverage = 0.5,
+            id = MetricId.RESPIRATORY_RATE,
+            channel = ChannelId.RESPIRATORY_RATE,
+            aggregation = Aggregation.MEDIAN,
+            sensitivity = Sensitivity.BOTH,
+            minSpread = 0.3,
+            minAbsDeviation = 1.0,
+            plausibleMin = 4.0,
+            plausibleMax = 40.0,
+            minSamples = 6,
+            coverageBinMin = 30,
+            minCoverage = 0.5,
         )
 
     /** Blood oxygen: only low values count as deviations. */
     val SPO2 =
         MetricSpec(
-            id = MetricId.SPO2, channel = ChannelId.SPO2, aggregation = Aggregation.MEDIAN,
-            sensitivity = Sensitivity.LOW, minSpread = 0.5, minAbsDeviation = 1.5,
-            plausibleMin = 70.0, plausibleMax = 100.0, minSamples = 4, coverageBinMin = 60, minCoverage = 0.5,
+            id = MetricId.SPO2,
+            channel = ChannelId.SPO2,
+            aggregation = Aggregation.MEDIAN,
+            sensitivity = Sensitivity.LOW,
+            minSpread = 0.5,
+            minAbsDeviation = 1.5,
+            plausibleMin = 70.0,
+            plausibleMax = 100.0,
+            minSamples = 4,
+            coverageBinMin = 60,
+            minCoverage = 0.5,
         )
 
     /** Sleep duration in minutes. */
     val SLEEP_DURATION =
         MetricSpec(
-            id = MetricId.SLEEP_DURATION, channel = null, aggregation = Aggregation.SLEEP_MINUTES,
-            sensitivity = Sensitivity.BOTH, minSpread = 20.0, minAbsDeviation = 60.0,
-            plausibleMin = 0.0, plausibleMax = 1440.0, minSamples = 0, coverageBinMin = 60, minCoverage = 0.0,
+            id = MetricId.SLEEP_DURATION,
+            channel = null,
+            aggregation = Aggregation.SLEEP_MINUTES,
+            sensitivity = Sensitivity.BOTH,
+            minSpread = 20.0,
+            minAbsDeviation = 60.0,
+            plausibleMin = 0.0,
+            plausibleMax = 1440.0,
+            minSamples = 0,
+            coverageBinMin = 60,
+            minCoverage = 0.0,
         )
 
     /** HRV (RMSSD), used when the source writes it. */
     val HRV =
         MetricSpec(
-            id = MetricId.HRV, channel = ChannelId.HRV_RMSSD, aggregation = Aggregation.MEDIAN,
-            sensitivity = Sensitivity.BOTH, minSpread = 3.0, minAbsDeviation = 8.0,
-            plausibleMin = 1.0, plausibleMax = 300.0, minSamples = 3, coverageBinMin = 60, minCoverage = 0.3,
+            id = MetricId.HRV,
+            channel = ChannelId.HRV_RMSSD,
+            aggregation = Aggregation.MEDIAN,
+            sensitivity = Sensitivity.BOTH,
+            minSpread = 3.0,
+            minAbsDeviation = 8.0,
+            plausibleMin = 1.0,
+            plausibleMax = 300.0,
+            minSamples = 3,
+            coverageBinMin = 60,
+            minCoverage = 0.3,
         )
 
     /** Skin temperature, used when the source writes it. */
     val SKIN_TEMPERATURE =
         MetricSpec(
-            id = MetricId.SKIN_TEMPERATURE, channel = ChannelId.SKIN_TEMPERATURE, aggregation = Aggregation.MEAN,
-            sensitivity = Sensitivity.BOTH, minSpread = 0.1, minAbsDeviation = 0.3,
-            plausibleMin = -10.0, plausibleMax = 45.0, minSamples = 1, coverageBinMin = 60, minCoverage = 0.0,
+            id = MetricId.SKIN_TEMPERATURE,
+            channel = ChannelId.SKIN_TEMPERATURE,
+            aggregation = Aggregation.MEAN,
+            sensitivity = Sensitivity.BOTH,
+            minSpread = 0.1,
+            minAbsDeviation = 0.3,
+            plausibleMin = -10.0,
+            plausibleMax = 45.0,
+            minSamples = 1,
+            coverageBinMin = 60,
+            minCoverage = 0.0,
         )
 
     /** All built-in metrics in display order. */

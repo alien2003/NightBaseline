@@ -106,7 +106,12 @@ object Evaluator {
      * Baseline of [spec] for the night of [date] from [history] (any order; nights on or after [date], short nights
      * and missing values are ignored). Null when fewer than [AlgoParams.minNights] values exist.
      */
-    fun baseline(spec: MetricSpec, date: String, history: List<NightSummary>, params: AlgoParams): Baseline? {
+    fun baseline(
+        spec: MetricSpec,
+        date: String,
+        history: List<NightSummary>,
+        params: AlgoParams,
+    ): Baseline? {
         val values = window(date, history, params).mapNotNull { it.values[spec.id]?.value }.take(params.windowNights)
         if (values.size < params.minNights) return null
         val median = Stats.median(values)
@@ -116,7 +121,11 @@ object Evaluator {
     }
 
     /** Valid nights before [date] within the lookback, newest first. */
-    fun window(date: String, history: List<NightSummary>, params: AlgoParams): List<NightSummary> {
+    fun window(
+        date: String,
+        history: List<NightSummary>,
+        params: AlgoParams,
+    ): List<NightSummary> {
         val d = LocalDate.parse(date)
         return history
             .filter { n ->
@@ -126,7 +135,11 @@ object Evaluator {
     }
 
     /** Evaluates [night] against the nights in [history]. */
-    fun evaluate(night: NightSummary, history: List<NightSummary>, params: AlgoParams): NightEvaluation {
+    fun evaluate(
+        night: NightSummary,
+        history: List<NightSummary>,
+        params: AlgoParams,
+    ): NightEvaluation {
         val historyNights = window(night.date, history, params).size
         val metrics =
             params.metrics
@@ -145,11 +158,20 @@ object Evaluator {
         return NightEvaluation(night.date, status, metrics, if (status in NO_COUNT) 0 else deviating, historyNights)
     }
 
-    private fun evaluateMetric(spec: MetricSpec, night: NightSummary, history: List<NightSummary>, params: AlgoParams): MetricEvaluation {
+    // Early returns for the missing and learning cases read more clearly than one nested expression.
+    @Suppress("ReturnCount")
+    private fun evaluateMetric(
+        spec: MetricSpec,
+        night: NightSummary,
+        history: List<NightSummary>,
+        params: AlgoParams,
+    ): MetricEvaluation {
         val mv = night.values[spec.id]
         val value = mv?.value
         val base = baseline(spec, night.date, history, params)
-        if (value == null) return MetricEvaluation(spec.id, null, base, null, MetricStatus.MISSING, false, mv?.missing ?: MissingReason.NO_DATA)
+        if (value == null) {
+            return MetricEvaluation(spec.id, null, base, null, MetricStatus.MISSING, false, mv?.missing ?: MissingReason.NO_DATA)
+        }
         if (base == null) return MetricEvaluation(spec.id, value, null, null, MetricStatus.LEARNING, false)
         val z = (value - base.median) / base.spread
         val status =

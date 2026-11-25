@@ -8,11 +8,16 @@ object Stats {
     /** Scale factor that makes the MAD a consistent estimator of the standard deviation for normal data. */
     const val MAD_TO_SD: Double = 1.4826
 
+    private const val MEDIAN_QUANTILE = 0.5
+
     /** Median of [values]; NaN when empty. */
-    fun median(values: List<Double>): Double = quantile(values, 0.5)
+    fun median(values: List<Double>): Double = quantile(values, MEDIAN_QUANTILE)
 
     /** Linear-interpolated quantile (type 7, as numpy's default) of [values]; NaN when empty. */
-    fun quantile(values: List<Double>, q: Double): Double {
+    fun quantile(
+        values: List<Double>,
+        q: Double,
+    ): Double {
         require(q in 0.0..1.0) { "q must be in [0, 1]" }
         if (values.isEmpty()) return Double.NaN
         val sorted = values.sorted()

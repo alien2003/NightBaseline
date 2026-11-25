@@ -22,8 +22,16 @@ class NightSelectorTest {
     private val off = ZoneOffset.ofHours(3).totalSeconds
     private val p = AlgoParams()
 
-    private fun at(date: String, h: Int, m: Int = 0): Long =
-        LocalDate.parse(date).atTime(h, m).toInstant(ZoneOffset.ofTotalSeconds(off)).toEpochMilli()
+    private fun at(
+        date: String,
+        h: Int,
+        m: Int = 0,
+    ): Long =
+        LocalDate
+            .parse(date)
+            .atTime(h, m)
+            .toInstant(ZoneOffset.ofTotalSeconds(off))
+            .toEpochMilli()
 
     @Test
     fun `split night is merged and nap is dropped`() {
@@ -90,18 +98,28 @@ class ExtractionTest {
 class EvaluatorTest {
     private val p = AlgoParams()
 
-    private fun summary(date: LocalDate, hr: Double?, rr: Double?, spo2: Double?, minutes: Double = 450.0) =
-        NightSummary(
-            date.toString(), 0, 0, minutes, minutes < p.minNightMinutes,
-            mapOf(
-                MetricId.SLEEPING_HR to MetricValue(MetricId.SLEEPING_HR, hr, 200, 1.0, if (hr == null) MissingReason.NO_DATA else null),
-                MetricId.RESPIRATORY_RATE to MetricValue(MetricId.RESPIRATORY_RATE, rr, 50, 1.0, if (rr == null) MissingReason.NO_DATA else null),
-                MetricId.SPO2 to MetricValue(MetricId.SPO2, spo2, 16, 1.0, if (spo2 == null) MissingReason.NO_DATA else null),
-                MetricId.SLEEP_DURATION to MetricValue(MetricId.SLEEP_DURATION, minutes, 0, 1.0),
-                MetricId.HRV to MetricValue(MetricId.HRV, null, 0, 0.0, MissingReason.NOT_PROVIDED),
-                MetricId.SKIN_TEMPERATURE to MetricValue(MetricId.SKIN_TEMPERATURE, null, 0, 0.0, MissingReason.NOT_PROVIDED),
-            ),
-        )
+    private fun summary(
+        date: LocalDate,
+        hr: Double?,
+        rr: Double?,
+        spo2: Double?,
+        minutes: Double = 450.0,
+    ) = NightSummary(
+        date.toString(),
+        0,
+        0,
+        minutes,
+        minutes < p.minNightMinutes,
+        mapOf(
+            MetricId.SLEEPING_HR to MetricValue(MetricId.SLEEPING_HR, hr, 200, 1.0, if (hr == null) MissingReason.NO_DATA else null),
+            MetricId.RESPIRATORY_RATE to
+                MetricValue(MetricId.RESPIRATORY_RATE, rr, 50, 1.0, if (rr == null) MissingReason.NO_DATA else null),
+            MetricId.SPO2 to MetricValue(MetricId.SPO2, spo2, 16, 1.0, if (spo2 == null) MissingReason.NO_DATA else null),
+            MetricId.SLEEP_DURATION to MetricValue(MetricId.SLEEP_DURATION, minutes, 0, 1.0),
+            MetricId.HRV to MetricValue(MetricId.HRV, null, 0, 0.0, MissingReason.NOT_PROVIDED),
+            MetricId.SKIN_TEMPERATURE to MetricValue(MetricId.SKIN_TEMPERATURE, null, 0, 0.0, MissingReason.NOT_PROVIDED),
+        ),
+    )
 
     private val d0 = LocalDate.of(2026, 1, 1)
     private val history = (0 until 20).map { summary(d0.plusDays(it.toLong()), 55.0 + (it % 3), 14.0 + (it % 2) * 0.4, 96.0 + (it % 2)) }
@@ -190,20 +208,23 @@ class SyntheticBehaviourTest {
             val (sessions, channels) = gen.flatten(nights)
             val results = Pipeline.run(sessions, channels).associateBy { it.first.date }
             val truth = nights.associateBy { it.wakeDate }
-            results.values.forEach { (_, e) ->
-                val t = truth.getValue(e.date)
-                if (!t.inEpisode && e.status != NightStatus.LEARNING && e.status != NightStatus.SHORT_NIGHT) {
-                    normalNights++
-                    if (e.notify) falseAlarms++
+            val normal =
+                results.values.map { it.second }.filter { e ->
+                    !truth.getValue(e.date).inEpisode && e.status != NightStatus.LEARNING && e.status != NightStatus.SHORT_NIGHT
                 }
-            }
+            normalNights += normal.size
+            falseAlarms += normal.count { it.notify }
             episodes++
             val episodeDates = nights.filter { it.inEpisode }.map { it.wakeDate }
             if (episodeDates.any { results[it]?.second?.notify == true }) found++
         }
         val falseRate = falseAlarms.toDouble() / normalNights
         val detection = found.toDouble() / episodes
-        println("synthetic: normal nights=$normalNights false alarms=$falseAlarms (${"%.4f".format(falseRate)}), episodes found $found/$episodes")
+        println(
+            "synthetic: normal nights=$normalNights false alarms=$falseAlarms (${"%.4f".format(
+                falseRate,
+            )}), episodes found $found/$episodes",
+        )
         assertTrue(falseRate < 0.02, "false-alarm rate per normal night $falseRate")
         assertTrue(detection > 0.9, "episode detection $detection")
     }

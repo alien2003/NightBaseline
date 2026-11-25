@@ -28,19 +28,33 @@ class ExportActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        val pad = (16 * resources.displayMetrics.density).toInt()
-        log = TextView(this).apply { setPadding(pad, pad, pad, pad); setTextIsSelectable(true) }
-        val grant = Button(this).apply { text = "Grant permissions"; setOnClickListener { request() } }
-        val export = Button(this).apply { text = "Export"; setOnClickListener { export() } }
+        val pad = (PADDING_DP * resources.displayMetrics.density).toInt()
+        log =
+            TextView(this).apply {
+                setPadding(pad, pad, pad, pad)
+                setTextIsSelectable(true)
+            }
+        val grant =
+            Button(this).apply {
+                text = "Grant permissions"
+                setOnClickListener { request() }
+            }
+        val export =
+            Button(this).apply {
+                text = "Export"
+                setOnClickListener { export() }
+            }
         setContentView(
             ScrollView(this).apply {
-                addView(LinearLayout(this@ExportActivity).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(pad, pad * 3, pad, pad)
-                    addView(grant)
-                    addView(export)
-                    addView(log)
-                })
+                addView(
+                    LinearLayout(this@ExportActivity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(pad, pad * TOP_PADDING_FACTOR, pad, pad)
+                        addView(grant)
+                        addView(export)
+                        addView(log)
+                    },
+                )
             },
         )
         refresh()
@@ -71,12 +85,22 @@ class ExportActivity : ComponentActivity() {
     }
 
     private fun refresh() {
-        val c = client() ?: run { log.text = "Health Connect is not available"; return }
+        val c =
+            client() ?: run {
+                log.text = "Health Connect is not available"
+                return
+            }
         lifecycleScope.launch {
             val granted = c.permissionController.getGrantedPermissions()
             val missing = wanted(c) - granted
             log.text =
-                if (missing.isEmpty()) "Permissions: all granted\n" else "Permissions: missing ${missing.size}\n" + missing.joinToString("\n") + "\n"
+                if (missing.isEmpty()) {
+                    "Permissions: all granted\n"
+                } else {
+                    "Permissions: missing ${missing.size}\n" +
+                        missing.joinToString("\n") +
+                        "\n"
+                }
         }
     }
 
@@ -85,6 +109,8 @@ class ExportActivity : ComponentActivity() {
         lifecycleScope.launch { requestPermissions.launch(wanted(c)) }
     }
 
+    // Debug tool: any export failure must be shown in the log instead of crashing the activity.
+    @Suppress("TooGenericExceptionCaught")
     private fun export() {
         val c = client() ?: return
         if (running) return
@@ -99,5 +125,13 @@ class ExportActivity : ComponentActivity() {
                 running = false
             }
         }
+    }
+
+    private companion object {
+        /** Base padding of the layout, dp. */
+        const val PADDING_DP = 16
+
+        /** The top padding is this many times the base padding (clears the status bar). */
+        const val TOP_PADDING_FACTOR = 3
     }
 }
