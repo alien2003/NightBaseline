@@ -1,0 +1,6 @@
+.tooling
+.gradle/
+build/
+.kotlin/
+local.properties
+.claude/worktrees/
