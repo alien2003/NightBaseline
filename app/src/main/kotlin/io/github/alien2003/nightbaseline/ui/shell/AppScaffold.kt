@@ -1,5 +1,11 @@
 package io.github.alien2003.nightbaseline.ui.shell
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
@@ -11,7 +17,6 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -27,11 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
-import io.github.alien2003.nightbaseline.ui.components.BarClearance
 import io.github.alien2003.nightbaseline.ui.components.FloatingNavBar
 import io.github.alien2003.nightbaseline.ui.components.FloatingNavRail
 import io.github.alien2003.nightbaseline.ui.components.LocalPaneScrolls
@@ -41,16 +47,22 @@ import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.layout.LocalLayoutSpec
 import io.github.alien2003.nightbaseline.ui.layout.NavigationKind
 import io.github.alien2003.nightbaseline.ui.material.LocalHazeState
+import io.github.alien2003.nightbaseline.ui.motion.NbDurations
+import io.github.alien2003.nightbaseline.ui.motion.NbEasing
+import io.github.alien2003.nightbaseline.ui.motion.NbSprings
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.ShellDimens
 
 /**
- * The app shell (`layouts.md` 4): the solid window background, the content as the glass backdrop
- * (`Modifier.hazeSource`), and on top of it the floating glass navigation of [layout] (bar centred above the
- * navigation-bar inset + 12 dp, or rail at the start edge + 12 dp) plus the screen's [topBar]. The shell components
- * are drawn outside the backdrop so they blur the content and not themselves. [topBar] receives the same padding as
- * [content] so it starts after the rail.
+ * The app shell (`layouts.md` 4, `coloros-conformance.md` A4, B1, C7): the solid window background, the content as
+ * the glass backdrop (`Modifier.hazeSource`), and on top of it the floating navigation of [layout] (bar centred
+ * 16 dp above the screen's bottom edge with gesture navigation, or 8 dp above a 3-button navigation bar; rail 16 dp
+ * from the start edge) plus the screen's [topBar]. The shell components are drawn outside the backdrop so they blur
+ * the content and not themselves. [topBar] receives the same padding as [content] so it starts after the rail.
  *
+ * @param showBar false on pushed sub-pages in Compact (the bar belongs to top-level destinations only); the bar slides
+ *   out and back in. The rail stays on wide windows.
  * @param content receives the padding that keeps it clear of the rail and the bar (`content.bottomClearance`).
  */
 @Composable
@@ -59,6 +71,7 @@ fun AppScaffold(
     selected: TopLevel,
     onSelect: (TopLevel) -> Unit,
     modifier: Modifier = Modifier,
+    showBar: Boolean = true,
     topBar: @Composable BoxScope.(PaddingValues) -> Unit = {},
     overlay: @Composable BoxScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
@@ -67,20 +80,24 @@ fun AppScaffold(
     val direction = LocalLayoutDirection.current
     val system = WindowInsets.navigationBars.asPaddingValues()
     val rail = layout.navigation !in setOf(NavigationKind.Bar, NavigationKind.None)
+    val bar = layout.navigation == NavigationKind.Bar && showBar
     val density = LocalDensity.current
+    val motion = NbTheme.motion
     var railWidth by remember { mutableStateOf(0.dp) }
+    var barHeight by remember { mutableStateOf(ShellDimens.barHeight) }
+    val inset = system.calculateBottomPadding()
+    // Gesture navigation: 16 dp from the screen edge, at least 4 dp above the handle; 3-button: 8 dp above the bar.
+    val barBottom =
+        if (inset > ShellDimens.gestureInsetMax) {
+            inset + ShellDimens.barAboveButtonsInset
+        } else {
+            maxOf(ShellDimens.barBottomMin, inset + ShellDimens.barAboveGestureInset)
+        }
     val padding =
         PaddingValues(
             // The rail grows with its labels at large font, so the content starts after its measured width.
-            start = if (rail) maxOf(NbDimens.railArea, railWidth + NbDimens.railOffset * 2) else 0.dp,
-            bottom =
-                if (layout.navigation ==
-                    NavigationKind.Bar
-                ) {
-                    BarClearance + system.calculateBottomPadding()
-                } else {
-                    system.calculateBottomPadding()
-                },
+            start = if (rail) maxOf(NbDimens.railArea, railWidth + ShellDimens.railOffset * 2) else 0.dp,
+            bottom = if (bar) barBottom + maxOf(barHeight, ShellDimens.barHeight) + ShellDimens.barContentGap else inset,
             end = system.calculateEndPadding(direction),
         )
     val paneScrolls = remember { PaneScrolls() }
@@ -99,7 +116,7 @@ fun AppScaffold(
                         .zIndex(1f)
                         .fillMaxHeight()
                         .windowInsetsPadding(WindowInsets.safeDrawing)
-                        .padding(start = NbDimens.railOffset),
+                        .padding(start = ShellDimens.railOffset),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     FloatingNavRail(
@@ -107,7 +124,6 @@ fun AppScaffold(
                         onSelect,
                         modifier = Modifier.focusGroup().onSizeChanged { railWidth = with(density) { it.width.toDp() } },
                         showLabels = layout.navigation != NavigationKind.RailIcons,
-                        wide = layout.navigation == NavigationKind.RailLabelled,
                     )
                 }
             }
@@ -120,14 +136,40 @@ fun AppScaffold(
                     Modifier
                         .align(Alignment.BottomStart)
                         .then(if (paneWidth != null) Modifier.width(paneWidth) else Modifier.fillMaxSize())
-                        .navigationBarsPadding()
-                        .padding(bottom = NbDimens.barOffset),
+                        .padding(bottom = barBottom),
                     contentAlignment = Alignment.BottomCenter,
                 ) {
-                    FloatingNavBar(selected, onSelect, Modifier.focusGroup())
+                    AnimatedVisibility(
+                        visible = showBar,
+                        enter =
+                            if (motion.reduced) {
+                                fadeIn(tween(NbDurations.REDUCED))
+                            } else {
+                                slideInVertically(NbSprings.Page.spec()) { it + barBottom.roundToPx(density) } +
+                                    fadeIn(NbSprings.Page.spec())
+                            },
+                        exit =
+                            if (motion.reduced) {
+                                fadeOut(tween(NbDurations.REDUCED))
+                            } else {
+                                slideOutVertically(tween(BAR_EXIT_MS, easing = NbEasing.Exit)) { it + barBottom.roundToPx(density) } +
+                                    fadeOut(tween(BAR_EXIT_MS, easing = NbEasing.Exit))
+                            },
+                    ) {
+                        FloatingNavBar(
+                            selected,
+                            onSelect,
+                            Modifier.focusGroup().onSizeChanged { barHeight = with(density) { it.height.toDp() } },
+                        )
+                    }
                 }
             }
             overlay()
         }
     }
 }
+
+/** The bar leaves sub-pages in 200 ms with `easing.exit` (`coloros-conformance.md` C7). */
+private const val BAR_EXIT_MS = 200
+
+private fun Dp.roundToPx(density: Density): Int = with(density) { roundToPx() }

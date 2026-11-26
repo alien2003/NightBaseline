@@ -2,6 +2,7 @@ package io.github.alien2003.nightbaseline.nav
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -59,6 +61,7 @@ import io.github.alien2003.nightbaseline.ui.home.HomeScreen
 import io.github.alien2003.nightbaseline.ui.home.HomeUi
 import io.github.alien2003.nightbaseline.ui.home.HomeViewModel
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
+import io.github.alien2003.nightbaseline.ui.layout.NavigationKind
 import io.github.alien2003.nightbaseline.ui.learning.LearningActions
 import io.github.alien2003.nightbaseline.ui.learning.LearningScreen
 import io.github.alien2003.nightbaseline.ui.metric.InfoOverlay
@@ -84,6 +87,7 @@ import io.github.alien2003.nightbaseline.ui.settings.SettingsActions
 import io.github.alien2003.nightbaseline.ui.settings.SettingsPage
 import io.github.alien2003.nightbaseline.ui.settings.SettingsScreen
 import io.github.alien2003.nightbaseline.ui.settings.SettingsViewModel
+import io.github.alien2003.nightbaseline.ui.shell.rememberPageTransitions
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import java.time.LocalDate
@@ -281,9 +285,15 @@ fun AppNavHost(
                 }
             },
     ) {
+        val transitions = rememberPageTransitions()
+        // Push / pop with parallax (coloros-conformance.md P1); top-level switches crossfade.
         NavHost(
             navController = navController,
             startDestination = if (onboardingDone) HomeRoute else OnboardingRoute(),
+            enterTransition = { if (isSwitch()) transitions.switchEnter() else transitions.pushEnter() },
+            exitTransition = { if (isSwitch()) transitions.switchExit() else transitions.pushExit() },
+            popEnterTransition = { if (isSwitch()) transitions.switchEnter() else transitions.popEnter() },
+            popExitTransition = { if (isSwitch()) transitions.switchExit() else transitions.popExit() },
         ) {
             composable<HomeRoute> { entry ->
                 HomeDestination(
@@ -324,7 +334,7 @@ fun AppNavHost(
                 state?.let { s ->
                     NightDetailScreen(
                         s,
-                        layout,
+                        layout.forDetail(),
                         actions =
                             NightDetailActions(
                                 onBack = { navController.popBackStack() },
@@ -376,7 +386,7 @@ fun AppNavHost(
                 state?.let { s ->
                     MetricDetailScreen(
                         s.copy(selected = selection, explainerOpen = explainer),
-                        layout,
+                        layout.forDetail(),
                         actions =
                             MetricDetailActions(
                                 onBack = { navController.popBackStack() },
@@ -451,6 +461,23 @@ private fun FoldBack(
     val current by rememberUpdatedState(action)
     LaunchedEffect(condition) { if (condition) current() }
 }
+
+/** Both ends of the transition are top-level destinations (a tab switch, not a push or pop). */
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.isSwitch(): Boolean = initialState.isTopLevel() && targetState.isTopLevel()
+
+/** Home, History or the Settings list. */
+private fun NavBackStackEntry.isTopLevel(): Boolean {
+    val destination = destination
+    return destination.hasRoute<HomeRoute>() ||
+        destination.hasRoute<HistoryRoute>() ||
+        (destination.hasRoute<SettingsRoute>() && toRoute<SettingsRoute>().page == SettingsPage.Main.name)
+}
+
+/**
+ * Pushed detail pages carry no bottom bar on phones (`coloros-conformance.md` C7): the bar belongs to the top-level
+ * destinations. The rail stays on wide windows.
+ */
+private fun LayoutSpec.forDetail(): LayoutSpec = if (navigation == NavigationKind.Bar) copy(navigation = NavigationKind.None) else this
 
 /** Top-level navigation: one entry per section, state saved and restored, Home at the root. */
 fun NavHostController.toTop(tab: TopLevel) {

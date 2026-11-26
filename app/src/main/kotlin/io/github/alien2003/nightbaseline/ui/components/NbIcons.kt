@@ -181,6 +181,47 @@ object NbIcons {
             }
         }
 
+    /**
+     * Back arrow of the top bar's round back button (`coloros-conformance.md` C1: an arrow, not a chevron); mirrored
+     * in RTL. Drawn at 20 dp it has a 1.5 dp stroke.
+     */
+    val ArrowBack: ImageVector =
+        icon("arrow_back", autoMirror = true) {
+            line {
+                moveTo(20f, 12f)
+                horizontalLineTo(4.5f)
+                moveTo(11f, 5f)
+                lineTo(4f, 12f)
+                lineTo(11f, 19f)
+            }
+        }
+
+    /**
+     * Small list chevron (`coloros-conformance.md` L3): draw at 12 x 24 dp; the glyph is about 5 x 10 dp with a
+     * 1.3 dp stroke. The viewport is half as wide as tall.
+     */
+    val ChevronSmall: ImageVector =
+        ImageVector
+            .Builder(
+                name = "chevron_small",
+                defaultWidth = 12.dp,
+                defaultHeight = 24.dp,
+                viewportWidth = 12f,
+                viewportHeight = 24f,
+                autoMirror = true,
+            ).apply {
+                path(
+                    stroke = SolidColor(Color.Black),
+                    strokeLineWidth = 1.3f,
+                    strokeLineCap = StrokeCap.Round,
+                    strokeLineJoin = StrokeJoin.Round,
+                ) {
+                    moveTo(3.5f, 7f)
+                    lineTo(8.5f, 12f)
+                    lineTo(3.5f, 17f)
+                }
+            }.build()
+
     /** Forward chevron. */
     val Chevron: ImageVector =
         icon("chevron", autoMirror = true) {
@@ -210,6 +251,16 @@ object NbIcons {
                 lineTo(18f, 18f)
                 moveTo(18f, 6f)
                 lineTo(6f, 18f)
+            }
+        }
+
+    /** More, vertical (three dots stacked), as on ColorOS toolbars. */
+    val MoreVertical: ImageVector =
+        icon("more_vertical") {
+            fill {
+                addCircle(12f, 5.5f, 1.7f)
+                addCircle(12f, 12f, 1.7f)
+                addCircle(12f, 18.5f, 1.7f)
             }
         }
 
