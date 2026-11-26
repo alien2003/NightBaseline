@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Velocity
 import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.ui.motion.NB_BACK_SCALE
 import io.github.alien2003.nightbaseline.ui.motion.NbDurations
 import io.github.alien2003.nightbaseline.ui.motion.NbMotionScheme
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
@@ -218,8 +219,8 @@ class ModalState internal constructor(
         /** Share of the height the panel follows a full predictive back gesture. */
         const val BACK_TRAVEL = 0.12f
 
-        /** Scale at a full predictive back gesture. */
-        const val BACK_SCALE = 0.92f
+        /** Scale at a full predictive back gesture (the same token as the pages' preview, ADR 0009). */
+        const val BACK_SCALE = NB_BACK_SCALE
     }
 }
 

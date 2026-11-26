@@ -37,6 +37,7 @@ Every document of the repository, grouped by reader.
 | [adr/0006-top-level-sections-stay-composed.md](adr/0006-top-level-sections-stay-composed.md) | Home, History and Settings stay composed across tab switches |
 | [adr/0007-on-device-e2e-suite.md](adr/0007-on-device-e2e-suite.md) | On-device end-to-end suite inside the installed release |
 | [adr/0008-high-refresh-rate.md](adr/0008-high-refresh-rate.md) | High refresh rate while the app is in use, battery-friendly |
+| [adr/0009-predictive-back.md](adr/0009-predictive-back.md) | Predictive back for screens: the page follows the gesture, values as tokens |
 
 ## Design
 

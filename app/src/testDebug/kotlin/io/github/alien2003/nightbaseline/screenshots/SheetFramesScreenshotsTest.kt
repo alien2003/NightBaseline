@@ -6,6 +6,7 @@ package io.github.alien2003.nightbaseline.screenshots
 import android.app.Application
 import android.graphics.Bitmap
 import android.os.Looper
+import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ import io.github.alien2003.nightbaseline.catalog.CatalogConfig
 import io.github.alien2003.nightbaseline.catalog.CatalogFrame
 import io.github.alien2003.nightbaseline.nav.AppNavHost
 import io.github.alien2003.nightbaseline.nav.LocalViewModelFactory
+import io.github.alien2003.nightbaseline.nav.NightRoute
 import io.github.alien2003.nightbaseline.nav.SystemActions
 import io.github.alien2003.nightbaseline.nav.toTop
 import io.github.alien2003.nightbaseline.testing.TestApp
@@ -62,7 +64,8 @@ import java.util.TimeZone
  *   owner-book: the centred dialog), checked for one panel and one scrim, scrim over the whole window (bar included);
  * - on `owner-outer` the Settings > Sensitivity push and pop at fixed times (the pushed page is opaque, the leaving
  *   page of a pop slides off on top).
- * Output: `frames-{sheet|push|pop}-{device}-{theme}-{step}.png` in build/screenshots; look at them after a motion
+ * - on `owner-outer` predictive back at 50 % of a gesture and its commit (Night detail, Settings sub-page).
+ * Output: `frames-{sheet|push|pop|back-*}-{device}-{theme}-{step}.png` in build/screenshots; look at them after a motion
  * change.
  */
 @RunWith(ParameterizedRobolectricTestRunner::class)
@@ -157,6 +160,38 @@ class SheetFramesScreenshotsTest(
         compose.mainClock.autoAdvance = true
     }
 
+    /**
+     * Predictive back (ADR 0009) on `owner-outer`: a Night detail and the Settings > Sensitivity sub-page at 50 % of a
+     * back swipe from the left edge (the page scaled, rounded and moved with the finger over the uncovered page in its
+     * covered pose), then the frames of the commit.
+     */
+    @Test
+    fun predictiveBackFrames() {
+        if (device.id != OUTER) return
+        launch()
+        compose.runOnIdle { nav.navigate(NightRoute(SampleData.LAST_WAKE.minusDays(2).toString(), TopLevel.Home.name)) }
+        idle()
+        gesture("back-night")
+        compose.runOnIdle { nav.toTop(TopLevel.Settings) }
+        idle()
+        compose.onNode(hasText("Balanced") and hasClickAction()).performScrollTo().performClick()
+        idle()
+        gesture("back-settings")
+    }
+
+    private fun gesture(name: String) {
+        val back = activity.onBackPressedDispatcher
+        back.dispatchOnBackStarted(BackEventCompat(0f, BACK_Y, 0f, BackEventCompat.EDGE_LEFT))
+        back.dispatchOnBackProgressed(BackEventCompat(BACK_X, BACK_Y, 0.5f, BackEventCompat.EDGE_LEFT))
+        idle()
+        write("frames-$name-${device.id}-$theme-50", compose.onRoot().captureToImage().asAndroidBitmap())
+        compose.mainClock.autoAdvance = false
+        back.onBackPressed()
+        frames("$name-commit")
+        compose.mainClock.autoAdvance = true
+        idle()
+    }
+
     private fun frames(name: String) {
         var t = 0L
         for (at in listOf(FRAME_MS, 100L, 200L, SETTLED_MS)) {
@@ -187,6 +222,8 @@ class SheetFramesScreenshotsTest(
         private const val SHEET_HALF_MS = 106L
         private const val DIALOG_HALF_MS = 112L
         private const val SETTLED_MS = 1500L
+        private const val BACK_X = 300f
+        private const val BACK_Y = 1200f
 
         /** Phone and owner-book for the sheet, owner-outer for the Settings pages. */
         @JvmStatic

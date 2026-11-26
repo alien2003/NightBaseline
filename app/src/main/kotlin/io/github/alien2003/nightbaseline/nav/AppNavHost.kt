@@ -1,6 +1,5 @@
 package io.github.alien2003.nightbaseline.nav
 
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -91,7 +91,13 @@ import io.github.alien2003.nightbaseline.ui.onboarding.OnboardingViewModel
 import io.github.alien2003.nightbaseline.ui.settings.SettingsActions
 import io.github.alien2003.nightbaseline.ui.settings.SettingsPage
 import io.github.alien2003.nightbaseline.ui.settings.SettingsScreen
+import io.github.alien2003.nightbaseline.ui.settings.SettingsSystemBack
 import io.github.alien2003.nightbaseline.ui.settings.SettingsViewModel
+import io.github.alien2003.nightbaseline.ui.shell.BackPreview
+import io.github.alien2003.nightbaseline.ui.shell.BackPreviewHandler
+import io.github.alien2003.nightbaseline.ui.shell.BackSettle
+import io.github.alien2003.nightbaseline.ui.shell.backPreviewPage
+import io.github.alien2003.nightbaseline.ui.shell.rememberBackPreview
 import io.github.alien2003.nightbaseline.ui.shell.rememberPageTransitions
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
@@ -160,6 +166,10 @@ fun AppNavHost(
         }
     }
     val onboardingDoneNow by rememberUpdatedState(onboardingDone)
+    // One predictive back preview for every level (ADR 0009). A window change during a gesture (fold, rotation,
+    // resize) drops it, so no page is left half moved in a layout it was not laid out for.
+    val preview = rememberBackPreview()
+    LaunchedEffect(layout) { preview.abort() }
 
     // Deep links wait for onboarding (screens.md 3: kept and opened after "ready").
     LaunchedEffect(deepLink, onboardingDone, newestNight) {
@@ -302,144 +312,35 @@ fun AppNavHost(
             sheetTitle = title
         }
         // Push / pop with parallax (coloros-conformance.md P1); top-level switches crossfade inside TopLevelHost.
-        NavHost(
-            navController = navController,
-            startDestination = if (onboardingDone) TopLevelRoute else OnboardingRoute(),
-            enterTransition = { transitions.pushEnter() },
-            exitTransition = { transitions.pushExit() },
-            popEnterTransition = { transitions.popEnter() },
-            popExitTransition = { transitions.popExit() },
-        ) {
-            composable<TopLevelRoute> { entry ->
-                val tabName by entry.savedStateHandle
-                    .getStateFlow(TOP_LEVEL_TAB, TopLevel.Home.name)
-                    .collectAsStateWithLifecycle()
-                val tab = TopLevel.entries.firstOrNull { it.name == tabName } ?: TopLevel.Home
-                // Back from History or Settings returns to Home (the old popUpTo(Home) stack); the sections' own
-                // Back handlers (Settings sub-pages) are registered later and win.
-                BackHandler(enabled = tab != TopLevel.Home) { openTab(TopLevel.Home) }
-                TopLevelHost(tab) { shown, active ->
-                    when (shown) {
-                        TopLevel.Home -> {
-                            HomeDestination(
-                                entry = entry,
-                                active = active,
-                                layout = layout,
-                                navController = navController,
-                                onSelectTab = openTab,
-                                onStateAction = nightActions,
-                                onStateSecondary = nightSecondary,
-                                onBannerAction = bannerAction,
-                                onSheet = onSheet,
-                                onAbout = about,
-                                onMore = more,
-                                debugAction = debugAction,
-                            )
-                        }
-
-                        TopLevel.History -> {
-                            HistoryDestination(entry, active, layout, navController, openTab, more, requestPermissions, system)
-                        }
-
-                        TopLevel.Settings -> {
-                            SettingsDestination(active, layout, navController, openTab, more, system)
-                        }
-                    }
-                }
-            }
-            composable<SettingsRoute> {
-                SettingsDestination(ALWAYS, layout, navController, openTab, more, system)
-            }
-            composable<NightRoute> { entry ->
-                val route = entry.toRoute<NightRoute>()
-                val vm: NightDetailViewModel = appViewModel()
-                val text = rememberUiText()
-                val state by vm.ui.collectAsStateWithLifecycle()
-                val scroll = rememberScrollState()
-                // Unfolded into two panes while this night was opened from History: back to History's detail pane.
-                FoldBack(layout.twoPanes && route.section == TopLevel.History.name) {
-                    navController.previousBackStackEntry?.savedStateHandle?.set(SELECT_NIGHT, vm.shownDate.value.toString())
-                    navController.popBackStack()
-                }
-                state?.let { s ->
-                    NightDetailScreen(
-                        s,
-                        layout.forDetail(),
-                        actions =
-                            NightDetailActions(
-                                onBack = { navController.popBackStack() },
-                                onPrevious = vm::show,
-                                onNext = vm::show,
-                                onMetric = { m ->
-                                    navController.navigate(MetricRoute(m.key, vm.shownDate.value.toString(), route.section))
-                                },
-                                onStateAction = { nightActions(it, s.source) },
-                                onStateSecondary = nightSecondary,
-                                onHowItWorks = { sheet = AppSheet.Explainer },
-                                onBannerAction = bannerAction,
-                                onBannerDismiss = vm::dismissBanner,
-                                onNotRecordedInfo = {
-                                    sheetSource = s.source
-                                    sheetTitle =
-                                        text.string(
-                                            R.string.home_not_recorded_row,
-                                            s.source,
-                                            text.list(s.night.notRecorded.map(text::name)),
-                                        )
-                                    sheet = AppSheet.NotRecorded
-                                },
-                                onAbout = about,
-                                onMore = more,
-                                onSelectTab = openTab,
-                            ),
-                        scrollState = scroll,
-                    )
-                }
-            }
-            composable<MetricRoute> { entry ->
-                val route = entry.toRoute<MetricRoute>()
-                val vm: MetricDetailViewModel = appViewModel()
-                val state by vm.ui.collectAsStateWithLifecycle()
-                var selection by rememberSaveable { mutableStateOf(route.point.takeIf { it >= 0 }) }
-                var explainer by rememberSaveable { mutableStateOf(false) }
-                val scroll = rememberScrollState()
-                // Unfolded into two panes while Home's metric was open: Home's detail pane takes over (layouts.md 8.2)
-                // with the same period and selected night.
-                FoldBack(layout.twoPanes && route.section == TopLevel.Home.name && route.date == null) {
-                    navController.previousBackStackEntry?.savedStateHandle?.let { home ->
-                        state?.period?.let { home[SELECT_PERIOD] = it.name }
-                        home[SELECT_POINT] = selection ?: -1
-                        home[SELECT_METRIC] = route.metric
-                    }
-                    navController.popBackStack()
-                }
-                state?.let { s ->
-                    MetricDetailScreen(
-                        s.copy(selected = selection, explainerOpen = explainer),
-                        layout.forDetail(),
-                        actions =
-                            MetricDetailActions(
-                                onBack = { navController.popBackStack() },
-                                onPeriod = {
-                                    selection = null
-                                    vm.setPeriod(it)
-                                },
-                                onSelect = { selection = it },
-                                onOpenNight = { navController.navigate(NightRoute(it.toString(), route.section)) },
-                                onOpenExplainer = { explainer = true },
-                                onCloseExplainer = { explainer = false },
-                                onChooseSource = { navController.navigate(SettingsRoute(SettingsPage.SourcePicker.name)) },
-                                onOpenPermissions = requestPermissions,
-                                onOpenStore = system::openStore,
-                                onAbout = about,
-                            ),
-                        scroll = scroll,
-                        onSelectTab = openTab,
-                    )
-                }
-            }
-            composable<OnboardingRoute> {
-                OnboardingDestination(layout, navController, system, onRefresh, about)
+        // Predictive back (P3, ADR 0009): the gesture previews the page, a commit plays the predictive pop.
+        NavBackPreviewHost(navController, preview) {
+            NavHost(
+                navController = navController,
+                startDestination = if (onboardingDone) TopLevelRoute else OnboardingRoute(),
+                enterTransition = { transitions.pushEnter() },
+                exitTransition = { transitions.pushExit() },
+                popEnterTransition = { transitions.popEnter() },
+                popExitTransition = { transitions.popExit() },
+                predictivePopEnterTransition = { edge -> transitions.predictivePopEnter(edge) },
+                predictivePopExitTransition = { edge -> transitions.predictivePopExit(edge) },
+            ) {
+                graph(
+                    layout = layout,
+                    navController = navController,
+                    preview = preview,
+                    openTab = openTab,
+                    nightActions = nightActions,
+                    nightSecondary = nightSecondary,
+                    bannerAction = bannerAction,
+                    onSheet = onSheet,
+                    about = about,
+                    more = more,
+                    requestPermissions = requestPermissions,
+                    system = system,
+                    onRefresh = onRefresh,
+                    debugAction = debugAction,
+                    onExplainer = { sheet = AppSheet.Explainer },
+                )
             }
         }
         // One host for the shared sheets: it animates every close (scrim, Back, drag, option) and leaves nothing
@@ -469,6 +370,178 @@ fun AppNavHost(
                     )
                 }
             }
+        }
+    }
+}
+
+/** The destinations of [AppNavHost]; every one is drawn by [BackPreviewDestination] (ADR 0009). */
+@Suppress("LongMethod", "LongParameterList") // The graph: one composable block per destination.
+private fun NavGraphBuilder.graph(
+    layout: LayoutSpec,
+    navController: NavHostController,
+    preview: BackPreview,
+    openTab: (TopLevel) -> Unit,
+    nightActions: (NightState, String) -> Unit,
+    nightSecondary: (NightState) -> Unit,
+    bannerAction: (BannerKind) -> Unit,
+    onSheet: (AppSheet, String, String) -> Unit,
+    about: () -> Unit,
+    more: () -> Unit,
+    requestPermissions: () -> Unit,
+    system: SystemActions,
+    onRefresh: () -> Unit,
+    debugAction: (@Composable () -> Unit)?,
+    onExplainer: () -> Unit,
+) {
+    composable<TopLevelRoute> { entry ->
+        BackPreviewDestination(entry, preview) {
+            val tabName by entry.savedStateHandle
+                .getStateFlow(TOP_LEVEL_TAB, TopLevel.Home.name)
+                .collectAsStateWithLifecycle()
+            val tab = TopLevel.entries.firstOrNull { it.name == tabName } ?: TopLevel.Home
+            // Back from History or Settings returns to Home (the old popUpTo(Home) stack) with the preview: the
+            // section follows the gesture over Home in its covered pose. The sections' own Back handlers (Settings
+            // sub-pages) are registered later and win. On Home nothing is registered (the system's back-to-home).
+            var peek by remember { mutableStateOf<TopLevel?>(null) }
+            BackPreviewHandler(
+                preview = preview,
+                enabled = tab != TopLevel.Home,
+                key = tab,
+                settle = BackSettle.Leave,
+                onStarted = { peek = TopLevel.Home },
+                onCancelled = { peek = null },
+            ) { openTab(TopLevel.Home) }
+            TopLevelHost(tab, preview = preview, peek = peek, onPeekDone = { peek = null }) { shown, active ->
+                when (shown) {
+                    TopLevel.Home -> {
+                        HomeDestination(
+                            entry = entry,
+                            active = active,
+                            layout = layout,
+                            navController = navController,
+                            onSelectTab = openTab,
+                            onStateAction = nightActions,
+                            onStateSecondary = nightSecondary,
+                            onBannerAction = bannerAction,
+                            onSheet = onSheet,
+                            onAbout = about,
+                            onMore = more,
+                            debugAction = debugAction,
+                        )
+                    }
+
+                    TopLevel.History -> {
+                        HistoryDestination(entry, active, layout, navController, openTab, more, requestPermissions, system)
+                    }
+
+                    TopLevel.Settings -> {
+                        SettingsDestination(active, layout, navController, openTab, more, system, preview)
+                    }
+                }
+            }
+        }
+    }
+    composable<SettingsRoute> { entry ->
+        BackPreviewDestination(entry, preview) {
+            SettingsDestination(ALWAYS, layout, navController, openTab, more, system, preview)
+        }
+    }
+    composable<NightRoute> { entry ->
+        BackPreviewDestination(entry, preview) {
+            val route = entry.toRoute<NightRoute>()
+            val vm: NightDetailViewModel = appViewModel()
+            val text = rememberUiText()
+            val state by vm.ui.collectAsStateWithLifecycle()
+            val scroll = rememberScrollState()
+            // Unfolded into two panes while this night was opened from History: back to History's detail pane.
+            FoldBack(layout.twoPanes && route.section == TopLevel.History.name) {
+                navController.previousBackStackEntry?.savedStateHandle?.set(SELECT_NIGHT, vm.shownDate.value.toString())
+                navController.popBackStack()
+            }
+            state?.let { s ->
+                NightDetailScreen(
+                    s,
+                    layout.forDetail(),
+                    actions =
+                        NightDetailActions(
+                            onBack = { navController.popBackStack() },
+                            onPrevious = vm::show,
+                            onNext = vm::show,
+                            onMetric = { m ->
+                                navController.navigate(MetricRoute(m.key, vm.shownDate.value.toString(), route.section))
+                            },
+                            onStateAction = { nightActions(it, s.source) },
+                            onStateSecondary = nightSecondary,
+                            onHowItWorks = onExplainer,
+                            onBannerAction = bannerAction,
+                            onBannerDismiss = vm::dismissBanner,
+                            onNotRecordedInfo = {
+                                onSheet(
+                                    AppSheet.NotRecorded,
+                                    s.source,
+                                    text.string(
+                                        R.string.home_not_recorded_row,
+                                        s.source,
+                                        text.list(s.night.notRecorded.map(text::name)),
+                                    ),
+                                )
+                            },
+                            onAbout = about,
+                            onMore = more,
+                            onSelectTab = openTab,
+                        ),
+                    scrollState = scroll,
+                )
+            }
+        }
+    }
+    composable<MetricRoute> { entry ->
+        BackPreviewDestination(entry, preview) {
+            val route = entry.toRoute<MetricRoute>()
+            val vm: MetricDetailViewModel = appViewModel()
+            val state by vm.ui.collectAsStateWithLifecycle()
+            var selection by rememberSaveable { mutableStateOf(route.point.takeIf { it >= 0 }) }
+            var explainer by rememberSaveable { mutableStateOf(false) }
+            val scroll = rememberScrollState()
+            // Unfolded into two panes while Home's metric was open: Home's detail pane takes over (layouts.md 8.2)
+            // with the same period and selected night.
+            FoldBack(layout.twoPanes && route.section == TopLevel.Home.name && route.date == null) {
+                navController.previousBackStackEntry?.savedStateHandle?.let { home ->
+                    state?.period?.let { home[SELECT_PERIOD] = it.name }
+                    home[SELECT_POINT] = selection ?: -1
+                    home[SELECT_METRIC] = route.metric
+                }
+                navController.popBackStack()
+            }
+            state?.let { s ->
+                MetricDetailScreen(
+                    s.copy(selected = selection, explainerOpen = explainer),
+                    layout.forDetail(),
+                    actions =
+                        MetricDetailActions(
+                            onBack = { navController.popBackStack() },
+                            onPeriod = {
+                                selection = null
+                                vm.setPeriod(it)
+                            },
+                            onSelect = { selection = it },
+                            onOpenNight = { navController.navigate(NightRoute(it.toString(), route.section)) },
+                            onOpenExplainer = { explainer = true },
+                            onCloseExplainer = { explainer = false },
+                            onChooseSource = { navController.navigate(SettingsRoute(SettingsPage.SourcePicker.name)) },
+                            onOpenPermissions = requestPermissions,
+                            onOpenStore = system::openStore,
+                            onAbout = about,
+                        ),
+                    scroll = scroll,
+                    onSelectTab = openTab,
+                )
+            }
+        }
+    }
+    composable<OnboardingRoute> { entry ->
+        BackPreviewDestination(entry, preview) {
+            OnboardingDestination(layout, navController, system, onRefresh, about, preview)
         }
     }
 }
@@ -504,17 +577,7 @@ private fun FoldBack(
     }
 }
 
-/** A [BackHandler] that is enabled only while the section is shown; [active] is read in its own small scope. */
-@Composable
-private fun ActiveBackHandler(
-    enabled: Boolean,
-    active: () -> Boolean,
-    onBack: () -> Unit,
-) {
-    BackHandler(enabled = enabled && active(), onBack = onBack)
-}
-
-/** [FoldBack] / [ActiveBackHandler] outside the top-level host: always shown. */
+/** [FoldBack] and the Settings Back handler outside the top-level host: always shown. */
 private val ALWAYS: () -> Boolean = { true }
 
 /**
@@ -764,15 +827,17 @@ private fun SettingsDestination(
     onSelectTab: (TopLevel) -> Unit,
     onMore: () -> Unit,
     system: SystemActions,
+    preview: BackPreview,
 ) {
     val vm: SettingsViewModel = appViewModel()
     val state by vm.ui.collectAsStateWithLifecycle()
     val page by vm.page.collectAsStateWithLifecycle()
     val scroll = rememberScrollState()
     val reason = NbTheme.effects.reason
+    val systemBack = remember(preview, active, vm) { SettingsSystemBack(preview, active) { vm.back() } }
     state?.let { s ->
-        // The page comes straight from the ViewModel: what is shown and what Back closes are the same page.
-        ActiveBackHandler(page != SettingsPage.Main && !layout.twoPanes, active) { vm.back() }
+        // The page comes straight from the ViewModel: what is shown and what Back closes are the same page. The
+        // screen registers the (previewing) Back handler for its sub-pages itself.
         SettingsScreen(
             s.copy(glassReason = reason, page = page),
             layout,
@@ -797,10 +862,15 @@ private fun SettingsDestination(
             onSelectTab = onSelectTab,
             onMore = onMore,
             scroll = scroll,
+            systemBack = systemBack,
         )
     }
 }
 
+/** Key of the onboarding step in the back preview: one surface whose content changes in place. */
+internal object OnboardingBackKey
+
+@Suppress("LongParameterList")
 @Composable
 private fun OnboardingDestination(
     layout: LayoutSpec,
@@ -808,6 +878,7 @@ private fun OnboardingDestination(
     system: SystemActions,
     onRefresh: () -> Unit,
     onAbout: () -> Unit,
+    preview: BackPreview,
 ) {
     val vm: OnboardingViewModel = appViewModel()
     val state by vm.ui.collectAsStateWithLifecycle()
@@ -819,10 +890,17 @@ private fun OnboardingDestination(
             system.requestHealthPermissions(vm.permissionsToRequest()) { vm.onPermissionsResult(it) }
         }
     }
-    BackHandler(enabled = state.step != OnboardingStep.Welcome && state.step != OnboardingStep.Ready) { vm.back() }
+    // Back to the previous step with the preview; the step changes in place and the page springs back to rest.
+    BackPreviewHandler(
+        preview = preview,
+        enabled = state.step != OnboardingStep.Welcome && state.step != OnboardingStep.Ready,
+        key = OnboardingBackKey,
+        settle = BackSettle.InPlace,
+    ) { vm.back() }
     OnboardingScreen(
         state,
         layout,
+        modifier = Modifier.backPreviewPage(preview, OnboardingBackKey),
         actions =
             OnboardingActions(
                 onNext = vm::next,

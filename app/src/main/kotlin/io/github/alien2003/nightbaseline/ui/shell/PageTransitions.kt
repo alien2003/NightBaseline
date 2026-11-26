@@ -1,5 +1,6 @@
 package io.github.alien2003.nightbaseline.ui.shell
 
+import androidx.activity.BackEventCompat
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -67,15 +68,51 @@ data class PageTransitions(
         if (reduced) fadeOut(tween(NbDurations.REDUCED)) else slideOutHorizontally(page<IntOffset>()) { sign * it }
 
     /**
+     * Uncovered page of a pop that a predictive back gesture started (ADR 0009). The gesture holds the transition at
+     * its start (the page waits a third of the width away, dimmed, under the previewing page); the commit plays the
+     * rest. The page comes from the side the finger leaves: from the start of the window for a swipe from the left
+     * edge, from the end for one from the right edge.
+     */
+    fun predictivePopEnter(edge: Int): EnterTransition =
+        if (reduced) {
+            popEnter()
+        } else {
+            slideInHorizontally(page<IntOffset>()) { -backDirection(edge) * it / PARALLAX } + uncovered()
+        }
+
+    /** Leaving page of a predictive pop: after the commit it slides off in the direction the finger moved. */
+    fun predictivePopExit(edge: Int): ExitTransition =
+        if (reduced) popExit() else slideOutHorizontally(page<IntOffset>()) { backDirection(edge) * it }
+
+    /** The physical direction a back swipe from [edge] moves (+1 right, -1 left); no edge: towards the end. */
+    private fun backDirection(edge: Int): Int =
+        when (edge) {
+            BackEventCompat.EDGE_LEFT -> 1
+            BackEventCompat.EDGE_RIGHT -> -1
+            else -> sign
+        }
+
+    /**
      * A push ([forward]) or pop for `AnimatedContent`. The page that moves over the full width is always on top: the
      * pushed page on a push, the leaving page on a pop (it slides off above the uncovered page, which comes back
      * from under it with the parallax; `AnimatedContent` would otherwise draw the uncovered page over it).
      */
-    fun content(forward: Boolean): ContentTransform =
-        if (forward) {
-            pushEnter() togetherWith pushExit()
-        } else {
-            (popEnter() togetherWith popExit()).apply { targetContentZIndex = -1f }
+    fun content(
+        forward: Boolean,
+        predictiveEdge: Int? = null,
+    ): ContentTransform =
+        when {
+            forward -> {
+                pushEnter() togetherWith pushExit()
+            }
+
+            predictiveEdge != null -> {
+                (predictivePopEnter(predictiveEdge) togetherWith predictivePopExit(predictiveEdge)).apply { targetContentZIndex = -1f }
+            }
+
+            else -> {
+                (popEnter() togetherWith popExit()).apply { targetContentZIndex = -1f }
+            }
         }
 
     private fun covered(): ExitTransition = if (dim) fadeOut(page(), targetAlpha = 1f - DIM) else ExitTransition.None

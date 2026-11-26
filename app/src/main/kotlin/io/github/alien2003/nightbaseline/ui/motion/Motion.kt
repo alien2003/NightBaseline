@@ -128,6 +128,12 @@ object NbSprings {
     /** `motion.spring.follow`: anything tracking the finger. */
     val Follow: NbSpring = NbSpring(1.0f, 1500f)
 
+    /** `motion.back.release`: a committed predictive back gesture finishing (the page spring) [estimate, ADR 0009]. */
+    val BackRelease: NbSpring = Page
+
+    /** `motion.back.cancel`: a cancelled predictive back gesture returning the page to rest [estimate, ADR 0009]. */
+    val BackCancel: NbSpring = Follow
+
     /** `motion.spring.sheet`: sheet show. */
     val Sheet: NbSpring = NbSpring(1.0f, 250f)
 
@@ -161,6 +167,18 @@ const val NB_PAGE_DIM: Float = 0.3f
 
 /** `motion.page.parallax`: fraction of the width the covered page moves during a push or pop. */
 const val NB_PAGE_PARALLAX: Float = 1f / 3f
+
+/**
+ * `motion.back.scale`: scale of the page a predictive back gesture leaves, at full gesture progress
+ * (`coloros-conformance.md` P3) [estimate: no slow-gesture capture of the OPPO system apps exists, ADR 0009].
+ */
+const val NB_BACK_SCALE: Float = 0.92f
+
+/** `motion.back.travel`: fraction of its width the leaving page follows the finger at full progress [estimate]. */
+const val NB_BACK_TRAVEL: Float = 0.12f
+
+/** `motion.back.corner`: corner radius (dp) the leaving page rounds to at full progress, `shape.xl` [estimate]. */
+const val NB_BACK_CORNER_DP: Float = 28f
 
 /**
  * The motion specs the components use, in their normal or reduced variant (`tokens.md` 9.6). Reduced motion is

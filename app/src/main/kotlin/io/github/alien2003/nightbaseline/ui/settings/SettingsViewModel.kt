@@ -114,9 +114,8 @@ class SettingsViewModel
 
         /** Back from a sub-page: true when handled (the page changed), false at the main list. */
         fun back(): Boolean {
-            val page = options.value.page
-            if (page == SettingsPage.Main) return false
-            openPage(if (page == SettingsPage.Licenses) SettingsPage.About else SettingsPage.Main)
+            val parent = options.value.page.parent() ?: return false
+            openPage(parent)
             return true
         }
 

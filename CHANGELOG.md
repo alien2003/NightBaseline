@@ -10,6 +10,14 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 
 ## [Unreleased]
 
+### Added
+
+- **The back gesture previews where it goes.** When you swipe back from a night, a measurement, a Settings page, an
+  onboarding step or the History and Settings tabs, the page now shrinks slightly, rounds its corners and moves with
+  your finger over the page you are going back to; let go to go back, or swipe back the other way to stay. On the
+  first screen nothing changes, so the system's own back-to-home animation plays. With animations off there is no
+  preview ([ADR 0009](https://github.com/alien2003/NightBaseline/blob/main/docs/adr/0009-predictive-back.md)).
+
 ### Changed
 
 - **Smoother on high-refresh screens.** While you use the app it now asks for the screen's highest refresh rate at

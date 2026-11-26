@@ -11,17 +11,19 @@ import android.view.Menu
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.Lifecycle
@@ -44,6 +46,10 @@ import io.github.alien2003.nightbaseline.ui.layout.resolveLayout
 import io.github.alien2003.nightbaseline.ui.material.GlassPreference
 import io.github.alien2003.nightbaseline.ui.material.rememberPlatformEffectsInputs
 import io.github.alien2003.nightbaseline.ui.material.resolveEffectsMode
+import io.github.alien2003.nightbaseline.ui.shell.BackPreviewHandler
+import io.github.alien2003.nightbaseline.ui.shell.BackSettle
+import io.github.alien2003.nightbaseline.ui.shell.backPreviewPage
+import io.github.alien2003.nightbaseline.ui.shell.rememberBackPreview
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import io.github.alien2003.nightbaseline.ui.theme.NightBaselineTheme
 import io.github.alien2003.nightbaseline.work.notify.AndroidNightNotifier
@@ -125,8 +131,12 @@ class MainActivity : ComponentActivity() {
             var showCatalog by rememberSaveable { mutableStateOf(false) }
             val catalog = DebugTools.catalog
             if (showCatalog && catalog != null) {
-                BackHandler { showCatalog = false }
-                catalog { showCatalog = false }
+                // Back closes the debug catalog with the same predictive preview as a page (ADR 0009).
+                val preview = rememberBackPreview()
+                BackPreviewHandler(preview, enabled = true, key = CATALOG_BACK_KEY, settle = BackSettle.InPlace) {
+                    showCatalog = false
+                }
+                Box(Modifier.fillMaxSize().backPreviewPage(preview, CATALOG_BACK_KEY)) { catalog { showCatalog = false } }
                 return@NightBaselineTheme
             }
             if (s == null) return@NightBaselineTheme
@@ -184,3 +194,6 @@ class MainActivity : ComponentActivity() {
         data += KeyboardShortcutGroup(getString(R.string.app_name), shortcuts)
     }
 }
+
+/** Key of the debug catalog in its back preview. */
+private const val CATALOG_BACK_KEY: String = "catalog"

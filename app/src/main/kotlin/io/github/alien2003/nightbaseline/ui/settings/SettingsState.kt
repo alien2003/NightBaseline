@@ -116,6 +116,15 @@ enum class SettingsPage(
 
     /** The in-app privacy policy. */
     Privacy(SettingsSection.Privacy),
+    ;
+
+    /** The page Back returns to: About from Licenses, the list from the other sub-pages; null on the list. */
+    fun parent(): SettingsPage? =
+        when (this) {
+            Main -> null
+            Licenses -> About
+            else -> Main
+        }
 }
 
 /** An open-source component listed on the licenses page (names are proper nouns, not translated). */

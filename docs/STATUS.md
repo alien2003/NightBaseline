@@ -44,6 +44,10 @@ Live project state. A new session starts here. Updated after every step. Last fu
   fastest mode at the current resolution while in use, plus `FrameRateCategory.High` votes on API 35+ (ADR 0008);
   second pass: java.time stability config, calendar cells memoized, lazy start-up injection, `ScrollCostTest`. Still
   to verify on the phone (ask): `dumpsys display` / `SurfaceFlinger` / `gfxinfo` (docs/development.md, Performance).
+- Predictive back for screens (ADR 0009): pushed routes, tab -> Home, Settings sub-pages, onboarding steps and the
+  catalog preview the page under the finger; no handler at the root. Verified in Robolectric (`PredictiveBackTest`,
+  frames in `SheetFramesScreenshotsTest`); not yet felt on the phone or an emulator with a real gesture. Values are
+  estimates until a slow back swipe of an OPPO system app is captured.
 
 ## Next
 1. Fix → build dev.6 → install (ask) → confirm the night is processed automatically; then a further new night without

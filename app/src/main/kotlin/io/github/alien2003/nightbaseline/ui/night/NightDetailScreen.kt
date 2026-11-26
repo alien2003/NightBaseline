@@ -76,6 +76,7 @@ import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.shell.CountComposition
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
@@ -99,6 +100,7 @@ fun NightDetailScreen(
     actions: NightDetailActions = NightDetailActions(),
     scrollState: ScrollState = rememberScrollState(),
 ) {
+    CountComposition("NightDetailScreen")
     val text = rememberUiText()
     val keys = Modifier.nightKeys(state, actions)
     ScreenFrame(
