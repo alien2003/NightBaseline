@@ -16,6 +16,8 @@ BUILD=1
 [[ "${1:-}" == "--no-build" ]] && BUILD=0
 
 die() { echo "error: $*" >&2; exit 1; }
+# Never leave the exporter (which keeps the screen on) in front, whatever happens.
+trap '"$ADB" shell am force-stop "$PKG" >/dev/null 2>&1 || true' EXIT
 adb() { "$ADB" "$@" | tr -d '\r'; }
 
 state="$(adb get-state 2>/dev/null || true)"
@@ -53,5 +55,8 @@ mkdir -p "$DATA/hc-dumps/$RUN"
 tar xf "$DATA/hc-dumps/$RUN.tar" -C "$DATA/hc-dumps"
 rm "$DATA/hc-dumps/$RUN.tar"
 [[ -f "$DATA/hc-dumps/$RUN/manifest.json" ]] || die "pulled dump has no manifest.json"
+# The exporter keeps the screen on while its window is in front: close it as soon as the dump is pulled, so the
+# phone's display (OLED) is never left lit.
+adb shell am force-stop "$PKG" >/dev/null || true
 
 python3 -I "$ROOT/tools/hc-dataset.py" merge --data "$DATA"
