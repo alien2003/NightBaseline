@@ -20,7 +20,10 @@ action and where it leads, icon/shape cue) and the copy. Screen structure and co
 - Placeholders: `{source}` source app label from the package manager; `{metric}` metric display name; `{n}`, `{k}`
   integers formatted per locale; `{date}` localized medium date; `{value}`, `{low}`, `{high}` per-metric number
   format + unit string. Counted nouns use `plurals` resources (Russian needs one/few/many/other).
-- Metric names (keys `metric_<id>`, short form `metric_<id>_short` for `Glance` windows, the widget and notifications):
+- Metric names (keys `metric_<id>`, short form `metric_<id>_short` for `Glance` windows and the widget only). Every
+  sentence, card, History row and the notification uses the full name, so a measurement has one name everywhere
+  (ADR 0010). Inside a Russian sentence only the first name of a list keeps its capital letter, and after a colon none
+  does; acronyms (SpO2, HRV) stay as they are:
 
 | key | en | ru |
 |---|---|---|
@@ -45,7 +48,7 @@ then each tile picks a **metric state**. The night state is the first match in t
 | 4 | `E-SOURCE-GONE` | the selected source package is no longer installed (`PackageManager` lookup fails); `{source}` is the last stored label |
 | 5 | `LOADING` | no stored evaluation yet and the first read is running (shown only after 300 ms) |
 | 6 | `L0` | `NightStatus.LEARNING` and `historyNights == 0` and no valid night stored |
-| 7 | `L1`..`L6` | `NightStatus.LEARNING`, `historyNights` = 1..6 |
+| 7 | `L1`..`L6` | `NightStatus.LEARNING`, `historyNights` = 0..6 with a valid night stored; the progress shows the nights collected, this one included (`historyNights` + 1 for a valid night, at most 7: every surface, onboarding included, counts the same nights). At 7 collected the body is `state_learning_ready_body`: "7 nights collected. Your usual range is ready, and the next night is compared with it." |
 | 8 | `E-SYNC` | no night for the expected wake date, the current time is past 18:00 (the end of the date's night window in midpoint keying, `nightKeyShiftHours` = 6) or the daily run's last attempt finished, and the newest record of any type from `{source}` ends before the night's earliest plausible start (18:00 the previous day): the source has not written anything since last evening |
 | 9 | `E-NODATA` | no night for the expected wake date, but `{source}` has written records that end after 03:00 on the wake date: the source synced, it just has no sleep session for that night |
 | 10 | `E-SHORT` | `NightStatus.SHORT_NIGHT` (asleep minutes < `minNightMinutes`, 180) |
@@ -62,9 +65,13 @@ Rules:
 - States 1–4 replace the summary card but never hide stored results: below the state card Home shows the newest
   stored night under the heading "Last result: {night label}" (`home_last_result_heading`).
 - "Expected wake date" = today if now >= 03:00 local, otherwise yesterday.
+- "Check now" (`E-SYNC`, `E-NODATA`, `B-WAIT`, `B-READ-FAILED`) is never silent: while the check runs its button reads
+  `action_checking`: "Checking…" and does nothing (no spinner; the card stays where it is), and when it ends without a
+  new night the card or banner adds `check_result_nothing_new`: "Checked at {time}. Nothing new from {source} yet."
+  (polite live region, for two minutes).
 
 Banners (one at a time, first match wins): `B-BG` > `B-READ-FAILED` > `B-SOURCE-QUIET` > `B-WAIT` > `B-NOTIF-OFF` >
-`B-RANGE-READY`.
+`B-RANGE-READY`. States 1–4 suppress `B-READ-FAILED`, `B-SOURCE-QUIET` and `B-WAIT`: the state card owns the fix.
 
 ## 2. Night states
 
@@ -85,7 +92,7 @@ Columns: trigger is in section 1; **cue** = glyph and color token; **action** = 
 | `E-AMBIGUOUS` | two overlapping half circles, `color.status.neutral` | `state_ambiguous_title`: "Two long sleeps on one day" | `state_ambiguous_body`: "{source} recorded two sleeps of 3 hours or more for this day, so it isn't clear which one was the night. This day isn't compared and doesn't change your usual range." | `action_see_history` -> History | yes |
 | `E-NOTEVAL` | empty circle with dash | `state_noteval_title`: "Too few readings last night" | `state_noteval_body`: "{source} recorded your sleep but too few measurements during it to compare. This can happen when the device sits loosely or its battery runs out." | `action_see_history` -> History | yes |
 | `E-PERM` | key outline, `color.status.info` | `state_perm_title`: "NightBaseline can't read your sleep data" | `state_perm_body`: "Health Connect access was turned off. Your earlier results are still here. Turn access back on to continue." | `action_open_hc_permissions`: "Turn on access" -> Health Connect permission request (falls back to HC app permission settings if the request contract returns without UI) | yes |
-| `E-HC-UPDATE` | download-arrow outline, `color.status.info` | `state_hc_update_title`: "Health Connect needs an update" | `state_hc_update_body`: "NightBaseline reads your nights through Health Connect. Install or update it, then come back." | `action_open_store`: "Install or update" -> `market://details?id=com.google.android.apps.healthdata&url=healthconnect%3A%2F%2Fonboarding` [`action_check_again`: "Check again"] | yes |
+| `E-HC-UPDATE` | download-arrow outline, `color.status.info` | `state_hc_update_title`: "Health Connect needs an update" | `state_hc_update_body`: "NightBaseline reads your nights through Health Connect. Install or update it, then come back." | `action_open_store`: "Install or update" -> `market://details?id=com.google.android.apps.healthdata&url=healthconnect%3A%2F%2Fonboarding` (Google Play, then any `market://` app, then the Play web page `https://play.google.com/store/apps/details?id=...`; if nothing opens, a toast `hc_store_unavailable`: "Couldn't open Google Play. Install Health Connect from your app store.") [`action_check_again`: "Check again"] | yes |
 | `E-SOURCE-GONE` | cloud-with-clock outline, `color.status.info` | `state_source_gone_title`: "{source} is no longer on this phone" | `state_source_gone_body`: "Choose another app that writes sleep data to Health Connect. Your earlier results stay here." | `action_choose_source`: "Choose source" -> Source picker | yes |
 | `E-HC-NONE` | slashed circle, `color.status.neutral` | `state_hc_none_title`: "Health Connect isn't available here" | `state_hc_none_body`: "NightBaseline needs Health Connect, which this phone or profile doesn't support. Nothing is read or stored." | `action_about`: "About NightBaseline" -> About | yes |
 
@@ -113,7 +120,7 @@ label}". All drafted in ru.
 | `M-WITHIN` | `MetricStatus.WITHIN` | filled circle inside band | `status_within`: "Usual" | `detail_within`: "Inside your usual range." | - | yes |
 | `M-HIGH` | `ABOVE`, `deviates` | up triangle right of band | `status_higher`: "Higher than usual" | `detail_higher`: "{delta} above your usual range." | - | yes |
 | `M-LOW` | `BELOW`, `deviates` | down triangle left of band | `status_lower`: "Lower than usual" | `detail_lower`: "{delta} below your usual range." | - | yes |
-| `M-SIDE-IGNORED` | value outside on a side the metric's `Sensitivity` ignores (e.g. SpO2 above range) | filled circle, marker outside band but no triangle | `status_within` | `detail_side_ignored`: "Higher values of {metric} are shown but don't count as a change." | - | yes |
+| `M-SIDE-IGNORED` | value outside on a side the metric's `Sensitivity` ignores (e.g. SpO2 above range) | filled circle, marker outside band but no triangle | `status_within` | above: `detail_side_ignored`: "Higher values of {metric} are shown but don't count as a change."; below: `metric_detail_side_ignored_lower`: "Lower values of {metric} are shown but don't count as a change." | - | yes |
 | `M-LEARN` | `MetricStatus.LEARNING` (metric has < 7 values, e.g. appeared later) | dotted ring, dotted band outline | `status_learning`: "Learning, {n} of 7" | `detail_learning`: "This measurement needs {left} more nights before it gets a range. It doesn't count until then." | "How it works" | yes |
 | `M-NODATA` | `MISSING`, `MissingReason.NO_DATA` | dash, no marker, band shown | `status_no_value`: "No value last night" | `detail_no_data`: "{source} recorded no {metric} during your sleep last night." | - | yes |
 | `M-FEW` | `MISSING`, `TOO_FEW_SAMPLES` | dash | `status_no_value` | `detail_too_few`: "Only {k} readings during sleep; at least {min} are needed to compare." | - | yes |
@@ -121,6 +128,7 @@ label}". All drafted in ru.
 | `M-NOTCOMPARED` | night is `SHORT_NIGHT` | dash next to the value | `status_not_compared`: "Not compared" | `detail_not_compared`: "Short nights aren't compared." | - | yes |
 | `M-NOTPROVIDED` | `MissingReason.NOT_PROVIDED` (source never writes the channel) | slashed circle, no band | `status_not_provided`: "Not recorded by {source}" | `detail_not_provided_title`: "{source} doesn't record {metric}" + `detail_not_provided_body`: "{source} doesn't send this measurement to Health Connect. If it starts, NightBaseline picks it up and learns its range automatically." | `action_choose_source` -> Source picker (secondary) | yes |
 | `M-PERM` | permission for this metric's record type not granted (core ones present) | key outline, no band | `status_access_off`: "Access off" | `detail_access_off`: "Health Connect access to {metric} is turned off." | `action_open_hc_permissions` | yes |
+| `M-PERM-THEN` | `MissingReason.NO_ACCESS`: the night was read while this permission was off, access is on now (the night is read again once, see `NightProcessor`) | dash, no band | `status_access_off_then`: "No access that night" | `detail_access_off_then`: "Health Connect access to {metric} was off when this night was read." | - | yes |
 
 ### 4.1 "Metric not provided by the source" on Home and Metric detail
 
@@ -177,7 +185,7 @@ Which states each screen shows and how (`card` = state card replaces the main co
 | Accent color | `color.status.moved` (light theme value), used by the system only for the icon tint. |
 | Category / visibility | `CATEGORY_STATUS`; `VISIBILITY_PRIVATE` with a public version (below). |
 | Title | `notif_dev_title` (plurals on {k}): "{k} measurements moved outside your usual range" |
-| Body (collapsed) | `notif_dev_body`: "{metric list}. {night label}." (e.g. "Heart rate and Breathing. Night of Nov 24–25."; `{night label}` is `night_label`, which already contains "Night of", so it is never wrapped in another "night of"). Metric list uses short names, max 3, then `notif_list_more` (plurals): "and {n} more". No values. |
+| Body (collapsed) | `notif_dev_body`: "{metric list}. {night label}." (e.g. "Heart rate and Breathing. Night of Nov 24–25."; `{night label}` is `night_label`, which already contains "Night of", so it is never wrapped in another "night of"). Metric list uses the full names (as the cards), max 3, then `notif_list_more` (plurals): "and {n} more". No values. |
 | Body (expanded, `BigTextStyle`) | `notif_dev_body_long`: "Higher than usual: {higher list}. Lower than usual: {lower list}. This compares the night with your own recent nights and isn't a diagnosis. Not a medical device." Empty direction groups are omitted (`notif_higher_prefix`, `notif_lower_prefix`). |
 | Public version (lock screen) | Title `notif_public_title`: "NightBaseline"; body `notif_public_body`: "Last night's result is ready." No metric names, no counts, no values. |
 | Tap action | `PendingIntent` (immutable) -> `nightbaseline://night/{date}`: Home if this is the newest evaluated night, otherwise Night detail; synthetic back stack to Home. Onboarding gate applies (`screens.md` section 3). |
@@ -232,13 +240,14 @@ it." Tap -> Home.
 | `O-WELCOME` | step 1 | `onb_welcome_title`: "NightBaseline" / `onb_welcome_body`: "Notices when your night measurements move outside your usual range." Points `onb_point_daily`: "Reads once a day, after you wake up", `onb_point_own`: "Compares each night with your own recent nights", `onb_point_local`: "Everything stays on this phone. No internet access." + `disclaimer_full`. Step indicator on every step: `onb_step`: "Step {n} of 6" | `onb_start`: "Get started" -> step 2 | yes |
 | `O-HOW` | step 2 | `onb_how_title`: "How it works" / `onb_how_body`: "The first 7 nights teach NightBaseline your usual range for each measurement. After that, you get a note when two or more move outside it on the same night." | `action_next`: "Next" | yes |
 | `O-SOURCE` | step 3, sources found | `onb_source_title`: "Where your nights come from" / `onb_source_body`: "Any app that writes sleep and heart rate to Health Connect works. Pick the one your watch or ring uses." Row summary `source_last_sync`: "Last sleep: {date}" | `onb_use_source`: "Use {source}" -> step 4 | yes |
+| `O-SOURCE-ACCESS` | Health Connect available, sleep not granted yet and no source can be listed | `onb_source_access_title`: "Allow access to see your sources" / `onb_source_access_body`: "NightBaseline needs to read sleep in Health Connect to find the app that records your nights." | `onb_perm_allow` -> the permission request; after the grant the app that wrote sleep is preselected | yes |
 | `O-NOSOURCE` | no app wrote sleep data in the last 30 days (only detectable after permissions; before that the list shows apps that have Health Connect access per the HC client, or is empty) | `onb_nosource_title`: "No sleep data in Health Connect yet" / `onb_nosource_body`: "Let your watch or ring app share sleep and heart rate with Health Connect, then check again." | `action_check_again` [`action_open_hc`: "Open Health Connect"] | yes |
 | `O-HC-UPDATE` / `O-HC-NONE` | as `E-HC-UPDATE` / `E-HC-NONE` | same copy as section 2 | same | yes |
 | `O-PERM` | step 4 | `onb_perm_title`: "Allow reading in Health Connect" / `onb_perm_body`: "NightBaseline only reads. It never writes, changes or shares your data." Lines per type `onb_perm_sleep`: "Sleep: when you slept and for how long", `onb_perm_hr`: "Heart rate during sleep", `onb_perm_rr`: "Respiratory rate", `onb_perm_spo2`: "Blood oxygen (SpO2)", `onb_perm_hrv`: "Heart rate variability, if your source records it", `onb_perm_skin`: "Skin temperature, if your source records it", `onb_perm_background`: "In the background, so the morning check runs without opening the app", `onb_perm_history`: "Past data, so up to 60 earlier nights can be used right away (optional)" | `onb_perm_allow`: "Allow in Health Connect" -> HC permission request | yes |
 | `O-PERM-DENIED` | sleep or heart rate not granted after the request | `onb_perm_denied_title`: "Sleep and heart rate are needed" / `onb_perm_denied_body`: "Without them there is nothing to compare. Other measurements are optional." | `action_try_again`: "Try again" (second denial: Health Connect stops showing the dialog -> `action_open_hc` opens HC app permissions) | yes |
-| `O-PERM-PARTIAL` | core granted, some optional not | inline note `onb_perm_partial`: "Some measurements are off. You can turn them on later in Settings." | continues | yes |
+| `O-PERM-PARTIAL` | core granted, some optional not | each optional row shows a check or an "off" cross (TalkBack `onb_perm_row_off`: "{row}: off"); the note names what is off: a measurement `onb_perm_partial`: "Some measurements are off. You can turn them on later in Settings.", background `onb_perm_partial_background`: "Background reading is off, so the morning check runs when you open the app. You can turn it on later in Settings.", past data `onb_perm_partial_history`: "Past data is off, so only the last 30 days can be used." (joined when several are off) | continues | yes |
 | `O-NOTIF` | step 5 | `onb_notif_title`: "A calm note in the morning" / `onb_notif_body`: "Only when two or more measurements move outside your usual range on the same night." | `onb_notif_allow`: "Allow notifications" -> system prompt (API 33+) [`action_not_now`: "Not now"] | yes |
-| `O-READY-HISTORY` | step 6, past nights found and >= 7 valid | `onb_ready_history_title` (plurals): "Found {n} past nights" / `onb_ready_history_body`: "Your usual range is ready. Last night is already compared." | `action_done`: "Done" -> Home | yes |
+| `O-READY-HISTORY` | step 6, past nights found and >= 7 valid | `onb_ready_history_title` (plurals): "Found {n} past nights" / `onb_ready_history_body`: "Your usual range is ready. From now on each night is compared with it." (the step runs before the first check, so it claims nothing about last night) | `action_done`: "Done" -> Home | yes |
 | `O-READY-LEARN` | step 6, < 7 valid past nights | `onb_ready_learn_title`: "Learning starts tonight" / `onb_ready_learn_body` (plurals on {n}): "{n} of 7 nights are already there." | `action_done` -> Home (learning) | yes |
 
 ### 7.4 Settings

@@ -83,7 +83,7 @@ written after "now".
 | `normal` | 60 | all within the usual range |
 | `deviations` | 60 | last night: heart rate +14 bpm, respiratory rate +2.5, SpO2 −4 → DEVIATIONS (3 moved, each well beyond the range edge for any night count) |
 | `learning` | 3 | learning period |
-| `learning6` | 6 | learning, one night before the first evaluation |
+| `learning6` | 6 | learning, "6 of 7 nights": the next night completes the range and the one after it is the first compared |
 | `short_last` | 60 | last night only 2 h → short night |
 | `ambiguous` | 60 | a 200-min sleep ending 2 h before the last night → ambiguous night |
 | `no_spo2_rr` | 60 | the source writes only sleep + heart rate (no steps either: completeness falls back to "ended 3 h ago") |
