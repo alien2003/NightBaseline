@@ -44,6 +44,9 @@ no internet. Current state and plan: `docs/STATUS.md` (read it first in a new se
 3. Caches and state in `.tooling/` inside the project (git-ignored).
 4. adb: only the Windows `adb.exe` through WSL interop (`ADB_WIN`), only the phone. Never `./gradlew installDebug` in
    WSL; install with `"$ADB_WIN" install -r "$(wslpath -w <apk>)"`.
+   Emulators (AVDs nb-fold, nb-phone, nb-tablet, nb-api28 in `.tooling/android-user/avd`, KVM, headless) run inside
+   WSL and are driven only with the Linux `adb` from `.tooling/android-sdk/platform-tools` addressed by `-s
+   emulator-<port>`; that adb never talks to the phone. Emulators may be freely written to (synthetic data only).
 5. Health data never reaches git, CI, build logs or release texts. Raw exports only in the git-ignored `.data/`. The
    repository gets summaries without raw values, and synthetic data. Repository screenshots only from synthetic data.
    Reference screenshots of system apps only in `.data/design-refs/`.

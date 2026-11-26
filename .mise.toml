@@ -10,6 +10,9 @@ GRADLE_USER_HOME = "{{config_root}}/.tooling/gradle"
 ADB_WIN = "adb.exe"
 # Debug keystore and other Android user state stay inside the project.
 ANDROID_USER_HOME = "{{config_root}}/.tooling/android-user"
+# Emulator AVDs and emulator state also stay inside the project.
+ANDROID_AVD_HOME = "{{config_root}}/.tooling/android-user/avd"
+ANDROID_EMULATOR_HOME = "{{config_root}}/.tooling/android-user"
 _.path = [
   "{{config_root}}/.tooling/android-sdk/cmdline-tools/latest/bin",
   "{{config_root}}/.tooling/android-sdk/platform-tools",
