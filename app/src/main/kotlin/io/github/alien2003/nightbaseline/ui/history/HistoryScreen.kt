@@ -225,14 +225,16 @@ private fun HistoryTopBar(
     val large = layout.mode == LayoutMode.Compact
     val short = layout.mode == LayoutMode.CompactShort || layout.mode == LayoutMode.WideShort
     // Past the first item the exact offset is unknown; anything beyond the large title block reads as fully scrolled.
-    val scrolled =
+    // Read lazily by the bar (layer, layout, derived state), so scrolling the feed never recomposes it.
+    val scrolled = {
         if (listState.firstVisibleItemIndex > 0) SCROLLED_PAST else with(density) { listState.firstVisibleItemScrollOffset.toDp() }
+    }
     Box(modifier) {
         ShellTopBar(
             title = stringResource(R.string.history_title),
             large = large,
             height = shellToolbarHeight(short, large),
-            scroll = scrolled,
+            scrollOffset = scrolled,
             actions = {
                 if (arrangement.toggleInBar && !state.empty && !state.loading) {
                     HistoryViewButton(state.view, onView)

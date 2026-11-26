@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,6 +36,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -156,37 +158,37 @@ fun PeriodSelector(
             }
             val lead: FiniteAnimationSpec<Float> = if (motion.reduced) snap() else spring(stiffness = THUMB_LEAD_STIFFNESS)
             val trail = motion.selection<Float>()
-            val left by animateFloatAsState(start, if (forward) trail else lead, label = "periodStart")
-            val right by animateFloatAsState(end, if (forward) lead else trail, label = "periodEnd")
-            val x = left
-            val w = (right - left).coerceAtLeast(0f)
-            Canvas(Modifier.matchParentSize()) {
-                val top = (trackInset + inset).toPx()
-                val h = size.height - 2 * top
-                val left = x + inset.toPx()
-                val radius = CornerRadius(h / 2)
-                // A solid convex chip (conformance K3, glass research 4.2): soft shadow, vertical gradient, top rim.
-                drawRoundRect(
-                    Color.Black.copy(alpha = thumbShadow.alpha),
-                    topLeft = Offset(left, top + thumbShadow.offsetY.toPx()),
-                    size = Size(w, h),
-                    cornerRadius = radius,
-                )
-                drawRoundRect(
-                    Brush.verticalGradient(listOf(data.segmentThumbTop, data.segmentThumbBottom), startY = top, endY = top + h),
-                    topLeft = Offset(left, top),
-                    size = Size(w, h),
-                    cornerRadius = radius,
-                )
-                val rim = 1.dp.toPx()
-                drawRoundRect(
-                    Brush.verticalGradient(listOf(data.segmentThumbRim, Color.Transparent), startY = top, endY = top + h / 2),
-                    topLeft = Offset(left + rim / 2, top + rim / 2),
-                    size = Size(w - rim, h - rim),
-                    cornerRadius = CornerRadius((h - rim) / 2),
-                    style = Stroke(rim),
-                )
-            }
+            // The animated edges are read only while drawing: the slide redraws the thumb, it never recomposes.
+            val left = animateFloatAsState(start, if (forward) trail else lead, label = "periodStart")
+            val right = animateFloatAsState(end, if (forward) lead else trail, label = "periodEnd")
+            Spacer(
+                Modifier.matchParentSize().drawWithCache {
+                    val top = (trackInset + inset).toPx()
+                    val h = size.height - 2 * top
+                    val radius = CornerRadius(h / 2)
+                    val shadow = Color.Black.copy(alpha = thumbShadow.alpha)
+                    val shadowY = top + thumbShadow.offsetY.toPx()
+                    val fill = Brush.verticalGradient(listOf(data.segmentThumbTop, data.segmentThumbBottom), startY = top, endY = top + h)
+                    val rim = 1.dp.toPx()
+                    val rimBrush = Brush.verticalGradient(listOf(data.segmentThumbRim, Color.Transparent), startY = top, endY = top + h / 2)
+                    val rimRadius = CornerRadius((h - rim) / 2)
+                    val rimStroke = Stroke(rim)
+                    onDrawBehind {
+                        val x = left.value + inset.toPx()
+                        val w = (right.value - left.value).coerceAtLeast(0f)
+                        // A solid convex chip (conformance K3, glass research 4.2): soft shadow, vertical gradient, top rim.
+                        drawRoundRect(shadow, topLeft = Offset(x, shadowY), size = Size(w, h), cornerRadius = radius)
+                        drawRoundRect(fill, topLeft = Offset(x, top), size = Size(w, h), cornerRadius = radius)
+                        drawRoundRect(
+                            rimBrush,
+                            topLeft = Offset(x + rim / 2, top + rim / 2),
+                            size = Size(w - rim, h - rim),
+                            cornerRadius = rimRadius,
+                            style = rimStroke,
+                        )
+                    }
+                },
+            )
         }
         Row(
             (if (fill) Modifier.fillMaxWidth().height(IntrinsicSize.Min) else Modifier)

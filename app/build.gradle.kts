@@ -188,6 +188,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.window)
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.health.connect.client)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.hilt.work)

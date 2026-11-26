@@ -1,0 +1,6 @@
+# Baseline profile of NightBaseline (hand-written; installed by androidx.profileinstaller on sideloaded builds).
+# The app is small, so every class and method of the app's own packages is compiled ahead of time: start-up, the
+# Home / History / Settings screens, their scrolling (rows, press feedback, overscroll) and the glass shell.
+# AndroidX and Compose bring their own profiles in their AARs; R8 rewrites these rules for the release build.
+HSPLio/github/alien2003/nightbaseline/**->**(**)**
+Lio/github/alien2003/nightbaseline/**;

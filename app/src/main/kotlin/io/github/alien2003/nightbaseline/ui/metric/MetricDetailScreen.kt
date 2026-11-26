@@ -128,7 +128,7 @@ fun MetricDetailScreen(
                     ShellTopBar(
                         title = text.name(state.metric.metric),
                         height = topBarHeight(layout.mode),
-                        scrolledUnder = with(density) { scroll.value.toDp() },
+                        scrollOffset = { with(density) { scroll.value.toDp() } },
                         onBack = actions.onBack,
                         actions = {
                             ShellRoundButton(NbIcons.Info, text.string(R.string.a11y_range_info), onClick = actions.onOpenExplainer)

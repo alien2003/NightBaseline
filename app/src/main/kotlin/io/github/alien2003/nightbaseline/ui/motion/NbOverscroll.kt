@@ -47,18 +47,23 @@ class NbOverscrollEffect(
         performScroll: (Offset) -> Offset,
     ): Offset {
         if (source != NestedScrollSource.UserInput) return performScroll(delta)
-        // 1. A drag back towards the edge first relaxes the current translation.
-        val relaxX = relax(offsetX, delta.x)
-        val relaxY = relax(offsetY, delta.y)
-        offsetX -= relaxX.second
-        offsetY -= relaxY.second
-        val afterRelax = Offset(delta.x - relaxX.first, delta.y - relaxY.first)
+        // Runs for every drag event of every scrollable: plain floats only, and the snapshot state is read and
+        // written only when the content is (or gets) translated, so an ordinary scroll costs nothing here.
+        var x = offsetX
+        var y = offsetY
+        // 1. A drag back towards the edge first relaxes the current translation (1:1 until it is gone).
+        val removedX = relaxed(x, delta.x)
+        val removedY = relaxed(y, delta.y)
+        x -= removedX
+        y -= removedY
+        val afterRelax = if (removedX == 0f && removedY == 0f) delta else Offset(delta.x + removedX, delta.y + removedY)
         // 2. The content scrolls normally.
         val consumed = performScroll(afterRelax)
         // 3. What the content could not take pulls it past the edge, against growing resistance.
-        val leftover = afterRelax - consumed
-        offsetX = pull(offsetX, leftover.x)
-        offsetY = pull(offsetY, leftover.y)
+        x = pull(x, afterRelax.x - consumed.x)
+        y = pull(y, afterRelax.y - consumed.y)
+        if (x != offsetX) offsetX = x
+        if (y != offsetY) offsetY = y
         return delta
     }
 
@@ -101,15 +106,16 @@ class NbOverscrollEffect(
         }
     }
 
-    /** (delta consumed, translation removed) for a drag of [delta] while translated by [current]. */
-    private fun relax(
+    /**
+     * Translation removed by a drag of [delta] while translated by [current]; the drag consumes the same amount with
+     * the opposite sign. Moving back, the translation follows the finger 1:1 until it is gone.
+     */
+    private fun relaxed(
         current: Float,
         delta: Float,
-    ): Pair<Float, Float> {
-        if (current == 0f || delta == 0f || sign(current) == sign(delta)) return 0f to 0f
-        // Moving back: the translation follows the finger 1:1 until it is gone.
-        val removed = if (abs(delta) >= abs(current)) current else -delta
-        return -removed to removed
+    ): Float {
+        if (current == 0f || delta == 0f || sign(current) == sign(delta)) return 0f
+        return if (abs(delta) >= abs(current)) current else -delta
     }
 
     private fun pull(

@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
@@ -164,16 +163,18 @@ fun Modifier.shellPressGlow(
     forcedPressed: Boolean = false,
 ): Modifier {
     val glowColor = ShellTokens.colors.glow
+    // Outline and brush survive frames: the fading light reuses its shader instead of building one per frame.
+    val outlines = remember { OutlineCache() }
+    val brushes = remember { GlowBrushCache() }
     return drawWithContent {
         val alpha = if (forcedPressed) 1f else state.glow.value
         if (alpha > 0f) {
-            val outline = shape.createOutline(size, layoutDirection, this)
+            val outline = outlines.get(shape, size, layoutDirection, this)
             val shift = inputOffset.toPx()
             val middle = Offset(size.width / 2f, size.height / 2f)
             val c = if (forcedPressed) middle else state.center?.let { it - Offset(shift, shift) } ?: middle
             val radius = min(ShellDimens.glowRadius.toPx(), maxOf(size.width, size.height))
-            val brush = Brush.radialGradient(listOf(glowColor, glowColor.copy(alpha = 0f)), center = c, radius = radius)
-            drawOutline(outline, brush, alpha = alpha)
+            drawOutline(outline, brushes.get(glowColor, c, radius), alpha = alpha)
         }
         drawContent()
     }

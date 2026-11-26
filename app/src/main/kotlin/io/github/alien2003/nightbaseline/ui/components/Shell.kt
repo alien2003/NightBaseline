@@ -37,6 +37,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -108,6 +109,9 @@ private val TitleEasing = CubicBezierEasing(0.33f, 0f, 0.67f, 1f)
  * @param scroll scroll offset of the page's main column. When null, [scrolledUnder] is used.
  * @param scrolledUnder how far content has moved under the bar's bottom edge (0 at rest).
  * @param height the toolbar height of the layout mode; values below 52 dp give the short toolbar.
+ * @param scrollOffset the scroll offset as a function, read only where it is used (the small title's layer, the large
+ *   title's layout, the derived material target), so scrolling never recomposes the bar; takes precedence over
+ *   [scroll] and [scrolledUnder].
  */
 @Suppress("CyclomaticComplexMethod") // Derives the scroll-driven states of tokens C4 / C5 in one place.
 @Composable
@@ -120,42 +124,44 @@ fun ShellTopBar(
     height: Dp = NbDimens.topBarCollapsed,
     onBack: (() -> Unit)? = null,
     scroll: Dp? = null,
+    scrollOffset: (() -> Dp)? = null,
     actions: @Composable () -> Unit = {},
 ) {
     val motion = NbTheme.motion
     val density = LocalDensity.current
-    val total: Dp = scroll ?: scrolledUnder
-    var blockHeight by remember { mutableStateOf(0.dp) }
-    // Any pane that scrolls on its own (second pane, supporting pane) also counts as content under the bar.
-    val paneScroll = with(density) { (LocalPaneScrolls.current?.maxScroll ?: 0).toDp() }
-    val ownUnder =
-        if (large) {
-            (total - blockHeight).coerceAtLeast(0.dp)
-        } else if (scroll != null) {
-            total
-        } else {
-            scrolledUnder
+    val total: () -> Dp = scrollOffset ?: { scroll ?: scrolledUnder }
+    val blockHeight = remember { mutableStateOf(0.dp) }
+    val panes = LocalPaneScrolls.current
+    // Only the material's target is derived in composition; it rests at 0 or 1 outside a 10 dp window of scroll.
+    val target by remember(total, large, motion.reduced, panes, density) {
+        derivedStateOf {
+            val scrolled = total()
+            val ownUnder = if (large) (scrolled - blockHeight.value).coerceAtLeast(0.dp) else scrolled
+            // Any pane that scrolls on its own (second pane, supporting pane) also counts as content under the bar.
+            val paneScroll = with(density) { (panes?.maxScroll ?: 0).toDp() }
+            val fraction = (maxOf(ownUnder, paneScroll) / ShellDimens.topBarTintDistance).coerceIn(0f, 1f)
+            if (motion.reduced) (if (fraction > 0f) 1f else 0f) else fraction
         }
-    val under = maxOf(ownUnder, paneScroll)
-    val fraction = (under / ShellDimens.topBarTintDistance).coerceIn(0f, 1f)
-    val target = if (motion.reduced) (if (fraction > 0f) 1f else 0f) else fraction
+    }
     val strength by animateFloatAsState(target, motion.crossfade(), label = "topBarMaterial")
     val toolbar = if (height < ShellDimens.toolbar) height else ShellDimens.toolbar
-    val smallTitle =
+    // Read in the title's layer only: the small title fades with the scroll without recomposing the bar.
+    val smallTitle: () -> Float = {
         when {
             !large -> {
                 1f
             }
 
             motion.reduced -> {
-                if (total >= (ShellDimens.smallTitleFadeStart + ShellDimens.smallTitleFadeEnd) / 2) 1f else 0f
+                if (total() >= (ShellDimens.smallTitleFadeStart + ShellDimens.smallTitleFadeEnd) / 2) 1f else 0f
             }
 
             else -> {
-                val raw = (total - ShellDimens.smallTitleFadeStart) / (ShellDimens.smallTitleFadeEnd - ShellDimens.smallTitleFadeStart)
-                TitleEasing.transform(raw.coerceIn(0f, 1f))
+                val fade = ShellDimens.smallTitleFadeEnd - ShellDimens.smallTitleFadeStart
+                TitleEasing.transform(((total() - ShellDimens.smallTitleFadeStart) / fade).coerceIn(0f, 1f))
             }
         }
+    }
     Column(modifier.fillMaxWidth()) {
         Box {
             // The material: blur + darkening (glass) or a background gradient (solid), fading out 16 dp below.
@@ -188,7 +194,7 @@ fun ShellTopBar(
             }
         }
         if (large) {
-            LargeTitleBlock(title, subtitle, total, onHeight = { blockHeight = it })
+            LargeTitleBlock(title, subtitle, total, onHeight = { blockHeight.value = it })
         }
     }
 }
@@ -200,7 +206,7 @@ private val TargetInset: Dp = (NbDimens.targetMin - ShellDimens.roundButton) / 2
 private fun RowScope.ToolbarTitle(
     title: String,
     subtitle: String?,
-    alpha: Float,
+    alpha: () -> Float,
     large: Boolean,
 ) {
     val colors = NbTheme.colors
@@ -209,7 +215,7 @@ private fun RowScope.ToolbarTitle(
         Modifier
             .weight(1f)
             .padding(vertical = NbDimens.focusRingWidth)
-            .graphicsLayer { this.alpha = alpha }
+            .graphicsLayer { this.alpha = alpha() }
             // On large-title pages the large title is the heading; the toolbar copy is decorative.
             .then(if (large) Modifier.clearAndSetSemantics {} else Modifier),
     ) {
@@ -226,7 +232,7 @@ private fun RowScope.ToolbarTitle(
 private fun LargeTitleBlock(
     title: String,
     subtitle: String?,
-    scroll: Dp,
+    scroll: () -> Dp,
     onHeight: (Dp) -> Unit,
 ) {
     val colors = NbTheme.colors
@@ -251,7 +257,7 @@ private fun LargeTitleBlock(
         modifier = Modifier.fillMaxWidth().clipToBounds(),
     ) { measurables, constraints ->
         val placeable = measurables.first().measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
-        val shift = scroll.roundToPx().coerceIn(0, placeable.height)
+        val shift = scroll().roundToPx().coerceIn(0, placeable.height)
         layout(constraints.maxWidth, placeable.height - shift) { placeable.place(0, -shift) }
     }
 }

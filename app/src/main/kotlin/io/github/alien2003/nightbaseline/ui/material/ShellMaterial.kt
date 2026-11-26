@@ -7,14 +7,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
-import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
@@ -169,17 +168,24 @@ fun Modifier.shellSurface(
                 Modifier
             }
 
+            // The shell redraws with every frame of the content blurred under it: brushes are built once per size.
             topBar -> {
-                Modifier.drawWithContent {
-                    drawContent()
-                    drawRect(topBarScrim(colors.background, shell.topBarDim), alpha = strength)
+                Modifier.drawWithCache {
+                    val scrim = topBarScrim(colors.background, shell.topBarDim)
+                    onDrawWithContent {
+                        drawContent()
+                        drawRect(scrim, alpha = strength)
+                    }
                 }
             }
 
             material == ShellMaterial.Bar || material == ShellMaterial.Rail -> {
-                Modifier.drawWithContent {
-                    drawContent()
-                    drawRect(Brush.verticalGradient(listOf(Color.Transparent, shell.barSheen)))
+                Modifier.drawWithCache {
+                    val sheen = Brush.verticalGradient(listOf(Color.Transparent, shell.barSheen))
+                    onDrawWithContent {
+                        drawContent()
+                        drawRect(sheen)
+                    }
                 }
             }
 
@@ -214,35 +220,30 @@ fun Modifier.shellRim(
     bottomWidth: Dp,
     shape: Shape,
 ): Modifier =
-    drawWithContent {
-        drawContent()
-        drawRimLayer(shape, top, topWidth, bottom, bottomWidth)
-    }
-
-private fun ContentDrawScope.drawRimLayer(
-    shape: Shape,
-    top: Color,
-    topWidth: Dp,
-    bottom: Color,
-    bottomWidth: Dp,
-) {
-    val outline = shape.createOutline(size, layoutDirection, this)
-    if (topWidth > 0.dp && top.alpha > 0f) {
+    // Outline, gradients and strokes are built once per size (the bar redraws every frame of the blur under it).
+    drawWithCache {
+        val outline = shape.createOutline(size, layoutDirection, this)
         // Half of a centred stroke lies outside the clipped shape, so the visible rim is [topWidth] wide.
-        drawOutline(
-            outline,
-            Brush.verticalGradient(0f to top, RIM_FADE to top.copy(alpha = 0f), 1f to top.copy(alpha = 0f)),
-            style = Stroke(width = topWidth.toPx() * 2),
-        )
+        val topRim =
+            if (topWidth > 0.dp && top.alpha > 0f) {
+                Brush.verticalGradient(0f to top, RIM_FADE to top.copy(alpha = 0f), 1f to top.copy(alpha = 0f)) to
+                    Stroke(width = topWidth.toPx() * 2)
+            } else {
+                null
+            }
+        val bottomRim =
+            if (bottomWidth > 0.dp && bottom.alpha > 0f) {
+                Brush.verticalGradient(0f to bottom.copy(alpha = 0f), 1f - RIM_FADE to bottom.copy(alpha = 0f), 1f to bottom) to
+                    Stroke(width = bottomWidth.toPx() * 2)
+            } else {
+                null
+            }
+        onDrawWithContent {
+            drawContent()
+            topRim?.let { (brush, stroke) -> drawOutline(outline, brush, style = stroke) }
+            bottomRim?.let { (brush, stroke) -> drawOutline(outline, brush, style = stroke) }
+        }
     }
-    if (bottomWidth > 0.dp && bottom.alpha > 0f) {
-        drawOutline(
-            outline,
-            Brush.verticalGradient(0f to bottom.copy(alpha = 0f), 1f - RIM_FADE to bottom.copy(alpha = 0f), 1f to bottom),
-            style = Stroke(width = bottomWidth.toPx() * 2),
-        )
-    }
-}
 
 /** Fraction of the height over which a rim fades out (top) or in (bottom). */
 private const val RIM_FADE = 0.45f
@@ -287,13 +288,13 @@ fun Modifier.extendBottom(extra: Dp): Modifier =
  */
 fun Modifier.fadeOutBottom(fade: Dp): Modifier =
     graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithContent {
-            drawContent()
+        .drawWithCache {
             val start = (1f - fade.toPx() / size.height).coerceIn(0f, 1f)
-            drawRect(
-                Brush.verticalGradient(0f to Color.Black, start to Color.Black, 1f to Color.Transparent),
-                blendMode = BlendMode.DstIn,
-            )
+            val mask = Brush.verticalGradient(0f to Color.Black, start to Color.Black, 1f to Color.Transparent)
+            onDrawWithContent {
+                drawContent()
+                drawRect(mask, blendMode = BlendMode.DstIn)
+            }
         }
 
 /** `material.solid.card`: `surface.1` with `elevation.card`. */

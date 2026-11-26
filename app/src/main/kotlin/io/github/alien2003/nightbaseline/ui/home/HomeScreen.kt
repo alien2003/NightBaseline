@@ -201,7 +201,7 @@ internal fun ScreenFrame(
                         subtitle = subtitle,
                         large = large,
                         height = barHeight,
-                        scroll = with(density) { scroll.value.toDp() },
+                        scrollOffset = { with(density) { scroll.value.toDp() } },
                         onBack = onBack,
                         actions = actions,
                     )
