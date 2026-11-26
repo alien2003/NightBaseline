@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +51,7 @@ import io.github.alien2003.nightbaseline.ui.components.DisclaimerFooter
 import io.github.alien2003.nightbaseline.ui.components.HistoryStrip
 import io.github.alien2003.nightbaseline.ui.components.InlineBanner
 import io.github.alien2003.nightbaseline.ui.components.LearningProgress
+import io.github.alien2003.nightbaseline.ui.components.LocalManualCheck
 import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
@@ -97,6 +99,22 @@ fun HomeScreen(
     scrollState: ScrollState = rememberScrollState(),
 ) {
     CountComposition("HomeScreen")
+    CompositionLocalProvider(LocalManualCheck provides state.check) {
+        HomeContent(state, layout, modifier, actions, onSelectTab, debugAction, scrollState)
+    }
+}
+
+@Suppress("LongParameterList") // HomeScreen's parameters, passed on below the check-state provider.
+@Composable
+private fun HomeContent(
+    state: HomeState,
+    layout: LayoutSpec,
+    modifier: Modifier,
+    actions: HomeActions,
+    onSelectTab: (TopLevel) -> Unit,
+    debugAction: (@Composable () -> Unit)?,
+    scrollState: ScrollState,
+) {
     val text = rememberUiText()
     // The summary card carries the night label itself; the bar repeats it only above learning and state cards.
     val noSubtitle = state.night.state.hasSummary || state.night.state == NightState.HealthConnectNone
@@ -602,7 +620,7 @@ private fun TabletopHome(
                 }
                 if (night.state == NightState.Learning || night.state == NightState.LearningStart) {
                     LearningProgress(
-                        night.historyNights,
+                        night.collectedNights,
                         Modifier.widthIn(max = maxWidth),
                         skipped = if (state.lastNightShort) 1 else 0,
                     )

@@ -661,7 +661,7 @@ private fun GlanceDetail(
             ?.let { it.copy(points = it.points.takeLast(GLANCE_NIGHTS)) }
             ?.takeIf { it.points.isNotEmpty() }
             ?.let { week ->
-                val summary = text.chartSummary(week, state.source)
+                val summary = text.chartSummary(week, state.source, state.metric.learnedNights)
                 NbText(
                     summary,
                     style = NbTheme.typography.bodySmall,

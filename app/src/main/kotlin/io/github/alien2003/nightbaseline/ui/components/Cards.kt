@@ -222,11 +222,7 @@ fun MetricRangeTile(
                 StatusLabel(text.status(metric, source), metric.state.glyph, metric.state.tone)
                 metric.range?.takeIf { metric.state != MetricState.Learning }?.let { range ->
                     NbText(
-                        text.string(
-                            R.string.stats_range,
-                            text.bare(metric.metric, range.low, text.decimals(metric)),
-                            text.value(metric.metric, range.high, text.decimals(metric)).text,
-                        ),
+                        text.usualRange(metric.metric, range, text.decimals(metric)),
                         style = type.statusCalm,
                         color = colors.textSecondary,
                     )

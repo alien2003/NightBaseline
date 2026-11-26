@@ -3,6 +3,7 @@ package io.github.alien2003.nightbaseline.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
@@ -11,11 +12,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbText
+import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.SettingsGroup
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
@@ -28,6 +33,7 @@ import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.data
 
 /** The source picker: intro and the detected sources as radio rows. */
 @Composable
@@ -40,6 +46,29 @@ internal fun SourcePickerContent(
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
         NbText(stringResource(R.string.onb_source_body), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
+        if (state.sources.isEmpty()) {
+            // No app wrote sleep in the lookback (or Health Connect can't be read): say so instead of an empty card.
+            NbCard(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }) {
+                NbText(
+                    stringResource(R.string.onb_nosource_title),
+                    style = NbTheme.typography.body,
+                    color = NbTheme.colors.textPrimary,
+                    modifier = Modifier.semantics { heading() },
+                )
+                NbText(
+                    stringResource(R.string.onb_nosource_body),
+                    style = NbTheme.typography.bodySmall,
+                    color = NbTheme.colors.textSecondary,
+                )
+                NbTextButton(
+                    stringResource(R.string.action_open_hc),
+                    onClick = actions.onOpenHealthConnect,
+                    color = NbTheme.colors.data.primaryText,
+                    modifier = Modifier.offset(x = -NbSpace.s4),
+                )
+            }
+            return@Column
+        }
         GroupCard(Modifier.selectableGroup()) {
             state.sources.forEachIndexed { i, source ->
                 SourceOptionRow(
@@ -135,3 +164,9 @@ private fun UiText.notificationsSummary(state: SettingsState): String =
 
 private fun UiText.glassValue(state: SettingsState): String =
     if (state.glass == GlassPreference.Off) string(R.string.glass_off) else string(R.string.glass_auto)
+
+/** The Automatic glass row's summary string for its [selected] state and the automatic [reason] ([glassAutoSummary]). */
+internal fun glassAutoSummaryRes(
+    selected: Boolean,
+    reason: EffectsReason,
+): Int = reason.summary ?: if (selected) R.string.setup_glass_on_now else R.string.setup_glass_available

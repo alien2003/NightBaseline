@@ -2,7 +2,10 @@ package io.github.alien2003.nightbaseline.app
 
 import android.Manifest
 import android.app.NotificationManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationManagerCompat
@@ -19,10 +22,13 @@ import io.github.alien2003.nightbaseline.ui.settings.NotificationAccess
 import io.github.alien2003.nightbaseline.work.notify.AndroidNightNotifier
 import io.github.alien2003.nightbaseline.work.schedule.NightWorkRequests
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -65,6 +71,12 @@ interface AppPlatform {
 
     /** Remembers that the system notification prompt was shown (after a denial it is not shown again). */
     fun markNotificationsAsked()
+
+    /**
+     * Emits when the time zone, the clock or the date changes while the app runs, so times and dates on screen are
+     * formatted again ("Last read", "Night of ..."). Nothing by default (tests, previews).
+     */
+    fun timeChanges(): Flow<Unit> = emptyFlow()
 }
 
 /** [AppPlatform] over the package manager and the notification manager. */
@@ -100,6 +112,28 @@ class AndroidAppPlatform
         override val versionName: String = BuildConfig.VERSION_NAME
 
         override val sdkInt: Int = Build.VERSION.SDK_INT
+
+        override fun timeChanges(): Flow<Unit> =
+            callbackFlow {
+                val receiver =
+                    object : BroadcastReceiver() {
+                        override fun onReceive(
+                            context: Context,
+                            intent: Intent,
+                        ) {
+                            trySend(Unit)
+                        }
+                    }
+                val filter =
+                    IntentFilter().apply {
+                        addAction(Intent.ACTION_TIMEZONE_CHANGED)
+                        addAction(Intent.ACTION_TIME_CHANGED)
+                        addAction(Intent.ACTION_DATE_CHANGED)
+                    }
+                // Protected system broadcasts: delivered to a not-exported receiver too.
+                ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+                awaitClose { context.unregisterReceiver(receiver) }
+            }
 
         private fun asked(): Boolean = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ASKED, false)
 

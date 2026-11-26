@@ -18,7 +18,8 @@ import java.util.Locale
  *
  * Arguments of `night_label`: 1 the locale's short date range ("Nov 24 – 25" in en-US, "24–25 Nov" in en-GB), 2 the
  * wake date with the month name in the locale's genitive form, 3 the evening's day alone, or with the month name when
- * the months differ; ru uses 2 and 3 ("night from the 24th to the 25th of November").
+ * the months differ; ru uses 2 and 3 ("night from the 24th to the 25th of November"). Each argument is one unbreakable
+ * unit ([unbreakable]).
  */
 object NightLabel {
     /** The label of the night that ends on [wake]. */
@@ -40,8 +41,14 @@ object NightLabel {
         val interval = DateIntervalFormat.getInstance(SKELETON_SHORT, locale).apply { timeZone = TimeZone.GMT_ZONE }
         val range = interval.format(DateInterval(millis(start), millis(wake)))
         val startText = if (start.month == wake.month) start.dayOfMonth.toString() else format(start, SKELETON_LONG, locale)
-        return Triple(range, format(wake, SKELETON_LONG, locale), startText)
+        return Triple(unbreakable(range), unbreakable(format(wake, SKELETON_LONG, locale)), unbreakable(startText))
     }
+
+    /**
+     * [text] with its spaces made non-breaking (the same width: a space becomes U+00A0, a thin space U+202F), so a
+     * title at large font wraps before the date ("Night of" / "Nov 22 – 23"), never inside it ("Nov 22 –" / "23").
+     */
+    fun unbreakable(text: String): String = text.replace(' ', NBSP).replace(THIN_SPACE, NARROW_NBSP)
 
     private fun format(
         date: LocalDate,
@@ -52,6 +59,9 @@ object NightLabel {
     private fun millis(date: LocalDate): Long = date.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() + NOON_MS
 
     private const val NOON_MS = 12 * 60 * 60 * 1000L
+    private const val NBSP = '\u00A0'
+    private const val THIN_SPACE = '\u2009'
+    private const val NARROW_NBSP = '\u202F'
     private const val SKELETON_SHORT = "MMMd"
     private const val SKELETON_LONG = "MMMMd"
 }

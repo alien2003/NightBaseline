@@ -53,6 +53,11 @@ object NightUiMapper {
                     metrics += metric(spec, metricEvaluation, summary, params, history)
                 }
 
+                // Read while the permission was off: the source may well write it, so never "Not recorded by".
+                summary.values[id]?.missing == MissingReason.NO_ACCESS -> {
+                    if (id in CORE_METRICS) metrics += MetricUi(id, MetricState.AccessOffThen)
+                }
+
                 summary.values[id]?.missing == MissingReason.NOT_PROVIDED -> {
                     if (id in CORE_METRICS) metrics += MetricUi(id, MetricState.NotProvided) else notRecorded += id
                 }
@@ -62,24 +67,32 @@ object NightUiMapper {
         return NightUi(
             wakeDate = LocalDate.parse(evaluation.date),
             startDate = Instant.ofEpochMilli(summary.startMs).atOffset(zone).toLocalDate(),
-            state = nightState(evaluation),
+            state = nightState(evaluation, counted = summary.valid),
             metrics = metrics,
             notRecorded = notRecorded,
             deviating = evaluation.deviating,
             historyNights = evaluation.historyNights,
+            counted = summary.valid,
             windowNights = windowNights,
             asleepMinutes = summary.asleepMinutes,
             threshold = params.minDeviatingMetrics,
         )
     }
 
-    /** Night state of an evaluated night. Problem states (permission, sync, Health Connect) come from the data layer. */
-    fun nightState(evaluation: NightEvaluation): NightState =
+    /**
+     * Night state of an evaluated night; [counted] when the night itself is valid (it then counts as collected, so it
+     * is never `L0`, which `states.md` reserves for "no valid night stored"). Problem states (permission, sync,
+     * Health Connect) come from the data layer.
+     */
+    fun nightState(
+        evaluation: NightEvaluation,
+        counted: Boolean = false,
+    ): NightState =
         when (evaluation.status) {
             NightStatus.ALL_WITHIN -> NightState.AllWithin
             NightStatus.SOME_DEVIATIONS -> NightState.SomeMoved
             NightStatus.DEVIATIONS -> NightState.Moved
-            NightStatus.LEARNING -> if (evaluation.historyNights == 0) NightState.LearningStart else NightState.Learning
+            NightStatus.LEARNING -> if (evaluation.historyNights == 0 && !counted) NightState.LearningStart else NightState.Learning
             NightStatus.SHORT_NIGHT -> NightState.Short
             NightStatus.AMBIGUOUS_NIGHT -> NightState.Ambiguous
             NightStatus.NOT_EVALUATED -> NightState.NotEvaluated
@@ -96,6 +109,7 @@ object NightUiMapper {
                     MissingReason.TOO_FEW_SAMPLES -> MetricState.TooFew
                     MissingReason.LOW_COVERAGE -> MetricState.LowCoverage
                     MissingReason.NOT_PROVIDED -> MetricState.NotProvided
+                    MissingReason.NO_ACCESS -> MetricState.AccessOffThen
                     MissingReason.NO_DATA, null -> MetricState.NoData
                 }
             }
@@ -133,12 +147,13 @@ object NightUiMapper {
     ): MetricUi {
         val state = metricState(evaluation, summary.short || summary.ambiguous)
         val value = summary.values[spec.id]
+        // Values collected so far, this night's included (it is in the next night's baseline): the same count as the
+        // night's "n of 7", so the tile, the Metric detail header and the chart summary agree.
         val learned =
             if (state == MetricState.Learning) {
-                Evaluator
-                    .window(summary.date, history, params)
-                    .count { it.values[spec.id]?.value != null }
-                    .coerceAtMost(params.minNights - 1)
+                val before = Evaluator.window(summary.date, history, params).count { it.values[spec.id]?.value != null }
+                val own = if (summary.valid && value?.value != null) 1 else 0
+                (before + own).coerceAtMost(params.minNights)
             } else {
                 0
             }

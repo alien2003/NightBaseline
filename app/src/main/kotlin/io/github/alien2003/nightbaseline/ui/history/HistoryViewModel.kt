@@ -11,6 +11,7 @@ import io.github.alien2003.nightbaseline.data.local.NightRecord
 import io.github.alien2003.nightbaseline.data.local.settings.AppSettings
 import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.NightUi
+import io.github.alien2003.nightbaseline.ui.settings.SourceNames
 import io.github.alien2003.nightbaseline.ui.shell.PerfProbe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -90,7 +91,7 @@ class HistoryViewModel
                 val problem = NightPresenter.problemState(access)
                 HistoryUiState(
                     nights = if (problem == NightState.HealthConnectNone) emptyList() else list,
-                    source = access?.sourceLabel ?: settings.sourcePackage,
+                    source = SourceNames.display(access?.sourceLabel, settings.sourcePackage),
                     today = today,
                     view = o.view,
                     filter = o.filter,

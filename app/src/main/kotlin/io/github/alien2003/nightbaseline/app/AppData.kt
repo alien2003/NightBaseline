@@ -15,13 +15,18 @@ import io.github.alien2003.nightbaseline.work.schedule.NightScheduler
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.update
 import java.time.Clock
 import java.time.Instant
@@ -115,10 +120,17 @@ class AppData(
     /** Nights of every source, newest first. */
     val allNights: Flow<List<NightRecord>> get() = nightRepository.observeAll()
 
-    /** The newest run-log lines, read again whenever the nights change or [refresh] runs. */
+    /**
+     * The newest run-log lines, read again whenever the nights change, [refresh] runs or the time zone or clock
+     * changes (every screen that combines this flow then formats its times and dates again in the new zone).
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val recentRuns: Flow<List<RunLogLine>>
-        get() = combine(nightRepository.observeAll(), tick) { _, t -> t }.mapLatest { runLog.recent(RUN_LINES) }
+        get() =
+            combine(nightRepository.observeAll(), tick, timeChanges) { _, t, _ -> t }.mapLatest { runLog.recent(RUN_LINES) }
+
+    /** A zone, clock or date change (one emission right away, so combining flows never wait for the first change). */
+    private val timeChanges: Flow<Unit> get() = platform.timeChanges().onStart { emit(Unit) }
 
     /** Now. */
     fun now(): Instant = clock.instant()
@@ -141,8 +153,36 @@ class AppData(
         settings.map { it.algoParams() }.distinctUntilChanged().collect { reevaluator.reevaluateIfNeeded(it) }
     }
 
-    /** "Check now": one night check right away. */
-    fun checkNow() = scheduler.runNow()
+    private val manualCheckAt = MutableStateFlow<Long?>(null)
+
+    /** "Check now": one night check right away, followed by [manualCheck]. */
+    fun checkNow() {
+        manualCheckAt.value = clock.millis()
+        scheduler.runNow()
+    }
+
+    /**
+     * Where the last "Check now" is: [ManualCheck.Checking] from the tap until the check ran (or [CHECK_START_MS]
+     * passed without it starting), then [ManualCheck.Done] for [CHECK_RESULT_MS], then [ManualCheck.None].
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val manualCheck: Flow<ManualCheck>
+        get() {
+            val ticks = manualCheckAt.flatMapLatest { at -> if (at == null) flowOf(Unit) else ticker() }
+            return combine(manualCheckAt, checks.running(), ticks) { at, running, _ -> at to running }
+                .scan(ManualCheckTrack()) { track, (at, running) -> track.next(at, running, clock.millis()) }
+                .map { it.state(clock.millis()) }
+                .distinctUntilChanged()
+        }
+
+    /** Ticks while a manual check or its result may still be on screen (the timeouts need an emission). */
+    private fun ticker(): Flow<Unit> =
+        flow {
+            repeat((CHECK_START_MS + CHECK_RESULT_MS) / CHECK_TICK_MS.toInt() + 1) {
+                emit(Unit)
+                delay(CHECK_TICK_MS)
+            }
+        }
 
     /** Time of the last successful read (evaluation or history read), formatted for [locale]; null when never. */
     fun lastRead(
@@ -162,5 +202,70 @@ class AppData(
     companion object {
         /** Run-log lines the banners look at. */
         const val RUN_LINES: Int = 20
+
+        /** A requested check that has not started after this long counts as done (WorkManager may skip RUNNING). */
+        const val CHECK_START_MS: Int = 15_000
+
+        /** How long the result of a manual check stays on screen. */
+        const val CHECK_RESULT_MS: Int = 120_000
+
+        private const val CHECK_TICK_MS: Long = 5_000L
+    }
+}
+
+/** The last "Check now" as Home shows it (`states.md` 2-3: a calm busy label, then "Checked at ..."). */
+sealed interface ManualCheck {
+    /** No recent manual check. */
+    data object None : ManualCheck
+
+    /** Requested or running. */
+    data object Checking : ManualCheck
+
+    /** Finished: [requestedAtMs] is when it was asked for, [finishedAtMs] when it ended. */
+    data class Done(
+        val requestedAtMs: Long,
+        val finishedAtMs: Long,
+    ) : ManualCheck
+}
+
+/** The state machine behind [AppData.manualCheck] (pure; unit-tested). */
+internal data class ManualCheckTrack(
+    val at: Long? = null,
+    val seenRunning: Boolean = false,
+    val finishedAt: Long? = null,
+) {
+    /** The track after [running] was observed at [now] for the request at [requested]. */
+    fun next(
+        requested: Long?,
+        running: Boolean,
+        now: Long,
+    ): ManualCheckTrack =
+        when {
+            requested == null -> {
+                ManualCheckTrack()
+            }
+
+            requested != at -> {
+                ManualCheckTrack(requested, running, null)
+            }
+
+            else -> {
+                val seen = seenRunning || running
+                val timedOut = !seen && now - requested >= AppData.CHECK_START_MS
+                val finished = finishedAt ?: now.takeIf { (seen && !running) || timedOut }
+                copy(seenRunning = seen, finishedAt = finished)
+            }
+        }
+
+    /** What Home shows at [now]. */
+    fun state(now: Long): ManualCheck {
+        val requested = at
+        val finished = finishedAt
+        return when {
+            requested == null -> ManualCheck.None
+            finished == null -> ManualCheck.Checking
+            now - finished < AppData.CHECK_RESULT_MS -> ManualCheck.Done(requested, finished)
+            else -> ManualCheck.None
+        }
     }
 }

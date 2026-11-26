@@ -1,6 +1,7 @@
 package io.github.alien2003.nightbaseline.work.process
 
 import io.github.alien2003.nightbaseline.algo.MetricId
+import io.github.alien2003.nightbaseline.algo.MissingReason
 import io.github.alien2003.nightbaseline.algo.NightStatus
 import io.github.alien2003.nightbaseline.algo.Sample
 import io.github.alien2003.nightbaseline.algo.WaitReason
@@ -115,6 +116,31 @@ class NightProcessorTest {
             h.clock.nowMs += HOUR
             assertTrue(h.processor.process() is ProcessOutcome.NothingNew)
             assertEquals(1, h.notices.size)
+        }
+
+    @Test
+    fun nightsReadWithoutAccessAreReadAgainOnceAccessIsBack() =
+        runTest {
+            val gen = nights(10)
+            SyntheticSource.load(h.gateway, gen)
+            h.gateway.granted -= HcPermissions.READ_OXYGEN_SATURATION
+            h.clock.nowMs = endOf(gen.last()) + 2 * HOUR
+            assertTrue(h.processor.process() is ProcessOutcome.Evaluated)
+            // Without access the gap is "no access", never "the source doesn't write it".
+            assertTrue(h.nights.all.all { it.summary.values[MetricId.SPO2]?.missing == MissingReason.NO_ACCESS })
+
+            h.gateway.granted += HcPermissions.READ_OXYGEN_SATURATION
+            h.clock.nowMs += HOUR
+            h.processor.process()
+            val older = h.nights.all.filter { it.date < gen.last().wakeDate }
+            assertTrue(older.isNotEmpty())
+            assertTrue(
+                older.none {
+                    it.summary.values[MetricId.SPO2]?.missing == MissingReason.NO_ACCESS
+                },
+                "${older.map { it.summary.values[MetricId.SPO2] }}",
+            )
+            assertTrue(older.any { it.summary.values[MetricId.SPO2]?.value != null })
         }
 
     @Test

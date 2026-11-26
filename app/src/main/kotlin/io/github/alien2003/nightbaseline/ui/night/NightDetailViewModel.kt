@@ -9,6 +9,7 @@ import io.github.alien2003.nightbaseline.app.NightPresenter
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.model.BannerKind
 import io.github.alien2003.nightbaseline.ui.model.NightState
+import io.github.alien2003.nightbaseline.ui.settings.SourceNames
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -46,7 +47,7 @@ class NightDetailViewModel
                 val banner = NightPresenter.resolveHome(data.now(), data.zoneId(), settings, access, nights, false, runs).banner
                 NightDetailState(
                     night = night,
-                    source = access?.sourceLabel ?: settings.sourcePackage,
+                    source = SourceNames.display(access?.sourceLabel, settings.sourcePackage),
                     previous = older,
                     next = newer,
                     banner = banner,

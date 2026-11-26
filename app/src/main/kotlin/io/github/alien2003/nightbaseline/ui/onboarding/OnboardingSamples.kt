@@ -3,6 +3,7 @@
 
 package io.github.alien2003.nightbaseline.ui.onboarding
 
+import io.github.alien2003.nightbaseline.data.hc.HcPermissions
 import io.github.alien2003.nightbaseline.ui.settings.NotificationAccess
 import io.github.alien2003.nightbaseline.ui.settings.SettingsSamples
 
@@ -27,12 +28,25 @@ object OnboardingSamples {
                 base.copy(step = OnboardingStep.Source, healthConnect = HealthConnectStatus.Checking, sources = emptyList()),
             "source" to base.copy(step = OnboardingStep.Source),
             "source-none" to base.copy(step = OnboardingStep.Source, sources = emptyList(), selectedSource = null),
+            "source-access" to
+                base.copy(step = OnboardingStep.Source, sources = emptyList(), selectedSource = null, sourcesNeedAccess = true),
             "hc-update" to base.copy(step = OnboardingStep.Source, healthConnect = HealthConnectStatus.NeedsUpdate, sources = emptyList()),
             "hc-none" to base.copy(step = OnboardingStep.Source, healthConnect = HealthConnectStatus.Unavailable, sources = emptyList()),
             "perm" to base.copy(step = OnboardingStep.Permissions),
             "perm-denied" to base.copy(step = OnboardingStep.Permissions, permission = PermissionStatus.Denied),
             "perm-denied-again" to base.copy(step = OnboardingStep.Permissions, permission = PermissionStatus.DeniedAgain),
-            "perm-partial" to base.copy(step = OnboardingStep.Permissions, permission = PermissionStatus.Partial),
+            "perm-partial" to
+                base.copy(
+                    step = OnboardingStep.Permissions,
+                    permission = PermissionStatus.Partial,
+                    missingOptional = setOf(HcPermissions.READ_HEART_RATE_VARIABILITY, HcPermissions.READ_SKIN_TEMPERATURE),
+                ),
+            "perm-partial-background" to
+                base.copy(
+                    step = OnboardingStep.Permissions,
+                    permission = PermissionStatus.Partial,
+                    missingOptional = setOf(HcPermissions.READ_HEALTH_DATA_IN_BACKGROUND, HcPermissions.READ_HEALTH_DATA_HISTORY),
+                ),
             "notif" to base.copy(step = OnboardingStep.Notifications),
             "notif-denied" to base.copy(step = OnboardingStep.Notifications, notifications = NotificationAccess.Blocked),
             "ready-history" to base.copy(step = OnboardingStep.Ready, pastNights = 42),

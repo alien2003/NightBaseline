@@ -77,6 +77,7 @@ import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
 import io.github.alien2003.nightbaseline.ui.shell.CountComposition
+import io.github.alien2003.nightbaseline.ui.theme.NbDataDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
@@ -323,7 +324,8 @@ private fun MeasurementBlocks(
             text.plural(R.plurals.night_range_window, night.windowNights, text.int(night.windowNights)),
             style = NbTheme.typography.bodySmall,
             color = NbTheme.colors.textSecondary,
-            modifier = Modifier.widthIn(max = maxWidth).fillMaxWidth().padding(start = NbSpace.s1),
+            // The heading's inset, so the caption lines up with "Measurements" and the card text below it.
+            modifier = Modifier.widthIn(max = maxWidth).fillMaxWidth().padding(horizontal = NbDataDimens.sectionHeaderStart),
         )
     }
     MetricGrid(night.metrics, state.source, columns, maxWidth, actions.onMetric, explain = true)
@@ -437,7 +439,7 @@ private fun TabletopNight(
                 }
                 if (night.state == NightState.Learning && !large) {
                     LearningProgress(
-                        night.historyNights,
+                        night.collectedNights,
                         Modifier.widthIn(max = maxWidth),
                         skipped = if (state.lastNightShort) 1 else 0,
                     )

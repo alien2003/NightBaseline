@@ -41,6 +41,12 @@ interface HealthDataReader {
         endMs: Long,
     ): Set<ChannelId>
 
+    /**
+     * Channels the app may not read right now: the record type exists on this device but its permission is not
+     * granted. A night summarised meanwhile records them as "no access", not as "the source doesn't write it".
+     */
+    suspend fun noAccessChannels(): Set<ChannelId>
+
     /** Sleep sessions of [origin] overlapping the range, ordered by start. */
     suspend fun readSessions(
         origin: String,
@@ -136,6 +142,16 @@ class HealthConnectReader(
                 guarded {
                     gateway.hasRecords(ch, startMs, endMs, origin)
                 }
+            }.mapTo(LinkedHashSet()) { it.id }
+    }
+
+    override suspend fun noAccessChannels(): Set<ChannelId> {
+        if (gateway.availability() != HcAvailability.AVAILABLE) return emptySet()
+        val readable = readableChannels(HcChannels.ALL).map { it.id }.toSet()
+        return HcChannels.ALL
+            .filter { ch ->
+                ch.id !in readable && ch.id != HcChannels.STEPS_ID &&
+                    (ch.feature == null || gateway.isFeatureAvailable(ch.feature))
             }.mapTo(LinkedHashSet()) { it.id }
     }
 

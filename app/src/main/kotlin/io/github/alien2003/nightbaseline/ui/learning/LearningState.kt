@@ -8,7 +8,7 @@ import io.github.alien2003.nightbaseline.ui.model.NightUi
 /** What the learning-period presentation of Home shows (`screens.md` 7.6, states `L0`, `L1`..`L6`). */
 @Immutable
 data class LearningState(
-    /** The newest night, in [NightState.LearningStart] or [NightState.Learning]; `historyNights` is the progress. */
+    /** The newest night, in [NightState.LearningStart] or [NightState.Learning]; `collectedNights` is the progress. */
     val night: NightUi,
     /** The last 7 nights, newest last (learning glyphs for counted nights, short-night glyphs for skipped ones). */
     val recent: List<NightUi>,
@@ -18,7 +18,7 @@ data class LearningState(
     val lastNightShort: Boolean = false,
 ) {
     /** Valid nights collected so far, 0..7. */
-    val collected: Int get() = night.historyNights.coerceIn(0, LEARNING_NIGHTS)
+    val collected: Int get() = night.collectedNights.coerceIn(0, LEARNING_NIGHTS)
 
     /** No value has arrived yet (`L0`): the "Already visible" block shows a note instead of tiles. */
     val nothingYet: Boolean get() = night.state == NightState.LearningStart || night.metrics.all { it.value == null }

@@ -15,19 +15,7 @@
     <!-- en "Night of Nov 24 – 25"; ru: evening (argument 3) and wake date (argument 2) -->
     <string name="night_label">Ночь с %3$s на %2$s</string>
 
-    <!-- Metrics -->
-    <string name="metric_sleeping_hr">Пульс во сне</string>
-    <string name="metric_sleeping_hr_short">Пульс</string>
-    <string name="metric_respiratory_rate">Частота дыхания</string>
-    <string name="metric_respiratory_rate_short">Дыхание</string>
-    <string name="metric_spo2">Кислород в крови (SpO2)</string>
-    <string name="metric_spo2_short">SpO2</string>
-    <string name="metric_sleep_duration">Длительность сна</string>
-    <string name="metric_sleep_duration_short">Сон</string>
-    <string name="metric_hrv">Вариабельность пульса (HRV)</string>
-    <string name="metric_hrv_short">HRV</string>
-    <string name="metric_skin_temperature">Температура кожи</string>
-    <string name="metric_skin_temperature_short">Темп. кожи</string>
+    <!-- Metric names live in :work (shared with the notification). -->
 
     <!-- Units -->
     <string name="unit_bpm">уд/мин</string>
@@ -206,32 +194,6 @@
     <string name="history_status_few">Мало измерений</string>
 
     <!-- Notification channels and notifications -->
-    <string name="channel_night_results_name">Результаты ночи</string>
-    <string name="channel_night_results_desc">Заметка утром, если два или больше показателя вышли за пределы обычного диапазона.</string>
-    <string name="channel_data_access_name">Проблемы с чтением данных</string>
-    <string name="channel_data_access_desc">Когда NightBaseline не может прочитать ваши ночи, например после выключения доступа.</string>
-    <plurals name="notif_dev_title">
-        <item quantity="one">%1$s показатель вышел за пределы обычного диапазона</item>
-        <item quantity="few">%1$s показателя вышли за пределы обычного диапазона</item>
-        <item quantity="many">%1$s показателей вышли за пределы обычного диапазона</item>
-        <item quantity="other">%1$s показателя вышли за пределы обычного диапазона</item>
-    </plurals>
-    <string name="notif_dev_body">%1$s. %2$s.</string>
-    <plurals name="notif_list_more">
-        <item quantity="one">и ещё %1$s</item>
-        <item quantity="few">и ещё %1$s</item>
-        <item quantity="many">и ещё %1$s</item>
-        <item quantity="other">и ещё %1$s</item>
-    </plurals>
-    <string name="notif_dev_body_long">%1$s%2$sЭто сравнение с вашими недавними ночами, а не диагноз. Не медицинское изделие.</string>
-    <string name="notif_higher_prefix">Выше обычного: %1$s. </string>
-    <string name="notif_lower_prefix">Ниже обычного: %1$s. </string>
-    <string name="notif_public_title">NightBaseline</string>
-    <string name="notif_public_body">Результат прошлой ночи готов.</string>
-    <string name="notif_perm_title">NightBaseline не может прочитать данные о сне</string>
-    <string name="notif_perm_body">Доступ в Health Connect был выключен. Нажмите, чтобы включить снова.</string>
-    <string name="notif_hc_title">Health Connect нужно обновить</string>
-    <string name="notif_hc_body">Нажмите, чтобы узнать, как продолжить.</string>
     <plurals name="notif_quiet_title">
         <item quantity="one">Нет новых данных от %1$s уже %2$s день</item>
         <item quantity="few">Нет новых данных от %1$s уже %2$s дня</item>
@@ -245,8 +207,6 @@
         <item quantity="other">Нет новых данных от источника уже %1$s дня</item>
     </plurals>
     <string name="notif_quiet_body">Нажмите, чтобы проверить источник.</string>
-    <string name="notif_bg_title">Утренней проверке нужен фоновый доступ</string>
-    <string name="notif_bg_body">Нажмите, чтобы разрешить его в Health Connect.</string>
     <string name="notif_source_gone_title">%1$s больше нет на этом телефоне</string>
     <string name="notif_source_gone_title_public">Вашего источника больше нет на этом телефоне</string>
     <string name="notif_source_gone_body">Нажмите, чтобы выбрать другой источник.</string>
@@ -291,7 +251,7 @@
         <item quantity="many">Найдено %1$s прошлых ночей</item>
         <item quantity="other">Найдено %1$s прошлой ночи</item>
     </plurals>
-    <string name="onb_ready_history_body">Ваш обычный диапазон готов. Прошлая ночь уже сравнена.</string>
+    <string name="onb_ready_history_body">Ваш обычный диапазон готов. Теперь каждая ночь сравнивается с ним.</string>
     <string name="onb_ready_learn_title">Обучение начнётся этой ночью</string>
     <plurals name="onb_ready_learn_body">
         <item quantity="one">%1$s из 7 ночей уже есть.</item>
@@ -335,9 +295,9 @@
 
     <!-- Range explainer and disclaimer -->
     <string name="explainer_title">Как работает обычный диапазон</string>
-    <string name="explainer_range">Для каждого показателя NightBaseline берёт ваши последние 28 ночей с данными (за последние 60 дней, минимум 7) и находит среднее (медианное) значение. Обычный диапазон — это оно плюс-минус то, насколько ваши ночи обычно различаются. Отдельные необычные ночи почти не сдвигают его.</string>
+    <string name="explainer_range">Для каждого показателя NightBaseline берёт ваши последние 28 ночей с данными (за последние 60 дней, минимум 7) и находит медиану — срединное значение. Обычный диапазон — это медиана плюс-минус то, насколько ваши ночи обычно различаются. Отдельные необычные ночи почти не сдвигают его.</string>
     <string name="explainer_learning">Для начала нужно 7 ночей. Ночи короче 3 часов и ночи без измерений не учитываются.</string>
-    <string name="explainer_outside">Ночь считается вне диапазона, если значение заметно отличается от вашего среднего — и с учётом обычного разброса, и не меньше чем на минимальную величину, поэтому мелкие колебания не считаются.</string>
+    <string name="explainer_outside">Ночь считается вне диапазона, если значение заметно отличается от вашей медианы — и с учётом обычного разброса, и не меньше чем на минимальную величину, поэтому мелкие колебания не считаются.</string>
     <string name="explainer_meaning_title">Что значит «вне обычного диапазона»</string>
     <string name="explainer_meaning">Это значит, что показатель отличался от ваших же недавних ночей. Это не диагноз. Один показатель часто меняется сам по себе; если за одну ночь изменились два или больше, NightBaseline присылает заметку. Свою роль могут играть поздний ужин, алкоголь, перелёт, тяжёлая тренировка, простуда, новое лекарство или то, как сидит устройство.</string>
     <string name="explainer_care">Если вы плохо себя чувствуете или беспокоитесь, обратитесь к врачу.</string>
@@ -397,7 +357,7 @@
         <item quantity="other">В обычном диапазоне: %1$s из %2$s ночи</item>
     </plurals>
     <string name="stats_range">Обычный диапазон: %1$s–%2$s</string>
-    <string name="stats_median">Среднее значение: %1$s</string>
+    <string name="stats_median">Медиана: %1$s</string>
     <string name="stats_label_inside">В обычном диапазоне</string>
     <plurals name="stats_value_inside">
         <item quantity="one">%1$s из %2$s ночи</item>
@@ -407,7 +367,7 @@
     </plurals>
     <string name="stats_label_range">Обычный диапазон</string>
     <string name="stats_value_range">%1$s–%2$s</string>
-    <string name="stats_label_median">Среднее значение</string>
+    <string name="stats_label_median">Медиана</string>
     <string name="detail_computed_title">Как считается ваш обычный диапазон</string>
     <string name="detail_source_line">Измерено: %1$s. Последняя синхронизация %2$s.</string>
     <string name="history_title">История</string>
@@ -456,4 +416,20 @@
     <string name="widget_waiting">Ждём синхронизации</string>
     <string name="widget_update_needed">Нужно обновление</string>
     <string name="widget_choose_source">Выберите источник</string>
+
+    <string name="unit_celsius_vs_usual">°C от обычного</string>
+    <string name="stats_range_to">Обычный диапазон: от %1$s до %2$s</string>
+    <string name="stats_value_range_to">от %1$s до %2$s</string>
+    <string name="status_access_off_then">Не было доступа</string>
+    <string name="detail_access_off_then">Когда эта ночь читалась, доступ Health Connect к показателю «%1$s» был выключен.</string>
+    <string name="detail_learning_ready">Ночей достаточно. Со следующей ночи этот показатель сравнивается с обычным диапазоном.</string>
+    <string name="state_learning_ready_body">Собрано 7 ночей. Ваш обычный диапазон готов, и следующая ночь будет сравнена с ним.</string>
+    <string name="onb_perm_partial_background">Фоновое чтение выключено, поэтому утренняя проверка пройдёт, когда вы откроете приложение. Его можно включить позже в настройках.</string>
+    <string name="onb_perm_partial_history">Прошлые данные выключены, поэтому используются только последние 30 дней.</string>
+    <string name="onb_perm_row_off">%1$s: выключено</string>
+    <string name="onb_source_access_title">Разрешите доступ, чтобы увидеть источники</string>
+    <string name="onb_source_access_body">NightBaseline нужно читать сон в Health Connect, чтобы найти приложение, которое записывает ваши ночи.</string>
+    <string name="action_checking">Проверяем…</string>
+    <string name="check_result_nothing_new">Проверено в %1$s. От %2$s пока ничего нового.</string>
+    <string name="hc_store_unavailable">Не удалось открыть Google Play. Установите Health Connect из магазина приложений.</string>
 </resources>

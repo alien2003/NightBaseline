@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -34,7 +35,9 @@ import androidx.compose.ui.unit.Dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.BannerKind
+import io.github.alien2003.nightbaseline.ui.model.ManualCheckUi
 import io.github.alien2003.nightbaseline.ui.model.NightGlyph
+import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.StatusTone
 import io.github.alien2003.nightbaseline.ui.model.UiText
@@ -147,7 +150,7 @@ fun LearningCard(
             color = colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )
-        LearningProgress(night.historyNights, skipped = if (lastNightShort) 1 else 0)
+        LearningProgress(night.collectedNights, skipped = if (lastNightShort) 1 else 0)
         NbText(text.nightBody(night, source), style = type.summary, color = colors.textSecondary)
         if (lastNightShort) {
             NbText(stringResource(R.string.state_learning_short_note), style = type.summary, color = colors.textSecondary)
@@ -179,6 +182,7 @@ fun StateCard(
     onPrimary: () -> Unit = {},
     secondaryAction: String? = null,
     onSecondary: () -> Unit = {},
+    note: String? = null,
 ) {
     val colors = NbTheme.colors
     val type = NbTheme.dataType
@@ -187,6 +191,7 @@ fun StateCard(
         Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
             NbText(title, style = type.title, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
             NbText(body, style = type.summary, color = colors.textSecondary)
+            note?.let { CheckNote(it) }
         }
         if (primaryAction != null || secondaryAction != null) {
             FlowRow(
@@ -211,6 +216,9 @@ fun NightStateCard(
     onSecondary: () -> Unit = {},
 ) {
     val text = rememberUiText()
+    val check = LocalManualCheck.current
+    val checks = night.state == NightState.NotSynced || night.state == NightState.NoData
+    val busy = checkBusy(night.state)
     StateCard(
         glyph = night.state.glyph,
         tone = night.state.tone,
@@ -219,8 +227,9 @@ fun NightStateCard(
         modifier = modifier,
         primaryAction = text.nightAction(night, source),
         onPrimary = onPrimary,
-        secondaryAction = text.nightSecondaryAction(night),
-        onSecondary = onSecondary,
+        secondaryAction = text.nightSecondaryLabel(night, busy),
+        onSecondary = unlessBusy(busy, onSecondary),
+        note = if (checks) text.checkNote(check, source) else null,
     )
 }
 
@@ -278,7 +287,11 @@ fun InlineBanner(
     val text = rememberUiText()
     val colors = NbTheme.colors
     val dismissible = onDismiss != null && (kind == BannerKind.NotificationsOff || kind == BannerKind.RangeReady)
-    val action = text.bannerAction(kind)
+    val check = LocalManualCheck.current
+    val checks = kind == BannerKind.Wait || kind == BannerKind.ReadFailed
+    val busy = checks && check == ManualCheckUi.Checking
+    val action = if (busy) text.string(R.string.action_checking) else text.bannerAction(kind)
+    val note = if (checks) text.checkNote(check, source) else null
     Row(
         modifier =
             Modifier
@@ -305,9 +318,22 @@ fun InlineBanner(
         }
         Column(Modifier.weight(1f).padding(top = NbSpace.s1)) {
             NbText(text.banner(kind, source, quietDays), style = NbTheme.dataType.summary, color = colors.textPrimary)
+            note?.let {
+                NbText(
+                    it,
+                    style = NbTheme.dataType.summary,
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(top = NbSpace.s2),
+                )
+            }
             action?.let { label ->
                 // Pulled back by the button's inner padding so the action lines up with the text.
-                NbTextButton(label, onClick = onAction, color = colors.data.primaryText, modifier = Modifier.offset(x = -NbSpace.s4))
+                NbTextButton(
+                    label,
+                    onClick = if (busy) ({}) else onAction,
+                    color = colors.data.primaryText,
+                    modifier = Modifier.offset(x = -NbSpace.s4),
+                )
             }
         }
         if (dismissible) {

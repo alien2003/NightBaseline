@@ -70,18 +70,12 @@ import io.github.alien2003.nightbaseline.ui.theme.dataType
 internal fun UiText.headerSentence(
     metric: MetricUi,
     source: String,
-): String =
-    if (metric.state == MetricState.SideIgnoredLower) {
-        string(R.string.metric_detail_side_ignored_lower, name(metric.metric))
-    } else {
-        detail(metric, source)
-    }
+): String = detail(metric, source)
 
 /** "Usual range: 52–61 bpm" with the header's precision (a value just outside never reads like the edge). */
 internal fun UiText.usualRange(metric: MetricUi): String? {
     val range = metric.range ?: return null
-    val d = decimals(metric)
-    return string(R.string.stats_range, bare(metric.metric, range.low, d), value(metric.metric, range.high, d).text)
+    return usualRange(metric.metric, range, decimals(metric))
 }
 
 /** The metric-specific "which side counts" line, or null when both sides count. */
@@ -426,7 +420,7 @@ internal fun SummaryText(state: MetricDetailState) {
     val series = state.shownSeries ?: return
     if (series.points.isEmpty()) return
     NbText(
-        text.chartSummary(series, state.source),
+        text.chartSummary(series, state.source, state.metric.learnedNights),
         style = NbTheme.typography.body,
         color = NbTheme.colors.textSecondary,
         modifier = Modifier.clearAndSetSemantics {},

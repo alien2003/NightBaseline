@@ -1,5 +1,7 @@
 package io.github.alien2003.nightbaseline.ui.material
 
+import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.ui.settings.glassAutoSummaryRes
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -52,6 +54,23 @@ class EffectsResolverTest {
         assertTrue(resolveEffectsMode(base.copy(powerSaveMode = true, preference = GlassPreference.Off)).reducedMotion)
         assertFalse(resolveEffectsMode(base.copy(animatorDurationScale = 0.5f)).reducedMotion)
         assertFalse(resolveEffectsMode(base.copy(sdkInt = 28)).reducedMotion)
+    }
+
+    @Test
+    fun `the automatic reason is known while Off is selected`() {
+        val off = resolveEffectsMode(base.copy(preference = GlassPreference.Off, sdkInt = 28))
+        assertEquals(EffectsReason.UserOff, off.reason)
+        assertEquals(EffectsReason.Unsupported, off.automaticReason)
+        assertEquals(EffectsReason.Automatic, resolveEffectsMode(base.copy(preference = GlassPreference.Off)).automaticReason)
+        assertEquals(EffectsReason.BatterySaver, resolveEffectsMode(base.copy(powerSaveMode = true)).automaticReason)
+    }
+
+    @Test
+    fun `the Automatic row never says on now when glass is not on`() {
+        assertEquals(R.string.setup_glass_on_now, glassAutoSummaryRes(selected = true, reason = EffectsReason.Automatic))
+        assertEquals(R.string.setup_glass_available, glassAutoSummaryRes(selected = false, reason = EffectsReason.Automatic))
+        assertEquals(R.string.glass_off_unsupported, glassAutoSummaryRes(selected = false, reason = EffectsReason.Unsupported))
+        assertEquals(R.string.glass_off_unsupported, glassAutoSummaryRes(selected = true, reason = EffectsReason.Unsupported))
     }
 
     @Test

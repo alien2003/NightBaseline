@@ -151,7 +151,7 @@ object Evaluator {
         val historyNights = window(night.date, history, params).size
         val metrics =
             params.metrics
-                .filter { night.values[it.id]?.missing != MissingReason.NOT_PROVIDED }
+                .filter { night.values[it.id]?.missing !in UNREAD }
                 .map { spec -> evaluateMetric(spec, night, history, params) }
         val deviating = countDeviations(metrics, params)
         val status =
@@ -215,6 +215,8 @@ object Evaluator {
         return phys.size + if (phys.isNotEmpty()) other.size else 0
     }
 
+    /** Metrics whose channel was not read at all (the source doesn't write it, or there was no access): not evaluated. */
+    private val UNREAD: Set<MissingReason?> = setOf(MissingReason.NOT_PROVIDED, MissingReason.NO_ACCESS)
     private val EVALUATED = setOf(MetricStatus.WITHIN, MetricStatus.ABOVE, MetricStatus.BELOW)
     private val NO_COUNT =
         setOf(NightStatus.SHORT_NIGHT, NightStatus.AMBIGUOUS_NIGHT, NightStatus.LEARNING, NightStatus.NOT_EVALUATED)

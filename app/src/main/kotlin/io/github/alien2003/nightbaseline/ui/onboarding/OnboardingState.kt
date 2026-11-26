@@ -85,6 +85,16 @@ data class OnboardingState(
     val notifications: NotificationAccess = NotificationAccess.NotAsked,
     /** Valid past nights found by the history read (ready step). */
     val pastNights: Int = 0,
+    /**
+     * Requestable optional permissions (measurements, background, past data) left off after the request: which rows
+     * of the permission step show "off" and what the partial note names.
+     */
+    val missingOptional: Set<String> = emptySet(),
+    /**
+     * Health Connect works, but sleep may not be read yet, so no source can be listed (`O-SOURCE-ACCESS`): the step
+     * asks for access instead of claiming there is no sleep data.
+     */
+    val sourcesNeedAccess: Boolean = false,
 ) {
     /** The selected source option, if any. */
     val selected: SourceOption? get() = sources.firstOrNull { it.packageName == selectedSource }

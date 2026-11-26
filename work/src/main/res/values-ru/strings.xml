@@ -39,11 +39,18 @@
     <string name="notif_read_failed_title">NightBaseline не удалось прочитать данные о сне</string>
     <string name="notif_read_failed_body">Попробуем снова позже. Нажмите, чтобы проверить сейчас.</string>
 
+    <string name="metric_sleeping_hr">Пульс во сне</string>
+    <string name="metric_respiratory_rate">Частота дыхания</string>
+    <string name="metric_spo2">Кислород в крови (SpO2)</string>
+    <string name="metric_sleep_duration">Длительность сна</string>
+    <string name="metric_hrv">Вариабельность пульса (HRV)</string>
+    <string name="metric_skin_temperature">Температура кожи</string>
     <string name="metric_sleeping_hr_short">Пульс</string>
     <string name="metric_respiratory_rate_short">Дыхание</string>
     <string name="metric_spo2_short">SpO2</string>
     <string name="metric_sleep_duration_short">Сон</string>
     <string name="metric_hrv_short">HRV</string>
     <string name="metric_skin_temperature_short">Темп. кожи</string>
+    <string name="metric_other">Другое</string>
     <string name="metric_other_short">Другое</string>
 </resources>

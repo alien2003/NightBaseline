@@ -124,6 +124,9 @@ enum class MetricState(
 
     /** `M-PERM`: access to this record type is off. */
     AccessOff(MetricGlyph.Key, StatusTone.Info),
+
+    /** `M-PERM-THEN`: the night was read while access to this record type was off (access is on now). */
+    AccessOffThen(MetricGlyph.Dash, StatusTone.Neutral),
     ;
 
     /** True for the states that were compared with a range. */
@@ -235,7 +238,7 @@ data class MetricUi(
     val value: Double? = null,
     /** Usual range on this night; null while learning or when the metric is not provided. */
     val range: RangeUi? = null,
-    /** Values collected for this metric so far (learning progress, 0..7). */
+    /** Values collected for this metric so far, this night's included (learning progress, 0..7). */
     val learnedNights: Int = 0,
     /** Readings during sleep (too-few state). */
     val samples: Int? = null,
@@ -274,8 +277,10 @@ data class NightUi(
     val notRecorded: List<MetricId> = emptyList(),
     /** Metrics that count as moved. */
     val deviating: Int = 0,
-    /** Valid nights before this one (learning progress, 0..7). */
+    /** Valid nights before this one inside the lookback (the baseline's size; the algorithm's learning condition). */
     val historyNights: Int = 0,
+    /** This night is valid and counts towards the range itself (the next night's baseline includes it). */
+    val counted: Boolean = false,
     /** Nights the ranges use (for "compared with your last {w} nights"). */
     val windowNights: Int = 0,
     /** Asleep minutes. */
@@ -283,11 +288,32 @@ data class NightUi(
     /** Notification threshold of the current sensitivity (`minDeviatingMetrics`). */
     val threshold: Int = 2,
 ) {
+    /**
+     * Nights collected so far, this one included when it [counted] (learning progress "n of 7", 0..7). Every surface
+     * that shows learning progress uses this, so Home, Night detail, onboarding and History agree.
+     */
+    val collectedNights: Int get() = (historyNights + if (counted) 1 else 0).coerceIn(0, PROGRESS_NIGHTS)
+
     /** Metrics compared with a range this night. */
     val compared: Int get() = metrics.count { it.state.compared }
 
     /** Metrics that moved, in registry order. */
     val movedMetrics: List<MetricUi> get() = metrics.filter { it.state.moved }
+}
+
+/** The last "Check now" on Home: a calm busy label while it runs, then when it ended if nothing new came. */
+@Immutable
+sealed interface ManualCheckUi {
+    /** Nothing to show. */
+    data object None : ManualCheckUi
+
+    /** The check runs: its button reads "Checking…" and does nothing. */
+    data object Checking : ManualCheckUi
+
+    /** It ended at [time] (formatted) and found no new night. */
+    data class NothingNew(
+        val time: String,
+    ) : ManualCheckUi
 }
 
 /** One night on a metric chart. */
@@ -326,3 +352,6 @@ enum class ChartPeriod(
     /** 90 nights. */
     Quarter(90),
 }
+
+/** Nights of the learning period (`AlgoParams.minNights` by default) for the progress count. */
+private const val PROGRESS_NIGHTS: Int = 7

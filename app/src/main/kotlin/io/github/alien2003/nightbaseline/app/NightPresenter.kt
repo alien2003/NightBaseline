@@ -3,6 +3,7 @@ package io.github.alien2003.nightbaseline.app
 import io.github.alien2003.nightbaseline.algo.AlgoParams
 import io.github.alien2003.nightbaseline.algo.Evaluator
 import io.github.alien2003.nightbaseline.algo.MetricId
+import io.github.alien2003.nightbaseline.algo.MissingReason
 import io.github.alien2003.nightbaseline.algo.NightStatus
 import io.github.alien2003.nightbaseline.data.hc.HcAvailability
 import io.github.alien2003.nightbaseline.data.hc.HcPermissions
@@ -172,8 +173,6 @@ object NightPresenter {
 
                 newest == null -> placeholder(expected, if (running) NightState.Loading else NightState.LearningStart)
 
-                missing && running -> newest
-
                 // Without a sync time from Health Connect: the source counts as silent when the night before last
                 // is missing too, otherwise it synced and simply has no session for last night.
                 missing -> placeholder(expected, if (quietDays >= 2) NightState.NotSynced else NightState.NoData)
@@ -184,8 +183,10 @@ object NightPresenter {
         val learning = problem == null && (night.state == NightState.Learning || night.state == NightState.LearningStart)
         val banner =
             banner(now, settings, access, newest, hasExpected, localTime, quietDays, runLog, nights).takeIf {
-                // E-SYNC already says what B-SOURCE-QUIET and B-WAIT would say.
-                !(night.state == NightState.NotSynced && (it == BannerKind.SourceQuiet || it == BannerKind.Wait))
+                // E-SYNC already says what B-SOURCE-QUIET and B-WAIT would say; states 1-4 own the fix, so a read-path
+                // banner ("Check now", "choose another source") next to them would blame the wrong thing.
+                val readBanner = it == BannerKind.Wait || it == BannerKind.SourceQuiet || it == BannerKind.ReadFailed
+                !(readBanner && (problem != null || night.state == NightState.NotSynced))
             }
         return HomeResolution(
             night = night,
@@ -205,7 +206,7 @@ object NightPresenter {
         val params = settings.algoParams()
         val stillLearning = newest.historyNights < params.minNights
         return if (newest.state == NightState.Short && stillLearning) {
-            newest.copy(state = if (newest.historyNights == 0) NightState.LearningStart else NightState.Learning)
+            newest.copy(state = if (newest.collectedNights == 0) NightState.LearningStart else NightState.Learning)
         } else {
             newest
         }
@@ -276,7 +277,12 @@ object NightPresenter {
                         }
                     val e = evaluation.metrics.firstOrNull { it.metric == metric }
                     val short = record.summary.short || record.summary.ambiguous
-                    val state = e?.let { NightUiMapper.metricState(it, short) } ?: MetricState.NotProvided
+                    val state =
+                        when {
+                            e != null -> NightUiMapper.metricState(e, short)
+                            record.summary.values[metric]?.missing == MissingReason.NO_ACCESS -> MetricState.AccessOffThen
+                            else -> MetricState.NotProvided
+                        }
                     ChartPointUi(date, e?.value, e?.baseline?.let(NightUiMapper::range), state)
                 }
             }

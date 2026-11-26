@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.data.hc.HcPermissions
 import io.github.alien2003.nightbaseline.ui.components.LearningProgress
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbIcon
@@ -99,10 +101,25 @@ private val PermissionStatus.denied: Boolean get() = this == PermissionStatus.De
 
 private fun sourceTitle(state: OnboardingState): Int =
     when (state.healthConnect) {
-        HealthConnectStatus.NeedsUpdate -> R.string.state_hc_update_title
-        HealthConnectStatus.Unavailable -> R.string.state_hc_none_title
-        HealthConnectStatus.Available -> if (state.sources.isEmpty()) R.string.onb_nosource_title else R.string.onb_source_title
-        HealthConnectStatus.Checking -> R.string.onb_source_title
+        HealthConnectStatus.NeedsUpdate -> {
+            R.string.state_hc_update_title
+        }
+
+        HealthConnectStatus.Unavailable -> {
+            R.string.state_hc_none_title
+        }
+
+        HealthConnectStatus.Available -> {
+            when {
+                state.sourcesNeedAccess -> R.string.onb_source_access_title
+                state.sources.isEmpty() -> R.string.onb_nosource_title
+                else -> R.string.onb_source_title
+            }
+        }
+
+        HealthConnectStatus.Checking -> {
+            R.string.onb_source_title
+        }
     }
 
 /** The buttons of the current step and state (`states.md` 7.3). */
@@ -147,6 +164,11 @@ private fun sourceButtons(
         HealthConnectStatus.Available -> {
             val selected = state.selected
             when {
+                // "Check again" asks for the permissions first while nothing may be listed (needsPermissionsToList).
+                state.sourcesNeedAccess -> {
+                    StepButtons(stringResource(R.string.onb_perm_allow), actions.onCheckAgain, back = true)
+                }
+
                 state.sources.isEmpty() -> {
                     StepButtons(
                         stringResource(R.string.action_check_again),
@@ -267,9 +289,21 @@ private fun Point(
     icon: ImageVector,
     text: String,
     style: TextStyle = NbTheme.typography.body,
+    off: Boolean = false,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(NbSpace.s4), verticalAlignment = Alignment.CenterVertically) {
-        NbIcon(icon, contentDescription = null, tint = NbTheme.controls.accent, modifier = Modifier.size(NbDimens.iconInline))
+    // An "off" row is one TalkBack node that says so; the icon alone would not.
+    val description = if (off) stringResource(R.string.onb_perm_row_off, text) else null
+    Row(
+        modifier = if (description != null) Modifier.clearAndSetSemantics { contentDescription = description } else Modifier,
+        horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NbIcon(
+            icon,
+            contentDescription = null,
+            tint = if (off) NbTheme.colors.textSecondary else NbTheme.controls.accent,
+            modifier = Modifier.size(NbDimens.iconInline),
+        )
         NbText(text, style = style, color = NbTheme.colors.textPrimary, modifier = Modifier.weight(1f))
     }
 }
@@ -297,7 +331,10 @@ private fun SourceBody(
         }
 
         HealthConnectStatus.Available -> {
-            if (state.sources.isEmpty()) {
+            if (state.sourcesNeedAccess) {
+                BadgeLine(NightGlyph.Key, StatusTone.Info)
+                BodyText(stringResource(R.string.onb_source_access_body))
+            } else if (state.sources.isEmpty()) {
                 BadgeLine(NightGlyph.DashCircle, StatusTone.Neutral)
                 BodyText(stringResource(R.string.onb_nosource_body))
             } else {
@@ -383,22 +420,56 @@ private fun PermissionBody(state: OnboardingState) {
         }
     }
     if (state.permission == PermissionStatus.Partial) {
-        Note(NightGlyph.Key, StatusTone.Info, stringResource(R.string.onb_perm_partial))
+        partialNote(state.missingOptional)?.let { Note(NightGlyph.Key, StatusTone.Info, it) }
     }
+    // After the request each optional row says whether it is on; before it, the rows only list what is asked.
+    val answered = state.permission == PermissionStatus.Partial || state.permission == PermissionStatus.Granted
     NbCard(Modifier.fillMaxWidth()) {
         PermissionHeading(stringResource(R.string.setup_perm_core_title))
         Point(NbIcons.Check, stringResource(R.string.onb_perm_sleep), NbTheme.typography.bodySmall)
         Point(NbIcons.Check, stringResource(R.string.onb_perm_hr), NbTheme.typography.bodySmall)
         PermissionHeading(stringResource(R.string.setup_perm_optional_title))
-        listOf(
-            R.string.onb_perm_rr,
-            R.string.onb_perm_spo2,
-            R.string.onb_perm_hrv,
-            R.string.onb_perm_skin,
-            R.string.onb_perm_background,
-            R.string.onb_perm_history,
-        ).forEach { Point(NbIcons.Info, stringResource(it), NbTheme.typography.bodySmall) }
+        OPTIONAL_ROWS.forEach { (label, permission) ->
+            val off = answered && permission in state.missingOptional
+            val icon =
+                when {
+                    !answered -> NbIcons.Info
+                    off -> NbIcons.Close
+                    else -> NbIcons.Check
+                }
+            Point(icon, stringResource(label), NbTheme.typography.bodySmall, off = off)
+        }
     }
+}
+
+/** The optional rows of the permission step and the permission each one stands for. */
+private val OPTIONAL_ROWS: List<Pair<Int, String>> =
+    listOf(
+        R.string.onb_perm_rr to HcPermissions.READ_RESPIRATORY_RATE,
+        R.string.onb_perm_spo2 to HcPermissions.READ_OXYGEN_SATURATION,
+        R.string.onb_perm_hrv to HcPermissions.READ_HEART_RATE_VARIABILITY,
+        R.string.onb_perm_skin to HcPermissions.READ_SKIN_TEMPERATURE,
+        R.string.onb_perm_background to HcPermissions.READ_HEALTH_DATA_IN_BACKGROUND,
+        R.string.onb_perm_history to HcPermissions.READ_HEALTH_DATA_HISTORY,
+    )
+
+/**
+ * The partial-access note for what is actually off (`O-PERM-PARTIAL`): measurements, background reading, past data,
+ * or a combination; null when only a permission without its own row is off (steps).
+ */
+@Composable
+private fun partialNote(missing: Set<String>): String? {
+    val parts =
+        listOfNotNull(
+            stringResource(R.string.onb_perm_partial).takeIf {
+                OPTIONAL_ROWS.any { (_, p) ->
+                    p in missing && p in HcPermissions.OPTIONAL
+                }
+            },
+            stringResource(R.string.onb_perm_partial_background).takeIf { HcPermissions.READ_HEALTH_DATA_IN_BACKGROUND in missing },
+            stringResource(R.string.onb_perm_partial_history).takeIf { HcPermissions.READ_HEALTH_DATA_HISTORY in missing },
+        )
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" ")
 }
 
 @Composable

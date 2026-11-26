@@ -233,6 +233,7 @@ fun PeriodSelector(
 fun UiText.chartSummary(
     series: MetricSeriesUi,
     source: String,
+    learnedNights: Int? = null,
 ): String {
     val metric = series.metric
     val points = series.points
@@ -240,7 +241,8 @@ fun UiText.chartSummary(
     val parts = mutableListOf(plural(R.plurals.chart_summary_header, n, name(metric), int(n)))
     val unit = unit(metric).orEmpty()
 
-    fun clean(s: String) = s.replace(" .", ".").replace(" ,", ",")
+    // A unit-less value leaves " ." behind; a date abbreviated with its own period (the Russian short month) ends a sentence once.
+    fun clean(s: String) = s.replace(" .", ".").replace(" ,", ",").replace("..", ".")
     // Same precision as the tile, so a value just outside never reads like the range edge.
     val d = points.lastOrNull()?.let { decimals(MetricUi(metric, it.state, it.value, it.range)) }
     points.lastOrNull { it.range != null }?.range?.let { r ->
@@ -255,33 +257,38 @@ fun UiText.chartSummary(
                         last.state,
                         last.value,
                         last.range,
+                        // The same count as the header's "n of 7" when the caller knows it (Metric detail).
                         learnedNights =
-                            points.count {
-                                it.value != null
-                            },
+                            learnedNights ?: points
+                                .count { it.value != null && (it.state == MetricState.Learning || it.state.compared) }
+                                .coerceAtMost(LEARNING_NIGHTS),
                     ),
                     source,
                 ).lowercase(locale)
             parts += clean(string(R.string.chart_summary_last, bare(metric, last.value, d), unit, status))
         }
     }
+    // Only compared nights have a range to be outside of: the same denominator as the "This period" readout.
+    val compared = points.count { it.state.compared }
     val outside = points.filter { it.state.moved }
     if (outside.isNotEmpty()) {
-        parts += string(R.string.chart_summary_outside, int(outside.size), int(n), dateShort(outside.last().date))
-    } else if (points.any { it.state.compared }) {
-        parts += plural(R.plurals.chart_summary_all_inside, n, int(n))
+        parts += clean(string(R.string.chart_summary_outside, int(outside.size), int(compared), dateShort(outside.last().date)))
+    } else if (compared > 0) {
+        parts += plural(R.plurals.chart_summary_all_inside, compared, int(compared))
     }
     val valued = points.filter { it.value != null }
     val min = valued.minByOrNull { it.value!! }
     val max = valued.maxByOrNull { it.value!! }
     if (min != null && max != null) {
         parts +=
-            string(
-                R.string.chart_summary_extremes,
-                bare(metric, min.value!!),
-                dateShort(min.date),
-                bare(metric, max.value!!),
-                dateShort(max.date),
+            clean(
+                string(
+                    R.string.chart_summary_extremes,
+                    bare(metric, min.value!!),
+                    dateShort(min.date),
+                    bare(metric, max.value!!),
+                    dateShort(max.date),
+                ),
             )
     }
     val gaps = points.count { it.value == null }
@@ -569,15 +576,13 @@ fun StatsRow(
             description = text.plural(R.plurals.stats_inside, compared.size, text.int(inside), text.int(compared.size)),
         )
         range?.let {
-            val low = text.bare(series.metric, it.low, decimals)
-            val high = text.value(series.metric, it.high, decimals).text
             ReadoutDivider()
             ReadoutRow(
                 label = text.string(R.string.stats_label_range),
-                value = text.string(R.string.stats_value_range, low, high),
-                description = text.string(R.string.stats_range, low, high),
+                value = text.rangeValue(series.metric, it, decimals),
+                description = text.usualRange(series.metric, it, decimals),
             )
-            val median = text.value(series.metric, it.median, decimals).text
+            val median = text.rangeEnd(series.metric, it.median, decimals)
             ReadoutDivider()
             ReadoutRow(
                 label = text.string(R.string.stats_label_median),

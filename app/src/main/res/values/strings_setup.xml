@@ -55,4 +55,6 @@
     <string name="setup_about_disclaimer_title">Not a medical device</string>
     <string name="setup_licenses_intro">NightBaseline is built with these open-source libraries.</string>
     <string name="setup_licenses_app">NightBaseline itself is released under the Apache License 2.0.</string>
+
+    <string name="setup_glass_available">Available on this device</string>
 </resources>

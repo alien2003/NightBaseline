@@ -33,6 +33,7 @@ import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
 import io.github.alien2003.nightbaseline.ui.material.EffectsReason
 import io.github.alien2003.nightbaseline.ui.material.GlassPreference
+import io.github.alien2003.nightbaseline.ui.material.LocalEffects
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.UiText
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
@@ -221,11 +222,16 @@ internal fun AppearanceGroup(
     }
 }
 
-/** "On now", or the reason the automatic mode turned glass off. */
+/**
+ * The Automatic row's summary: the reason the automatic mode keeps glass off on this device (also while Off is
+ * selected), otherwise "On now" when Automatic is selected and "Available on this device" when it is not.
+ */
 @Composable
 internal fun glassAutoSummary(state: SettingsState): String {
-    val reason = state.glassReason.takeIf { state.glass == GlassPreference.Automatic && it != EffectsReason.UserOff }
-    return reason?.summary?.let { stringResource(it) } ?: stringResource(R.string.setup_glass_on_now)
+    val selected = state.glass == GlassPreference.Automatic
+    // With Automatic selected the decision's reason is the automatic one; with Off it is UserOff, so ask the theme.
+    val reason = if (selected) state.glassReason else LocalEffects.current.automaticReason
+    return glassAutoSummaryRes(selected, reason).let { stringResource(it) }
 }
 
 /** Data and privacy: local only, read-only, and the in-app privacy policy. */

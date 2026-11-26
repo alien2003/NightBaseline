@@ -16,6 +16,12 @@ enum class MissingReason {
 
     /** Samples cover less of the night than [MetricSpec.minCoverage]. */
     LOW_COVERAGE,
+
+    /**
+     * The app had no Health Connect access to this channel when the night was read: whether the source writes it is
+     * unknown (never stored as [NOT_PROVIDED], so granting access later does not read as "the source doesn't send it").
+     */
+    NO_ACCESS,
 }
 
 /** The nightly value of one metric, or why there is none. */
@@ -59,14 +65,16 @@ data class NightSummary(
 object MetricExtractor {
     /**
      * Summarises [night]. [providedChannels] lists the channels the source writes at all (a channel absent there
-     * gives [MissingReason.NOT_PROVIDED] rather than [MissingReason.NO_DATA]).
+     * gives [MissingReason.NOT_PROVIDED] rather than [MissingReason.NO_DATA]); [noAccessChannels] lists the channels
+     * the app may not read (no permission), which give [MissingReason.NO_ACCESS] whatever the source writes.
      */
     fun summarize(
         night: NightInput,
         providedChannels: Set<ChannelId>,
         params: AlgoParams,
+        noAccessChannels: Set<ChannelId> = emptySet(),
     ): NightSummary {
-        val values = params.metrics.associate { spec -> spec.id to extract(spec, night, providedChannels) }
+        val values = params.metrics.associate { spec -> spec.id to extract(spec, night, providedChannels, noAccessChannels) }
         return NightSummary(
             date = night.date,
             startMs = night.startMs,
@@ -87,11 +95,13 @@ object MetricExtractor {
         spec: MetricSpec,
         night: NightInput,
         provided: Set<ChannelId>,
+        noAccess: Set<ChannelId>,
     ): MetricValue {
         if (spec.aggregation == Aggregation.SLEEP_MINUTES) {
             return MetricValue(spec.id, night.asleepMinutes, 0, 1.0)
         }
         val channel = checkNotNull(spec.channel)
+        if (channel in noAccess) return MetricValue(spec.id, null, 0, 0.0, MissingReason.NO_ACCESS)
         if (channel !in provided) return MetricValue(spec.id, null, 0, 0.0, MissingReason.NOT_PROVIDED)
         val from = night.startMs + (spec.skipFirstMinutes * MS_PER_MIN).toLong()
         val samples =

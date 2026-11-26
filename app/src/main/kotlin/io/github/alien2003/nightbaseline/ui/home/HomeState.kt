@@ -5,6 +5,7 @@ import io.github.alien2003.nightbaseline.algo.MetricId
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.model.BannerKind
 import io.github.alien2003.nightbaseline.ui.model.ChartPeriod
+import io.github.alien2003.nightbaseline.ui.model.ManualCheckUi
 import io.github.alien2003.nightbaseline.ui.model.MetricSeriesUi
 import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.NightUi
@@ -41,6 +42,8 @@ data class HomeState(
     val period: ChartPeriod = ChartPeriod.Month,
     /** Selected chart point of the detail pane (index into the shown points), or null. */
     val chartSelection: Int? = null,
+    /** The last "Check now" (busy label, "Checked at ..."). */
+    val check: ManualCheckUi = ManualCheckUi.None,
 ) {
     /** The night whose metrics fill the tiles and the detail pane: [lastResult] below a state card, else [night]. */
     val metricsNight: NightUi?

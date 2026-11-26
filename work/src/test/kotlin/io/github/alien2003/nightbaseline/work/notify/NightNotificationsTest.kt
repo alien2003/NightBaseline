@@ -39,22 +39,30 @@ class NightNotificationsTest {
         val res = app.resources
         assertEquals("2 measurements moved outside your usual range", NoticeText.title(res, two))
         // The range comes from the locale's interval format (ICU may put thin spaces around the dash).
-        assertEquals("Heart rate and Breathing. Night of Nov 24–25.", NoticeText.body(res, two, Locale.US).dash())
-        assertEquals("Heart rate, Breathing, Skin temp. and 2 more. Night of Nov 24–25.", NoticeText.body(res, five, Locale.US).dash())
+        // The same full names as the app's cards, summary and History (one name per measurement).
+        assertEquals("Sleeping heart rate and Respiratory rate. Night of Nov 24–25.", NoticeText.body(res, two, Locale.US).dash())
+        assertEquals(
+            "Sleeping heart rate, Respiratory rate, Skin temperature and 2 more. Night of Nov 24–25.",
+            NoticeText.body(res, five, Locale.US).dash(),
+        )
         // Across a month boundary both months are named.
-        assertEquals("Heart rate and SpO2. Night of Nov 30–Dec 1.", NoticeText.body(res, mixed, Locale.US).dash())
+        assertEquals("Sleeping heart rate and Blood oxygen (SpO2). Night of Nov 30–Dec 1.", NoticeText.body(res, mixed, Locale.US).dash())
         // Day-first English locales get the day-first range, the same label as the app's screens.
         assertEquals("Night of 24–25 Nov", NightLabel.format(res, LocalDate.of(2026, 11, 25), Locale.UK).dash())
         // The evening is named whatever time the sleep started: the label depends on the wake date only.
         assertEquals("24", NightLabel.args(LocalDate.of(2026, 11, 25), Locale.US).third)
         assertTrue(NightLabel.args(LocalDate.of(2026, 12, 1), Locale.US).third.startsWith("November"))
         assertEquals(
-            "Higher than usual: Heart rate. Lower than usual: SpO2. This compares the night with your own recent nights and " +
+            "Higher than usual: Sleeping heart rate. Lower than usual: Blood oxygen (SpO2). This compares the night with your own " +
+                "recent nights and " +
                 "isn't a diagnosis. Not a medical device.",
             NoticeText.bodyLong(res, mixed),
         )
         // Empty direction groups are omitted.
-        assertTrue(NoticeText.bodyLong(res, two).startsWith("Higher than usual: Heart rate and Breathing. This compares"))
+        assertTrue(NoticeText.bodyLong(res, two).startsWith("Higher than usual: Sleeping heart rate and Respiratory rate. This compares"))
+        // The title wraps before the date, never inside it.
+        val (range, wakeLong, start) = NightLabel.args(LocalDate.of(2026, 11, 23), Locale.US)
+        listOf(range, wakeLong, start).forEach { arg -> assertFalse(arg, arg.any { it == ' ' || it == '\u2009' }) }
         assertEquals("Other", NoticeText.list(res, listOf(MetricId("future_metric"))))
     }
 
@@ -68,9 +76,15 @@ class NightNotificationsTest {
         assertEquals(res.getQuantityString(R.plurals.notif_dev_title, 5, 5), NoticeText.title(res, five))
         // Russian uses different plural forms for 2 ("few") and 5 ("many").
         assertNotEquals(NoticeText.title(res, two).drop(1), NoticeText.title(res, five).drop(1))
-        val hr = res.getString(R.string.metric_sleeping_hr_short)
-        val rr = res.getString(R.string.metric_respiratory_rate_short)
-        assertTrue(NoticeText.body(res, two, ru).startsWith(res.getString(R.string.notif_list_and, hr, rr)))
+        val hr = res.getString(R.string.metric_sleeping_hr)
+        val rr = res.getString(R.string.metric_respiratory_rate)
+        // Inside a Russian sentence only the first name keeps its capital letter.
+        val rrInline = rr.replaceFirstChar { it.lowercase(ru) }
+        assertTrue(NoticeText.body(res, two, ru).startsWith(res.getString(R.string.notif_list_and, hr, rrInline)))
+        // After "Higher than usual:" the first name is inside the sentence too; the sentences keep their spaces.
+        val long = NoticeText.bodyLong(res, mixed)
+        assertTrue(long, long.contains(hr.replaceFirstChar { it.lowercase(ru) } + ". "))
+        assertTrue(long, long.contains("(SpO2). "))
         assertTrue(NoticeText.body(res, five, ru).contains(res.getQuantityString(R.plurals.notif_list_more, 2, 2)))
         assertNotEquals(NoticeText.bodyLong(res, mixed), "")
         assertTrue("Russian title is fully translated", NoticeText.title(res, two).none { it in 'A'..'z' })
@@ -172,7 +186,7 @@ class NightNotificationsTest {
 
     private companion object {
         /** Drops the (thin) spaces ICU may put around the range dash. */
-        fun String.dash(): String = replace(Regex("[\\s\u2009\u202F]*–[\\s\u2009\u202F]*"), "–")
+        fun String.dash(): String = replace(Regex("[\\s\u00A0\u2009\u202F]*–[\\s\u00A0\u2009\u202F]*"), "–").replace('\u00A0', ' ')
 
         private fun stem(vararg codePoints: Int) = String(codePoints, 0, codePoints.size)
 

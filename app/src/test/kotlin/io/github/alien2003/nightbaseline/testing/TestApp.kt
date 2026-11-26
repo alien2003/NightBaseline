@@ -31,6 +31,8 @@ import io.github.alien2003.nightbaseline.work.process.HistoryBackfill
 import io.github.alien2003.nightbaseline.work.process.NightReevaluator
 import io.github.alien2003.nightbaseline.work.schedule.NightScheduler
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -89,6 +91,11 @@ class FakePlatform(
     override fun markNotificationsAsked() {
         asked = true
     }
+
+    /** Time zone / clock changes the test announces. */
+    val timeChange = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    override fun timeChanges(): Flow<Unit> = timeChange
 }
 
 /** [NightScheduler] that records its calls. */
@@ -154,6 +161,9 @@ class TestApp(
     /** Whether a check runs. */
     val running = MutableStateFlow(false)
 
+    /** The person's zone (a test may change it, then announce it with [FakePlatform.timeChange]). */
+    var zoneId: ZoneId = SampleData.ZONE
+
     private val reader = HealthConnectReader(gateway, { true }, { SampleData.ZONE }, ownPackage = "io.github.alien2003.nightbaseline")
 
     /** The bundle the ViewModels take. */
@@ -166,7 +176,7 @@ class TestApp(
             checks = { running },
             scheduler = scheduler,
             clock = clock,
-            zone = { SampleData.ZONE },
+            zone = { zoneId },
             platform = platform,
             reader = reader,
             backfill = HistoryBackfill(this.settings, reader, this.nights, runLog, clock),

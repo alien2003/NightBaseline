@@ -34,6 +34,9 @@ import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightStateCard
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
+import io.github.alien2003.nightbaseline.ui.components.checkBusy
+import io.github.alien2003.nightbaseline.ui.components.nightSecondaryLabel
+import io.github.alien2003.nightbaseline.ui.components.unlessBusy
 import io.github.alien2003.nightbaseline.ui.model.MetricState
 import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.NightUi
@@ -230,7 +233,8 @@ internal fun NightActionsRow(
 ) {
     val text = rememberUiText()
     val primary = text.nightAction(night, source)
-    val secondary = text.nightSecondaryAction(night)
+    val busy = checkBusy(night.state)
+    val secondary = text.nightSecondaryLabel(night, busy)
     if (primary == null && secondary == null) return
     val single = night.movedMetrics.singleOrNull()
     val learning = night.state == NightState.Learning || night.state == NightState.LearningStart
@@ -250,6 +254,6 @@ internal fun NightActionsRow(
             }
             if (night.state.hasSummary || learning) NbTextButton(label, onClick) else PrimaryButton(label, onClick)
         }
-        secondary?.let { NbTextButton(it, onClick = { onStateSecondary(night.state) }) }
+        secondary?.let { NbTextButton(it, onClick = unlessBusy(busy) { onStateSecondary(night.state) }) }
     }
 }

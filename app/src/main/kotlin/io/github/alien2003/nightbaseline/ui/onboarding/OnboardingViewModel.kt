@@ -104,7 +104,9 @@ class OnboardingViewModel
                 data.settingsRepository.setSourcePackage(selected)
                 go(OnboardingStep.Permissions)
                 val granted = withContext(data.io) { runCatching { data.reader.grantedPermissions() }.getOrDefault(emptySet()) }
-                if (HcPermissions.missingRequired(granted).isEmpty()) state.update { it.copy(permission = statusOf(granted)) }
+                if (HcPermissions.missingRequired(granted).isEmpty()) {
+                    state.update { it.copy(permission = statusOf(granted), missingOptional = missingOptional(granted)) }
+                }
             }
         }
 
@@ -132,11 +134,30 @@ class OnboardingViewModel
                         withContext(data.io) { runCatching { data.reader.grantedPermissions() }.getOrDefault(emptySet()) }
                 }
                 val sources = if (status == HealthConnectStatus.Available) SourceDiscovery.discover(data) else emptyList()
-                val current = state.value.selectedSource ?: data.settings.first().sourcePackage
-                val selected = sources.firstOrNull { it.packageName == current } ?: sources.firstOrNull()
-                state.update { it.copy(healthConnect = status, sources = sources, selectedSource = selected?.packageName) }
+                val selected = resolveSelection(sources)
+                val needAccess = status == HealthConnectStatus.Available && sources.isEmpty() && !sleepGranted
+                state.update {
+                    it.copy(
+                        healthConnect = status,
+                        sources = sources,
+                        selectedSource = selected?.packageName,
+                        sourcesNeedAccess = needAccess,
+                    )
+                }
                 selected?.let { handle[KEY_SOURCE] = it.packageName }
             }
+        }
+
+        /**
+         * The source to preselect (`screens.md` 7.5 step 3): the current choice when it wrote sleep, else the first app
+         * that wrote sleep (the default source sorts first), else the current choice or the first row.
+         */
+        private suspend fun resolveSelection(sources: List<SourceOption>): SourceOption? {
+            val current = state.value.selectedSource ?: data.settings.first().sourcePackage
+            return sources.firstOrNull { it.packageName == current && it.lastSleep != null }
+                ?: sources.firstOrNull { it.lastSleep != null }
+                ?: sources.firstOrNull { it.packageName == current }
+                ?: sources.firstOrNull()
         }
 
         /** The result of the Health Connect permission request. */
@@ -152,17 +173,22 @@ class OnboardingViewModel
                     return@launch
                 }
                 sleepGranted = true
-                state.update { it.copy(permission = statusOf(all)) }
-                // Now sleep can be read: the real list of sources. If the chosen app wrote nothing, pick again.
+                state.update { it.copy(permission = statusOf(all), missingOptional = missingOptional(all)) }
+                // Now sleep can be read: the real list of sources, with the selection resolved again (before the grant
+                // the list was empty and nothing was selected). If the chosen app wrote nothing, pick again.
                 val sources = SourceDiscovery.discover(data)
-                val selected = state.value.selectedSource
-                state.update { it.copy(sources = sources) }
-                val chosenWroteSleep = sources.any { it.packageName == selected && it.lastSleep != null }
+                val chosen = state.value.selectedSource
+                val chosenWroteSleep = sources.any { it.packageName == chosen && it.lastSleep != null }
+                val selected = resolveSelection(sources)
+                state.update { it.copy(sources = sources, selectedSource = selected?.packageName, sourcesNeedAccess = false) }
+                selected?.let { handle[KEY_SOURCE] = it.packageName }
                 if (!chosenWroteSleep && sources.any { it.lastSleep != null }) {
                     go(OnboardingStep.Source)
                 }
             }
         }
+
+        private fun missingOptional(granted: Set<String>): Set<String> = requestable - HcPermissions.REQUIRED - granted
 
         private fun statusOf(granted: Set<String>): PermissionStatus =
             if ((requestable - granted).isEmpty()) PermissionStatus.Granted else PermissionStatus.Partial

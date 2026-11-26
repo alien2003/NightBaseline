@@ -99,6 +99,11 @@ data class EffectsDecision(
     val reason: EffectsReason,
     /** Reduced motion: animations removed or battery saver on. */
     val reducedMotion: Boolean,
+    /**
+     * The reason the Automatic setting would give right now, whatever is selected: Settings describes the Automatic
+     * row with it ("Not available on this Android version" even while Off is selected), never with [reason].
+     */
+    val automaticReason: EffectsReason = reason,
 ) {
     /** Shortcut for [mode] == [EffectsMode.Glass]. */
     val glass: Boolean get() = mode == EffectsMode.Glass
@@ -109,7 +114,8 @@ data class EffectsDecision(
         val ForcedGlass: EffectsDecision = EffectsDecision(EffectsMode.Glass, EffectsReason.Automatic, reducedMotion = false)
 
         /** Solid fallback, normal motion. */
-        val ForcedSolid: EffectsDecision = EffectsDecision(EffectsMode.Solid, EffectsReason.UserOff, reducedMotion = false)
+        val ForcedSolid: EffectsDecision =
+            EffectsDecision(EffectsMode.Solid, EffectsReason.UserOff, reducedMotion = false, automaticReason = EffectsReason.Automatic)
     }
 }
 
@@ -129,9 +135,8 @@ const val THERMAL_STATUS_SEVERE: Int = 3
 fun resolveEffectsMode(inputs: EffectsInputs): EffectsDecision {
     val animationsOff = inputs.animatorDurationScale == 0f
     val reducedMotion = animationsOff || inputs.powerSaveMode
-    val reason =
+    val automatic =
         when {
-            inputs.preference == GlassPreference.Off -> EffectsReason.UserOff
             inputs.sdkInt < GLASS_MIN_SDK -> EffectsReason.Unsupported
             animationsOff -> EffectsReason.AnimationsOff
             inputs.powerSaveMode -> EffectsReason.BatterySaver
@@ -141,8 +146,9 @@ fun resolveEffectsMode(inputs: EffectsInputs): EffectsDecision {
             inputs.thermalStatus >= THERMAL_STATUS_SEVERE -> EffectsReason.Thermal
             else -> EffectsReason.Automatic
         }
+    val reason = if (inputs.preference == GlassPreference.Off) EffectsReason.UserOff else automatic
     val mode = if (reason == EffectsReason.Automatic) EffectsMode.Glass else EffectsMode.Solid
-    return EffectsDecision(mode, reason, reducedMotion)
+    return EffectsDecision(mode, reason, reducedMotion, automaticReason = automatic)
 }
 
 /**

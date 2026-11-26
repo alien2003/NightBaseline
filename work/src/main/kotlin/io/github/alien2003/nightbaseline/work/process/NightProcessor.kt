@@ -9,6 +9,7 @@ import io.github.alien2003.nightbaseline.algo.CompletenessParams
 import io.github.alien2003.nightbaseline.algo.CompletenessVerdict
 import io.github.alien2003.nightbaseline.algo.Evaluator
 import io.github.alien2003.nightbaseline.algo.MetricExtractor
+import io.github.alien2003.nightbaseline.algo.MissingReason
 import io.github.alien2003.nightbaseline.algo.NightCandidate
 import io.github.alien2003.nightbaseline.algo.NightEvaluation
 import io.github.alien2003.nightbaseline.algo.NightSelector
@@ -53,6 +54,8 @@ import javax.inject.Inject
  *    status changed into DEVIATIONS. Learning, short and ambiguous nights are never notified.
  * 5. When no new night is visible yet in the morning (before [NO_NIGHT_WAIT_UNTIL]), the check is repeated every
  *    [NO_NIGHT_RETRY_MS] so that a late upload is still evaluated on its own day.
+ * 6. A stored night read while a channel's permission was off ([MissingReason.NO_ACCESS]) is read again once that
+ *    permission is granted, final or not, so it shows the measurement instead of a gap.
  *
  * Before all of this, stored nights evaluated by another algorithm version or other parameters are re-evaluated from
  * their stored summaries ([NightReevaluator]; silent, no Health Connect read), so the history the new night is compared
@@ -100,6 +103,7 @@ class NightProcessor
             val fingerprint = AlgoFingerprint.of(params)
             val stored = mutableMapOf<String, NightRecord>()
             var provided: Set<ChannelId> = emptySet()
+            var noAccess: Set<ChannelId> = emptySet()
             val reevaluated = mutableListOf<String>()
 
             suspend fun execute(): ProcessOutcome {
@@ -107,6 +111,7 @@ class NightProcessor
                 val missing = HcPermissions.missingRequired(reader.grantedPermissions())
                 if (missing.isNotEmpty()) throw HcError.PermissionMissing(missing)
                 provided = reader.channelsOf(source, now - DISCOVERY_MS, now)
+                noAccess = reader.noAccessChannels()
                 val from = now - (params.lookbackDays + 2L) * DAY_MS
                 val candidates = NightSelector.select(reader.readSessions(source, from, now), params).filter { it.endMs <= now }
                 nights.since(source, localDate(from)).associateByTo(stored) { it.date }
@@ -152,7 +157,15 @@ class NightProcessor
                 val dates =
                     (
                         byDate.keys.filter { it < limitDate && it !in stored && byDate.getValue(it).endMs <= now - capMs() } +
-                            stored.values.filter { !it.final && it.date < limitDate && reevaluationDue(it, targetComplete) }.map { it.date }
+                            stored.values
+                                .filter {
+                                    !it.final && it.date < limitDate &&
+                                        reevaluationDue(
+                                            it,
+                                            targetComplete,
+                                        )
+                                }.map { it.date } +
+                            stored.values.filter { it.date < limitDate && it.date in byDate && accessRegained(it) }.map { it.date }
                     ).distinct()
                         .sorted()
                 for (date in dates) {
@@ -176,6 +189,13 @@ class NightProcessor
                     }
                 }
             }
+
+            /** A night read while a channel had no access, and that access is granted now: read it again (once). */
+            private fun accessRegained(record: NightRecord): Boolean =
+                params.metrics.any { spec ->
+                    val channel = spec.channel
+                    channel != null && channel !in noAccess && record.summary.values[spec.id]?.missing == MissingReason.NO_ACCESS
+                }
 
             private fun reevaluationDue(
                 record: NightRecord,
@@ -280,7 +300,13 @@ class NightProcessor
             /** Summary of [candidate] from Health Connect, evaluated against the stored history. */
             private suspend fun compute(candidate: NightCandidate): Computed {
                 val data = reader.readNight(source, candidate.startMs, candidate.endMs + 1)
-                val summary = MetricExtractor.summarize(candidate.withSamples(data.channels), provided - HcChannels.STEPS_ID, params)
+                val summary =
+                    MetricExtractor.summarize(
+                        candidate.withSamples(data.channels),
+                        provided - HcChannels.STEPS_ID,
+                        params,
+                        noAccess,
+                    )
                 return Computed(summary, Evaluator.evaluate(summary, stored.values.map { it.summary }, params))
             }
 

@@ -31,7 +31,22 @@ object NoticeText {
     /** Names shown before "and {n} more". */
     const val MAX_LISTED: Int = 3
 
-    /** Short display name of [metric]; unknown (future) metrics get a generic name. */
+    /**
+     * Display name of [metric], the same full name the app's cards, summary and History use (one name per
+     * measurement); unknown (future) metrics get a generic name.
+     */
+    fun metricNameRes(metric: MetricId): Int =
+        when (metric) {
+            MetricId.SLEEPING_HR -> R.string.metric_sleeping_hr
+            MetricId.RESPIRATORY_RATE -> R.string.metric_respiratory_rate
+            MetricId.SPO2 -> R.string.metric_spo2
+            MetricId.SLEEP_DURATION -> R.string.metric_sleep_duration
+            MetricId.HRV -> R.string.metric_hrv
+            MetricId.SKIN_TEMPERATURE -> R.string.metric_skin_temperature
+            else -> R.string.metric_other
+        }
+
+    /** Short display name of [metric] (compact surfaces); unknown (future) metrics get a generic name. */
     fun metricShortNameRes(metric: MetricId): Int =
         when (metric) {
             MetricId.SLEEPING_HR -> R.string.metric_sleeping_hr_short
@@ -57,24 +72,39 @@ object NoticeText {
         res: Resources,
         notice: NightNotice,
         locale: Locale,
-    ): String = res.getString(R.string.notif_dev_body, list(res, notice.metrics), nightLabel(res, notice.date, locale))
+    ): String = res.getString(R.string.notif_dev_body, list(res, notice.metrics, locale), nightLabel(res, notice.date, locale))
 
     /** `notif_dev_body_long`: higher and lower groups (empty ones omitted), then the disclaimer. */
     fun bodyLong(
         res: Resources,
         notice: NightNotice,
     ): String {
-        val higher = if (notice.higher.isEmpty()) "" else res.getString(R.string.notif_higher_prefix, list(res, notice.higher))
-        val lower = if (notice.lower.isEmpty()) "" else res.getString(R.string.notif_lower_prefix, list(res, notice.lower))
+        val locale = res.configuration.locales[0]
+        val higher =
+            if (notice.higher.isEmpty()) {
+                ""
+            } else {
+                res.getString(
+                    R.string.notif_higher_prefix,
+                    list(res, notice.higher, locale, inline = true),
+                )
+            }
+        val lower =
+            if (notice.lower.isEmpty()) "" else res.getString(R.string.notif_lower_prefix, list(res, notice.lower, locale, inline = true))
         return res.getString(R.string.notif_dev_body_long, higher, lower)
     }
 
-    /** Short names: "A", "A and B", "A, B and C", "A, B, C and {n} more". */
+    /**
+     * Names: "A", "A and B", "A, B and C", "A, B, C and {n} more", written as inside a sentence ([InlineNames];
+     * [inline] when the list follows other words, as after "Lower than usual:").
+     */
     fun list(
         res: Resources,
         metrics: List<MetricId>,
+        locale: Locale = res.configuration.locales[0],
+        inline: Boolean = false,
     ): String {
-        val names = metrics.map { res.getString(metricShortNameRes(it)) }
+        val names = InlineNames.of(metrics.map { res.getString(metricNameRes(it)) }, locale, inline)
         val shown = names.take(MAX_LISTED)
         val rest = names.size - shown.size
         return when {

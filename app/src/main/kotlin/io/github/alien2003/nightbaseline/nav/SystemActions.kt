@@ -5,7 +5,9 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -13,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import io.github.alien2003.nightbaseline.R
 
 /**
  * Everything that leaves the app or asks the system: the Health Connect permission request, the notification prompt
@@ -29,10 +32,16 @@ interface SystemActions {
     /** Launches the POST_NOTIFICATIONS prompt (API 33+). */
     fun requestNotifications(onResult: (Boolean) -> Unit)
 
-    /** Health Connect's own permission screen for this app (or Health Connect settings). */
+    /**
+     * Health Connect's permission screen of this app; where that cannot be opened, Health Connect's data screen or
+     * settings; where Health Connect is missing, [openStore]. Never silent: a short message says when nothing opened.
+     */
     fun openHealthConnect()
 
-    /** The Play Store page that installs or updates Health Connect. */
+    /**
+     * The store page that installs or updates Health Connect: Google Play, any app that handles `market://`, then the
+     * Play web page (a browser; the app itself still needs no INTERNET). A short message says when nothing opened.
+     */
     fun openStore()
 
     /** The system notification settings of this app. */
@@ -96,16 +105,13 @@ fun rememberSystemActions(): SystemActions {
             }
 
             override fun openHealthConnect() {
-                val manage =
-                    runCatching { HealthConnectClient.getHealthConnectManageDataIntent(context) }
-                        .getOrElse { Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS) }
-                context.startSafely(manage) || context.startSafely(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS))
+                val opened = HealthConnectIntents.forPermissions(context, Build.VERSION.SDK_INT).any { context.startSafely(it) }
+                if (!opened) openStore()
             }
 
             override fun openStore() {
-                val uri = Uri.parse("market://details?id=$HEALTH_CONNECT_PACKAGE&url=healthconnect%3A%2F%2Fonboarding")
-                context.startSafely(Intent(Intent.ACTION_VIEW, uri).setPackage("com.android.vending")) ||
-                    context.startSafely(Intent(Intent.ACTION_VIEW, uri))
+                val opened = HealthConnectIntents.store().any { context.startSafely(it) }
+                if (!opened) Toast.makeText(context, R.string.hc_store_unavailable, Toast.LENGTH_LONG).show()
             }
 
             override fun openNotificationSettings() {
@@ -125,7 +131,45 @@ private class Callbacks {
     var notifications: ((Boolean) -> Unit)? = null
 }
 
-private const val HEALTH_CONNECT_PACKAGE = "com.google.android.apps.healthdata"
+/** The intents [SystemActions] tries in order (pure, so the order is unit-tested). */
+internal object HealthConnectIntents {
+    /** Health Connect's app package (Android 13 and lower; the store id everywhere). */
+    const val PACKAGE: String = "com.google.android.apps.healthdata"
+
+    /** `HealthConnectManager.ACTION_MANAGE_HEALTH_PERMISSIONS` (Android 14+, the framework's Health Connect). */
+    const val ACTION_MANAGE_PERMISSIONS_FRAMEWORK: String = "android.health.connect.action.MANAGE_HEALTH_PERMISSIONS"
+
+    /** The same screen of the Health Connect app (Android 13 and lower). */
+    const val ACTION_MANAGE_PERMISSIONS_APK: String = "androidx.health.ACTION_MANAGE_HEALTH_PERMISSIONS"
+
+    private const val FRAMEWORK_SDK = 34
+
+    /** NightBaseline's own permission page first, then Health Connect's data screen, then its settings. */
+    fun forPermissions(
+        context: Context,
+        sdkInt: Int,
+    ): List<Intent> {
+        val own =
+            if (sdkInt >= FRAMEWORK_SDK) {
+                Intent(ACTION_MANAGE_PERMISSIONS_FRAMEWORK)
+            } else {
+                Intent(ACTION_MANAGE_PERMISSIONS_APK).setPackage(PACKAGE)
+            }.putExtra(Intent.EXTRA_PACKAGE_NAME, context.packageName)
+        val manage = runCatching { HealthConnectClient.getHealthConnectManageDataIntent(context) }.getOrNull()
+        return listOfNotNull(own, manage, Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS))
+    }
+
+    /** Google Play, any `market://` handler, then the Play web page. */
+    fun store(): List<Intent> {
+        val market = Uri.parse("market://details?id=$PACKAGE&url=healthconnect%3A%2F%2Fonboarding")
+        val web = Uri.parse("https://play.google.com/store/apps/details?id=$PACKAGE&url=healthconnect%3A%2F%2Fonboarding")
+        return listOf(
+            Intent(Intent.ACTION_VIEW, market).setPackage("com.android.vending"),
+            Intent(Intent.ACTION_VIEW, market),
+            Intent(Intent.ACTION_VIEW, web),
+        )
+    }
+}
 
 /** Starts [intent]; false when no app handles it. */
 private fun Context.startSafely(intent: Intent): Boolean =

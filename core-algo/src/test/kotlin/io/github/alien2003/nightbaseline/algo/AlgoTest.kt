@@ -133,6 +133,25 @@ class ExtractionTest {
     }
 
     @Test
+    fun `a channel without access is no access, not not provided, and is not evaluated`() {
+        val hr = (0 until 240).map { Sample(it * 120_000L, 55.0) }
+        val n = night(mapOf(ChannelId.HEART_RATE to hr))
+        val s =
+            MetricExtractor.summarize(
+                n,
+                setOf(ChannelId.HEART_RATE),
+                p,
+                noAccessChannels = setOf(ChannelId.SPO2, ChannelId.RESPIRATORY_RATE),
+            )
+        assertEquals(MissingReason.NO_ACCESS, s.values.getValue(MetricId.SPO2).missing)
+        assertEquals(MissingReason.NO_ACCESS, s.values.getValue(MetricId.RESPIRATORY_RATE).missing)
+        assertEquals(MissingReason.NOT_PROVIDED, s.values.getValue(MetricId.HRV).missing)
+        assertEquals(55.0, s.values.getValue(MetricId.SLEEPING_HR).value)
+        val e = Evaluator.evaluate(s, emptyList(), p)
+        assertTrue(e.metrics.none { it.metric == MetricId.SPO2 || it.metric == MetricId.RESPIRATORY_RATE })
+    }
+
+    @Test
     fun `low coverage and implausible samples are rejected`() {
         val firstHourOnly = (0 until 60).map { Sample(it * 60_000L, 55.0) }
         val s = MetricExtractor.summarize(night(mapOf(ChannelId.HEART_RATE to firstHourOnly)), setOf(ChannelId.HEART_RATE), p)

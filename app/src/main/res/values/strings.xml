@@ -15,19 +15,7 @@
     <!-- NightLabel: %1$s the date range from the evening before ("Nov 24 – 25"), %2$s the wake date ("November 25"), %3$s the evening (day, or day and month). en shows the range, ru uses 3 and 2. -->
     <string name="night_label">Night of %1$s</string>
 
-    <!-- Metrics -->
-    <string name="metric_sleeping_hr">Sleeping heart rate</string>
-    <string name="metric_sleeping_hr_short">Heart rate</string>
-    <string name="metric_respiratory_rate">Respiratory rate</string>
-    <string name="metric_respiratory_rate_short">Breathing</string>
-    <string name="metric_spo2">Blood oxygen (SpO2)</string>
-    <string name="metric_spo2_short">SpO2</string>
-    <string name="metric_sleep_duration">Sleep duration</string>
-    <string name="metric_sleep_duration_short">Sleep</string>
-    <string name="metric_hrv">Heart rate variability (HRV)</string>
-    <string name="metric_hrv_short">HRV</string>
-    <string name="metric_skin_temperature">Skin temperature</string>
-    <string name="metric_skin_temperature_short">Skin temp.</string>
+    <!-- Metric names live in :work (shared with the notification). -->
 
     <!-- Units -->
     <string name="unit_bpm">bpm</string>
@@ -186,28 +174,6 @@
     <string name="history_status_few">Too few readings</string>
 
     <!-- Notification channels and notifications -->
-    <string name="channel_night_results_name">Night results</string>
-    <string name="channel_night_results_desc">A note in the morning when two or more measurements move outside your usual range.</string>
-    <string name="channel_data_access_name">Problems reading data</string>
-    <string name="channel_data_access_desc">When NightBaseline can\'t read your nights, for example after access was turned off.</string>
-    <plurals name="notif_dev_title">
-        <item quantity="one">%1$s measurement moved outside your usual range</item>
-        <item quantity="other">%1$s measurements moved outside your usual range</item>
-    </plurals>
-    <string name="notif_dev_body">%1$s. %2$s.</string>
-    <plurals name="notif_list_more">
-        <item quantity="one">and %1$s more</item>
-        <item quantity="other">and %1$s more</item>
-    </plurals>
-    <string name="notif_dev_body_long">%1$s%2$sThis compares the night with your own recent nights and isn\'t a diagnosis. Not a medical device.</string>
-    <string name="notif_higher_prefix">Higher than usual: %1$s. </string>
-    <string name="notif_lower_prefix">Lower than usual: %1$s. </string>
-    <string name="notif_public_title">NightBaseline</string>
-    <string name="notif_public_body">Last night\'s result is ready.</string>
-    <string name="notif_perm_title">NightBaseline can\'t read your sleep data</string>
-    <string name="notif_perm_body">Health Connect access was turned off. Tap to turn it back on.</string>
-    <string name="notif_hc_title">Health Connect needs an update</string>
-    <string name="notif_hc_body">Tap to see how to continue.</string>
     <plurals name="notif_quiet_title">
         <item quantity="one">No new data from %1$s for %2$s day</item>
         <item quantity="other">No new data from %1$s for %2$s days</item>
@@ -217,8 +183,6 @@
         <item quantity="other">No new data from your source for %1$s days</item>
     </plurals>
     <string name="notif_quiet_body">Tap to check your source.</string>
-    <string name="notif_bg_title">The morning check needs background access</string>
-    <string name="notif_bg_body">Tap to allow it in Health Connect.</string>
     <string name="notif_source_gone_title">%1$s is no longer on this phone</string>
     <string name="notif_source_gone_title_public">Your source is no longer on this phone</string>
     <string name="notif_source_gone_body">Tap to choose another source.</string>
@@ -261,7 +225,7 @@
         <item quantity="one">Found %1$s past night</item>
         <item quantity="other">Found %1$s past nights</item>
     </plurals>
-    <string name="onb_ready_history_body">Your usual range is ready. Last night is already compared.</string>
+    <string name="onb_ready_history_body">Your usual range is ready. From now on each night is compared with it.</string>
     <string name="onb_ready_learn_title">Learning starts tonight</string>
     <plurals name="onb_ready_learn_body">
         <item quantity="one">%1$s of 7 nights is already there.</item>
@@ -412,4 +376,21 @@
     <string name="widget_waiting">Waiting for sync</string>
     <string name="widget_update_needed">Update needed</string>
     <string name="widget_choose_source">Choose source</string>
+
+    <!-- Added with the walkthrough fixes: signed values, access off at read time, learning ready, onboarding notes, manual check. -->
+    <string name="unit_celsius_vs_usual">°C vs usual</string>
+    <string name="stats_range_to">Usual range: %1$s to %2$s</string>
+    <string name="stats_value_range_to">%1$s to %2$s</string>
+    <string name="status_access_off_then">No access that night</string>
+    <string name="detail_access_off_then">Health Connect access to %1$s was off when this night was read.</string>
+    <string name="detail_learning_ready">Enough nights collected. From the next night on, this measurement is compared with its usual range.</string>
+    <string name="state_learning_ready_body">7 nights collected. Your usual range is ready, and the next night is compared with it.</string>
+    <string name="onb_perm_partial_background">Background reading is off, so the morning check runs when you open the app. You can turn it on later in Settings.</string>
+    <string name="onb_perm_partial_history">Past data is off, so only the last 30 days can be used.</string>
+    <string name="onb_perm_row_off">%1$s: off</string>
+    <string name="onb_source_access_title">Allow access to see your sources</string>
+    <string name="onb_source_access_body">NightBaseline needs to read sleep in Health Connect to find the app that records your nights.</string>
+    <string name="action_checking">Checking…</string>
+    <string name="check_result_nothing_new">Checked at %1$s. Nothing new from %2$s yet.</string>
+    <string name="hc_store_unavailable">Couldn\'t open Google Play. Install Health Connect from your app store.</string>
 </resources>

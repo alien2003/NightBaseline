@@ -2,6 +2,7 @@ package io.github.alien2003.nightbaseline.ui.model
 
 import android.content.res.Resources
 import android.icu.text.DateFormat
+import android.icu.text.DisplayContext
 import android.icu.text.ListFormatter
 import android.icu.util.TimeZone
 import androidx.annotation.PluralsRes
@@ -13,19 +14,22 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalResources
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.algo.MetricId
+import io.github.alien2003.nightbaseline.work.notify.InlineNames
 import io.github.alien2003.nightbaseline.work.notify.NightLabel
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import io.github.alien2003.nightbaseline.work.R as WorkR
 
 /** How one metric is named and formatted. */
 @Immutable
 data class MetricDisplay(
     /** Full name (`metric_<id>`). */
     @param:StringRes val name: Int,
-    /** Short name (`metric_<id>_short`) for Glance windows, the widget and notifications. */
+    /** Short name (`metric_<id>_short`) for Glance windows and the widget only; sentences use [name]. */
     @param:StringRes val shortName: Int,
     /** Unit string; null for sleep duration (hours and minutes carry their own units). */
     @param:StringRes val unit: Int?,
@@ -33,25 +37,40 @@ data class MetricDisplay(
     val decimals: Int,
     /** Values are minutes shown as "7 h 05 min". */
     val duration: Boolean = false,
+    /**
+     * Values are a change from the source's own baseline (skin temperature): shown with a sign and a real minus, the
+     * value's unit says so ([valueUnit]) and ranges read "−0.5 to +0.5" instead of a dash next to a minus.
+     */
+    val signed: Boolean = false,
+    /** Unit next to a night's value when it differs from [unit] (signed metrics: "°C vs usual"). */
+    @param:StringRes val valueUnit: Int? = null,
 ) {
     /** Displays of the built-in metrics. */
     companion object {
         private val KNOWN: Map<MetricId, MetricDisplay> =
             mapOf(
-                MetricId.SLEEPING_HR to MetricDisplay(R.string.metric_sleeping_hr, R.string.metric_sleeping_hr_short, R.string.unit_bpm, 0),
+                MetricId.SLEEPING_HR to
+                    MetricDisplay(WorkR.string.metric_sleeping_hr, WorkR.string.metric_sleeping_hr_short, R.string.unit_bpm, 0),
                 MetricId.RESPIRATORY_RATE to
                     MetricDisplay(
-                        R.string.metric_respiratory_rate,
-                        R.string.metric_respiratory_rate_short,
+                        WorkR.string.metric_respiratory_rate,
+                        WorkR.string.metric_respiratory_rate_short,
                         R.string.unit_breaths_per_min,
                         1,
                     ),
-                MetricId.SPO2 to MetricDisplay(R.string.metric_spo2, R.string.metric_spo2_short, R.string.unit_percent, 0),
+                MetricId.SPO2 to MetricDisplay(WorkR.string.metric_spo2, WorkR.string.metric_spo2_short, R.string.unit_percent, 0),
                 MetricId.SLEEP_DURATION to
-                    MetricDisplay(R.string.metric_sleep_duration, R.string.metric_sleep_duration_short, null, 0, duration = true),
-                MetricId.HRV to MetricDisplay(R.string.metric_hrv, R.string.metric_hrv_short, R.string.unit_ms, 0),
+                    MetricDisplay(WorkR.string.metric_sleep_duration, WorkR.string.metric_sleep_duration_short, null, 0, duration = true),
+                MetricId.HRV to MetricDisplay(WorkR.string.metric_hrv, WorkR.string.metric_hrv_short, R.string.unit_ms, 0),
                 MetricId.SKIN_TEMPERATURE to
-                    MetricDisplay(R.string.metric_skin_temperature, R.string.metric_skin_temperature_short, R.string.unit_celsius, 1),
+                    MetricDisplay(
+                        WorkR.string.metric_skin_temperature,
+                        WorkR.string.metric_skin_temperature_short,
+                        R.string.unit_celsius,
+                        1,
+                        signed = true,
+                        valueUnit = R.string.unit_celsius_vs_usual,
+                    ),
             )
 
         /** Display of [metric]; an unknown (future) metric gets the heart-rate names as a safe placeholder. */
@@ -67,8 +86,8 @@ data class FormattedValue(
     /** Unit, or null. */
     val unit: String?,
 ) {
-    /** "number unit" for sentences and content descriptions. */
-    val text: String get() = if (unit == null) number else "$number $unit"
+    /** "number unit" for sentences and content descriptions; never broken between the number and its unit. */
+    val text: String get() = if (unit == null) number else "$number\u00A0$unit"
 }
 
 /**
@@ -114,8 +133,16 @@ class UiText(
     /** Short metric name. */
     fun shortName(metric: MetricId): String = resources.getString(MetricDisplay.of(metric).shortName)
 
-    /** Unit of [metric], or null for durations. */
-    fun unit(metric: MetricId): String? = MetricDisplay.of(metric).unit?.let(resources::getString)
+    /** Unit of [metric] (of ranges and differences), or null for durations. */
+    fun unit(metric: MetricId): String? = MetricDisplay.of(metric).unit?.let(::unitString)
+
+    /** Unit next to a night's value: [unit], or the signed metrics' "°C vs usual". */
+    private fun valueUnit(metric: MetricId): String? = MetricDisplay.of(metric).let { it.valueUnit ?: it.unit }?.let(::unitString)
+
+    /** A unit string; a word joiner after each slash keeps "breaths/min" on one line. */
+    private fun unitString(
+        @StringRes id: Int,
+    ): String = resources.getString(id).replace("/", "/$WORD_JOINER")
 
     /** [value] of [metric] as number and unit, with [decimals] fraction digits (the metric's default when null). */
     fun value(
@@ -125,7 +152,77 @@ class UiText(
     ): FormattedValue {
         val display = MetricDisplay.of(metric)
         if (display.duration) return FormattedValue(duration(value), null)
-        return FormattedValue(number(value, decimals ?: display.decimals), display.unit?.let(resources::getString))
+        return FormattedValue(number(metric, value, decimals ?: display.decimals), valueUnit(metric))
+    }
+
+    /** A range end or median of [metric] as "number unit" (the plain unit, signed when the metric is). */
+    fun rangeEnd(
+        metric: MetricId,
+        value: Double,
+        decimals: Int? = null,
+    ): String {
+        val display = MetricDisplay.of(metric)
+        if (display.duration) return duration(value)
+        val number = number(metric, value, decimals ?: display.decimals)
+        return unit(metric)?.let { "$number$NBSP$it" } ?: number
+    }
+
+    /** A distance outside the range (always positive) as "number unit", e.g. "0.3 °C". */
+    fun magnitude(
+        metric: MetricId,
+        value: Double,
+        decimals: Int? = null,
+    ): String {
+        val display = MetricDisplay.of(metric)
+        if (display.duration) return duration(value)
+        val number = number(value, decimals ?: display.decimals)
+        return unit(metric)?.let { "$number$NBSP$it" } ?: number
+    }
+
+    /** [value] of [metric] as a number only: signed ("+0.2", "−0.1", "0.0") when the metric is a change. */
+    private fun number(
+        metric: MetricId,
+        value: Double,
+        decimals: Int,
+    ): String {
+        if (!MetricDisplay.of(metric).signed) return number(value, decimals)
+        val plain = number(abs(value), decimals)
+        val zero = number(0.0, decimals)
+        return when {
+            plain == zero -> zero
+            value < 0 -> "$MINUS$plain"
+            else -> "+$plain"
+        }
+    }
+
+    /** "Usual range: 52–61 bpm" (the signed metrics: "Usual range: −0.5 to +0.5 °C"). */
+    fun usualRange(
+        metric: MetricId,
+        range: RangeUi,
+        decimals: Int? = null,
+    ): String {
+        val low = bare(metric, range.low, decimals)
+        val high = rangeEnd(metric, range.high, decimals)
+        return if (MetricDisplay.of(metric).signed) {
+            string(R.string.stats_range_to, low, high)
+        } else {
+            string(R.string.stats_range, low, high)
+        }
+    }
+
+    /** "52–61 bpm" as a readout value (the signed metrics: "−0.5 to +0.5 °C"). */
+    fun rangeValue(
+        metric: MetricId,
+        range: RangeUi,
+        decimals: Int? = null,
+    ): String {
+        val low = bare(metric, range.low, decimals)
+        val high = rangeEnd(metric, range.high, decimals)
+        return if (MetricDisplay.of(metric).signed) {
+            string(R.string.stats_value_range_to, low, high)
+        } else {
+            string(R.string.stats_value_range, low, high)
+        }
     }
 
     /**
@@ -182,16 +279,11 @@ class UiText(
         decimals: Int? = null,
     ): String = value(metric, value, decimals).number
 
-    /** "52–61 bpm". */
+    /** "52–61 bpm" (the signed metrics: "−0.5 to +0.5 °C"). */
     fun range(
         metric: MetricId,
         range: RangeUi,
-    ): String {
-        val low = bare(metric, range.low)
-        val high = bare(metric, range.high)
-        val unit = unit(metric)
-        return if (unit == null) "$low–$high" else "$low–$high $unit"
-    }
+    ): String = rangeValue(metric, range)
 
     /** Short status label of a metric (`status_*`). */
     fun status(
@@ -208,6 +300,7 @@ class UiText(
             MetricState.NotCompared -> string(R.string.status_not_compared)
             MetricState.NotProvided -> string(R.string.status_not_provided, source)
             MetricState.AccessOff -> string(R.string.status_access_off)
+            MetricState.AccessOffThen -> string(R.string.status_access_off_then)
         }
 
     /** The one-sentence explanation of a metric state (`detail_*`, `states.md` 4). */
@@ -218,7 +311,7 @@ class UiText(
         minNights: Int = LEARNING_NIGHTS,
     ): String {
         val name = name(metric.metric)
-        val delta = metric.delta?.let { value(metric.metric, it, decimals(metric)).text }
+        val delta = metric.delta?.let { magnitude(metric.metric, it, decimals(metric)) }
         return when (metric.state) {
             MetricState.Within -> {
                 string(R.string.detail_within)
@@ -232,13 +325,17 @@ class UiText(
                 delta?.let { string(R.string.detail_lower, it) } ?: string(R.string.status_lower)
             }
 
-            MetricState.SideIgnoredHigher, MetricState.SideIgnoredLower -> {
+            MetricState.SideIgnoredHigher -> {
                 string(R.string.detail_side_ignored, name)
             }
 
+            MetricState.SideIgnoredLower -> {
+                string(R.string.metric_detail_side_ignored_lower, name)
+            }
+
             MetricState.Learning -> {
-                val left = (minNights - metric.learnedNights).coerceAtLeast(1)
-                plural(R.plurals.detail_learning, left, int(left))
+                val left = minNights - metric.learnedNights
+                if (left <= 0) string(R.string.detail_learning_ready) else plural(R.plurals.detail_learning, left, int(left))
             }
 
             MetricState.NoData -> {
@@ -268,6 +365,10 @@ class UiText(
             MetricState.AccessOff -> {
                 string(R.string.detail_access_off, name)
             }
+
+            MetricState.AccessOffThen -> {
+                string(R.string.detail_access_off_then, name)
+            }
         }
     }
 
@@ -294,8 +395,8 @@ class UiText(
                     name,
                     value,
                     status(metric, source),
-                    value(metric.metric, range.low, d).text,
-                    value(metric.metric, range.high, d).text,
+                    rangeEnd(metric.metric, range.low, d),
+                    rangeEnd(metric.metric, range.high, d),
                 )
             }
 
@@ -327,22 +428,33 @@ class UiText(
     /** Weekday initial for strips and the calendar header. */
     fun weekdayLetter(date: LocalDate): String = format(date, "EEEEE")
 
-    /** "November 2026". */
-    fun month(date: LocalDate): String = format(date, "yMMMM")
+    /** "November 2026" as a heading: capitalised in every locale (CLDR writes the Russian standalone month in lower case). */
+    fun month(date: LocalDate): String = format(date, "yMMMM", DisplayContext.CAPITALIZATION_FOR_BEGINNING_OF_SENTENCE)
 
     private fun format(
         date: LocalDate,
         skeleton: String,
+        context: DisplayContext? = null,
     ): String {
         val fmt =
-            dateFormats.getOrPut(
-                skeleton,
-            ) { DateFormat.getInstanceForSkeleton(skeleton, locale).apply { timeZone = TimeZone.GMT_ZONE } }
+            dateFormats.getOrPut("$skeleton/${context?.name.orEmpty()}") {
+                DateFormat.getInstanceForSkeleton(skeleton, locale).apply {
+                    timeZone = TimeZone.GMT_ZONE
+                    context?.let(::setContext)
+                }
+            }
         return fmt.format(java.util.Date(date.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() + NOON_MS))
     }
 
-    /** "A, B and C" in the locale. */
-    fun list(items: List<String>): String = listFormatter.format(items)
+    /**
+     * "A, B and C" in the locale. Metric names are standalone labels with a capital letter; inside a Russian sentence
+     * only the first item keeps it ("Sleeping heart rate, respiratory rate and SpO2"), [inline] lowercases the first one too
+     * (after a colon). Acronyms ("SpO2", "HRV") stay as they are. English keeps its title-case names.
+     */
+    fun list(
+        items: List<String>,
+        inline: Boolean = false,
+    ): String = listFormatter.format(InlineNames.of(items, locale, inline))
 
     /** Headline of a night (`state_*_title`). */
     @Suppress("CyclomaticComplexMethod") // An exhaustive state -> copy table (states.md); splitting it would hide the mapping.
@@ -434,8 +546,8 @@ class UiText(
             }
 
             NightState.Learning -> {
-                val left = (LEARNING_NIGHTS - night.historyNights).coerceAtLeast(1)
-                plural(R.plurals.state_learning_body, left, int(left))
+                val left = LEARNING_NIGHTS - night.collectedNights
+                if (left <= 0) string(R.string.state_learning_ready_body) else plural(R.plurals.state_learning_body, left, int(left))
             }
 
             NightState.AllWithin -> {
@@ -451,7 +563,7 @@ class UiText(
             }
 
             NightState.Moved -> {
-                string(R.string.state_dev_body, list(night.movedMetrics.map { shortName(it.metric) }))
+                string(R.string.state_dev_body, list(night.movedMetrics.map { name(it.metric) }))
             }
 
             NightState.NotSynced -> {
@@ -541,6 +653,9 @@ class UiText(
         const val NOON_MS = 12 * 60 * 60 * 1000L
         const val SKELETON_SHORT = "MMMd"
         const val SKELETON_LONG = "MMMMd"
+        const val NBSP = '\u00A0'
+        const val WORD_JOINER = '\u2060'
+        const val MINUS = '\u2212'
     }
 }
 

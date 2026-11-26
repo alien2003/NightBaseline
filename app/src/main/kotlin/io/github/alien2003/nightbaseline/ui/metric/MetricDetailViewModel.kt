@@ -17,6 +17,7 @@ import io.github.alien2003.nightbaseline.ui.model.ChartPeriod
 import io.github.alien2003.nightbaseline.ui.model.MetricState
 import io.github.alien2003.nightbaseline.ui.model.MetricUi
 import io.github.alien2003.nightbaseline.ui.model.NightState
+import io.github.alien2003.nightbaseline.ui.settings.SourceNames
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -114,7 +115,7 @@ class MetricDetailViewModel
                     metric = metricUi,
                     anchorDate = anchor,
                     series = series,
-                    source = access?.sourceLabel ?: settings.sourcePackage,
+                    source = SourceNames.display(access?.sourceLabel, settings.sourcePackage),
                     period = period,
                     countedSide = countedSide(metric, params),
                     notice = noticeOf(home.night.state),

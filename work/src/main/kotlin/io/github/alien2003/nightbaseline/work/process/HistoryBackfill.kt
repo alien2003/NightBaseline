@@ -63,11 +63,12 @@ class HistoryBackfill
             val from = if (whole) HISTORY_START_MS else now - WITHOUT_HISTORY_DAYS * DAY_MS
             val settledBefore = now - (NightProcessor.COMPLETENESS.capHours * NightProcessor.HOUR_MS).toLong()
             val provided = reader.channelsOf(source, from, now) - HcChannels.STEPS_ID
+            val noAccess = reader.noAccessChannels()
             val candidates = NightSelector.select(reader.readSessions(source, from, now), params).filter { it.endMs <= settledBefore }
             val summaries = mutableListOf<NightSummary>()
             for (chunk in chunks(candidates)) {
                 val data = reader.readNight(source, chunk.first().startMs, chunk.last().endMs + 1)
-                chunk.forEach { c -> summaries += MetricExtractor.summarize(c.withSamples(data.channels), provided, params) }
+                chunk.forEach { c -> summaries += MetricExtractor.summarize(c.withSamples(data.channels), provided, params, noAccess) }
             }
             val fingerprint = AlgoFingerprint.of(params)
             summaries.forEach { summary ->

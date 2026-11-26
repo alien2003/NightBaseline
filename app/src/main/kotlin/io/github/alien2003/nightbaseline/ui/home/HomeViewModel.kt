@@ -5,12 +5,15 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alien2003.nightbaseline.app.AccessStatus
 import io.github.alien2003.nightbaseline.app.AppData
+import io.github.alien2003.nightbaseline.app.ManualCheck
 import io.github.alien2003.nightbaseline.app.NightPresenter
 import io.github.alien2003.nightbaseline.data.local.NightRecord
 import io.github.alien2003.nightbaseline.data.local.RunLogLine
 import io.github.alien2003.nightbaseline.data.local.settings.AppSettings
 import io.github.alien2003.nightbaseline.ui.learning.LearningState
 import io.github.alien2003.nightbaseline.ui.model.BannerKind
+import io.github.alien2003.nightbaseline.ui.model.ManualCheckUi
+import io.github.alien2003.nightbaseline.ui.settings.SourceNames
 import io.github.alien2003.nightbaseline.ui.shell.PerfProbe
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +23,11 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 import javax.inject.Inject
 
 /** What the Home route shows. */
@@ -58,9 +66,9 @@ class HomeViewModel
                 data.settings,
                 data.access.status,
                 data.currentNights,
-                data.checks.running(),
+                combine(data.checks.running(), data.manualCheck, ::Pair),
                 data.recentRuns,
-            ) { settings, access, records, running, runs -> Inputs(settings, access, records, running, runs) }
+            ) { settings, access, records, (running, check), runs -> Inputs(settings, access, records, running, runs, check) }
                 .mapLatest(::build)
                 .flowOn(data.compute)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), HomeUi.Pending)
@@ -71,6 +79,7 @@ class HomeViewModel
             val records: List<NightRecord>,
             val running: Boolean,
             val runs: List<RunLogLine>,
+            val check: ManualCheck,
         )
 
         private fun build(inputs: Inputs): HomeUi {
@@ -82,7 +91,7 @@ class HomeViewModel
             val zone = data.zoneId()
             val nights = NightPresenter.nights(records, params, zone, access)
             val r = NightPresenter.resolveHome(data.now(), zone, settings, access, nights, inputs.running, inputs.runs)
-            val source = access?.sourceLabel ?: settings.sourcePackage
+            val source = SourceNames.display(access?.sourceLabel, settings.sourcePackage)
             val recent = nights.take(HomeState.STRIP).reversed()
             if (r.learning) return HomeUi.Learning(LearningState(r.night, recent, source, r.lastNightShort))
             val metricsNight = r.lastResult ?: r.night
@@ -100,9 +109,40 @@ class HomeViewModel
                     lastResult = r.lastResult,
                     lastNightShort = r.lastNightShort,
                     quietDays = r.quietDays,
+                    check = checkUi(inputs.check, records, zone),
                 ),
             )
         }
+
+        /** "Checking…" while a manual check runs; "Checked at ..." when it ended without storing a night. */
+        private fun checkUi(
+            check: ManualCheck,
+            records: List<NightRecord>,
+            zone: ZoneId,
+        ): ManualCheckUi =
+            when (check) {
+                ManualCheck.None -> {
+                    ManualCheckUi.None
+                }
+
+                ManualCheck.Checking -> {
+                    ManualCheckUi.Checking
+                }
+
+                is ManualCheck.Done -> {
+                    // A stored or re-read night changes the screen by itself; only "nothing new" needs words.
+                    if (records.any { it.computedAtMs >= check.requestedAtMs }) {
+                        ManualCheckUi.None
+                    } else {
+                        val time =
+                            DateTimeFormatter
+                                .ofLocalizedTime(FormatStyle.SHORT)
+                                .withLocale(Locale.getDefault())
+                                .format(Instant.ofEpochMilli(check.finishedAtMs).atZone(zone))
+                        ManualCheckUi.NothingNew(time)
+                    }
+                }
+            }
 
         /** "Check now" (`E-SYNC`, `E-NODATA`, `B-WAIT`, `B-READ-FAILED`). */
         fun checkNow() = data.checkNow()

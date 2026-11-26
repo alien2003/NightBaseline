@@ -40,6 +40,13 @@
     <string name="notif_read_failed_title">NightBaseline couldn\'t read your sleep data</string>
     <string name="notif_read_failed_body">It will try again later. Tap to check now.</string>
 
+    <!-- Full metric names: the app's tiles, summaries and History, and the notification (one name per measurement). -->
+    <string name="metric_sleeping_hr">Sleeping heart rate</string>
+    <string name="metric_respiratory_rate">Respiratory rate</string>
+    <string name="metric_spo2">Blood oxygen (SpO2)</string>
+    <string name="metric_sleep_duration">Sleep duration</string>
+    <string name="metric_hrv">Heart rate variability (HRV)</string>
+    <string name="metric_skin_temperature">Skin temperature</string>
     <string name="metric_sleeping_hr_short">Heart rate</string>
     <string name="metric_respiratory_rate_short">Breathing</string>
     <string name="metric_spo2_short">SpO2</string>
@@ -47,5 +54,6 @@
     <string name="metric_hrv_short">HRV</string>
     <string name="metric_skin_temperature_short">Skin temp.</string>
     <!-- A metric added after this build (no name yet). -->
+    <string name="metric_other">Other</string>
     <string name="metric_other_short">Other</string>
 </resources>
