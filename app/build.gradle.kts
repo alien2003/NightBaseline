@@ -125,6 +125,22 @@ kotlin {
     jvmToolchain(libs.versions.jvmTarget.get().toInt())
 }
 
+composeCompiler {
+    // java.time values are immutable; without this every LocalDate / YearMonth parameter is unstable.
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose-stability.conf"))
+}
+
+// Compose compiler stability reports (docs/development.md, "Performance"): -PcomposeReports writes the per-class
+// stability and per-composable skippability reports into build/compose-reports and the metrics into
+// build/compose-metrics. Off by default; run the compile task with --rerun, or the build cache restores its classes
+// without writing the reports.
+if (providers.gradleProperty("composeReports").isPresent) {
+    composeCompiler {
+        reportsDestination = layout.buildDirectory.dir("compose-reports")
+        metricsDestination = layout.buildDirectory.dir("compose-metrics")
+    }
+}
+
 /**
  * Hands the merged manifest of every variant (Variant API, SingleArtifact.MERGED_MANIFEST) to the unit-test JVM as
  * `-Dnightbaseline.mergedManifest.<variant>=<path>`. Declaring the files as inputs makes the test task depend on

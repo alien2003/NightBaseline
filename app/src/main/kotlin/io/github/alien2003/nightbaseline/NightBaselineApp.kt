@@ -3,6 +3,7 @@ package io.github.alien2003.nightbaseline
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import io.github.alien2003.nightbaseline.data.local.settings.SettingsRepository
 import io.github.alien2003.nightbaseline.work.notify.Channels
@@ -18,25 +19,31 @@ import javax.inject.Inject
  * The application: the Hilt component root and WorkManager's configuration ([HiltWorkerFactory], so the night worker
  * gets its dependencies; the default initializer is removed in the manifest). On start it creates the notification
  * channels and, once onboarding is done, makes sure the daily chain is scheduled (KEEP: an existing check stays).
+ * Both run on a background thread, and the injected objects are built only when first used, so the main thread goes
+ * straight to the first frame (docs/development.md, "Performance"). Every notifier creates the channels itself
+ * before it posts, so nothing depends on the start-up call having finished.
  */
 @HiltAndroidApp
 class NightBaselineApp :
     Application(),
     Configuration.Provider {
-    @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var lazyWorkerFactory: Lazy<HiltWorkerFactory>
 
-    @Inject lateinit var settings: SettingsRepository
+    @Inject lateinit var lazySettings: Lazy<SettingsRepository>
 
-    @Inject lateinit var scheduler: NightScheduler
+    @Inject lateinit var lazyScheduler: Lazy<NightScheduler>
+
+    /** The app's settings repository (the on-device suite reads it). */
+    val settings: SettingsRepository get() = lazySettings.get()
 
     override val workManagerConfiguration: Configuration
-        get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
+        get() = Configuration.Builder().setWorkerFactory(lazyWorkerFactory.get()).build()
 
     override fun onCreate() {
         super.onCreate()
-        Channels.ensure(this)
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            if (settings.settings.first().onboardingDone) scheduler.ensureScheduled()
+            Channels.ensure(this@NightBaselineApp)
+            if (settings.settings.first().onboardingDone) lazyScheduler.get().ensureScheduled()
         }
     }
 }

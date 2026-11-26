@@ -40,6 +40,10 @@ Live project state. A new session starts here. Updated after every step. Last fu
   regression test `DaytimeWritesTest`, system-log diagnostics (tag `NightBaseline`, docs/development.md). Still to
   confirm on the phone: a real night processed automatically after the fix.
 - On-device e2e suite (instrumentation, single write+delete of a year-2000 tagged record, before/after snapshots).
+- "Doesn't feel smooth": the phone rendered the app at 60 Hz ("Win preferred rateId=0"). The window now asks for the
+  fastest mode at the current resolution while in use, plus `FrameRateCategory.High` votes on API 35+ (ADR 0008);
+  second pass: java.time stability config, calendar cells memoized, lazy start-up injection, `ScrollCostTest`. Still
+  to verify on the phone (ask): `dumpsys display` / `SurfaceFlinger` / `gfxinfo` (docs/development.md, Performance).
 
 ## Next
 1. Fix → build dev.6 → install (ask) → confirm the night is processed automatically; then a further new night without

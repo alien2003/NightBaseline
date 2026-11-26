@@ -9,6 +9,7 @@ How to set up, build, test and release NightBaseline, and the rules the code bas
 - [Build, test and lint](#build-test-and-lint)
 - [Modules](#modules)
 - [Screenshots](#screenshots)
+- [Performance](#performance)
 - [Health data, the dataset exporter and algo-cli](#health-data-the-dataset-exporter-and-algo-cli)
 - [Running on a phone](#running-on-a-phone)
 - [Continuous integration](#continuous-integration)
@@ -176,6 +177,66 @@ documents. Documents carry aggregates without raw values (for example
   `run` prints aggregates only (status counts, notifications, per-metric counts). `--details <file.jsonl>` writes
   per-night results with values: keep that file under `.data/` (for example `.data/out/`). `--params <json>` overrides
   `AlgoParams`. Exit codes: 0 ok, 64 usage, 65 invalid input, 66 missing input.
+
+## Performance
+
+Frame pacing and per-frame work are part of the ColorOS canon: the app must feel as smooth as OPPO's own apps next to
+it. What is in place:
+
+- **High refresh rate** ([ADR 0008](adr/0008-high-refresh-rate.md)): while `MainActivity` is in use its window asks
+  for the fastest display mode at the current resolution (`display/HighRefreshRate.kt`, API 30+), released 5 s after
+  the last touch and on pause; on API 35+ the navigation root also votes `FrameRateCategory.High` for every frame it
+  draws (`Modifier.preferredFrameRate`).
+- **No recomposition while scrolling**: the top bars read the scroll offset in layers and derived state only.
+  `ScrollCostTest` flings Last night, History and Settings and fails if a screen body composes again;
+  `TabSwitchCostTest` and `RowInteractionCostTest` guard tab switches and row presses. The hooks are `PerfProbe` /
+  `CountComposition` (a no-op in the app).
+- **Stability**: UI models are `@Immutable` / `@Stable`; `app/compose-stability.conf` declares the `java.time` value
+  types stable, so calendar cells given equal dates are skipped.
+- **Start-up**: the hand-written baseline profile (`app/src/main/baseline-prof.txt`) covers the app's own packages,
+  the navigation / lifecycle / lazy-list / animation libraries and Haze. `NightBaselineApp` injects its
+  dependencies lazily and creates the notification channels and the schedule check on a background thread.
+- **Glass**: Haze 2.1 already blurs a downscaled input (the default `HazePerformanceMode.Balanced`: about 79 % of
+  the width and height, 62.5 % of the pixels); radius and input scale stay as they are, because a lower scale or
+  radius changes the look.
+
+### Compose compiler reports
+
+```sh
+mise exec -- ./gradlew :app:compileReleaseKotlin --rerun -PcomposeReports --console=plain
+```
+
+writes `app/build/compose-reports/app-{classes,composables}.txt` and `app-composables.csv` (stability of every class
+and parameter, skippability of every composable) and `app/build/compose-metrics/release/app-module.json` (totals).
+`--rerun` is needed because the build cache otherwise restores the compiled classes without writing reports. Look for
+`unstable` parameters of composables on hot paths (rows, cells, charts) and for `runtime` (uncertain) classes.
+
+### Measuring on the phone
+
+Only with the owner's permission for each step ([Phone access](#phone-access)); the release build, warm, glass on.
+Package `io.github.alien2003.nightbaseline`.
+
+```sh
+# Display modes the panel offers, the active mode and the rendered rate
+"$ADB_WIN" shell dumpsys display | grep -E 'mSupportedModes|mActiveSfDisplayMode|renderFrameRate'
+# The app's request as the display-mode director sees it (vote APP_REQUEST_BASE_MODE_REFRESH_RATE, app requested mode)
+"$ADB_WIN" shell dumpsys display | grep -iE 'AppRequest|APP_REQUEST'
+# SurfaceFlinger's view: active mode / render rate, and the per-layer frame-rate votes of the app's window
+"$ADB_WIN" shell dumpsys SurfaceFlinger | grep -iE 'activeMode|renderRate|refresh'
+"$ADB_WIN" shell dumpsys SurfaceFlinger | grep -iE -A6 'nightbaseline' | grep -iE 'frameRate|vote'
+# Frame timeline (present times and jank classification of the last frames), right after scrolling
+"$ADB_WIN" shell dumpsys SurfaceFlinger --frametimeline -l
+# Frame times: reset, scroll History for ~10 s, read (janky frames and the 50th..99th percentiles)
+"$ADB_WIN" shell dumpsys gfxinfo io.github.alien2003.nightbaseline reset
+"$ADB_WIN" shell dumpsys gfxinfo io.github.alien2003.nightbaseline
+# The ColorOS refresh-rate manager's line for the window (expected: a non-zero rateId while touching)
+"$ADB_WIN" logcat -d | grep -iE 'preferred rateId' | tail -5
+```
+
+Expected while scrolling: the active mode is the 120 Hz mode at the current resolution and `renderFrameRate` 120;
+10 s after the last touch the app's request is gone (the system's choice, often 60 Hz). At 120 Hz a frame has 8.3 ms,
+so `gfxinfo` counts janky frames against that deadline. The developer option "Show refresh rate" also works, but is a
+persistent setting: turn it off again afterwards.
 
 ## Running on a phone
 

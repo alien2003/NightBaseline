@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -270,9 +271,12 @@ fun MonthCalendar(
     val text = rememberUiText()
     val controls = NbTheme.controls
     val firstDay = WeekFields.of(text.locale).firstDayOfWeek
-    val offset = (month.atDay(1).dayOfWeek.value - firstDay.value + DAYS) % DAYS
-    val cells = List(offset) { null } + (1..month.lengthOfMonth()).map { month.atDay(it) }
-    val rows = cells.chunked(DAYS)
+    // Built once per month: equal dates keep their instances, so the cells and their click lambdas stay skippable.
+    val rows =
+        remember(month, firstDay) {
+            val offset = (month.atDay(1).dayOfWeek.value - firstDay.value + DAYS) % DAYS
+            (List(offset) { null } + (1..month.lengthOfMonth()).map { month.atDay(it) }).chunked(DAYS)
+        }
     Column(
         modifier
             .widthIn(max = NbDimens.textMax)

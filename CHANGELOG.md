@@ -10,6 +10,23 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 
 ## [Unreleased]
 
+### Changed
+
+- **Smoother on high-refresh screens.** While you use the app it now asks for the screen's highest refresh rate at
+  the current resolution (for example 120 Hz instead of 60 Hz), and gives it back 5 seconds after your last touch and
+  when you leave the app; battery saver and the system's refresh-rate setting still take precedence
+  ([ADR 0008](https://github.com/alien2003/NightBaseline/blob/main/docs/adr/0008-high-refresh-rate.md)).
+- **Less work per frame and at start-up.** The calendar no longer redraws every day cell when one changes, the
+  start-up work runs off the main thread, and the start-up profile now covers the whole blur library.
+
+### Fixed
+
+- **No more rows or tabs stuck pressed.** A quick tap in a scrolling screen (for example "Health Connect permissions"
+  in Settings, or the "All / Moved / Learning and gaps" filters in History) could leave the grey pressed highlight on
+  after the tap: the release arrived before the highlight had drawn its first frame and was skipped. Every press now
+  ends on its own release or cancel, and a press also clears when the window loses focus or the app is paused or
+  stopped.
+
 ## [0.1.0] - 2026-11-26
 
 First release. NightBaseline reads last night's measurements from Health Connect once a day, compares each one with

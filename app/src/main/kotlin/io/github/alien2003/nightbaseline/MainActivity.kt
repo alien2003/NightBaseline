@@ -8,6 +8,7 @@ import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
 import android.view.KeyboardShortcutInfo
 import android.view.Menu
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
@@ -29,6 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.alien2003.nightbaseline.data.local.settings.GlassMode
 import io.github.alien2003.nightbaseline.data.local.settings.ThemeMode
+import io.github.alien2003.nightbaseline.display.HighRefreshRate
 import io.github.alien2003.nightbaseline.nav.AppNavHost
 import io.github.alien2003.nightbaseline.nav.AppRootViewModel
 import io.github.alien2003.nightbaseline.nav.DeepLink
@@ -53,17 +55,40 @@ import io.github.alien2003.nightbaseline.work.notify.NightIntents
  * The system bar icons follow the app's own theme, not the system's (a forced light or dark theme keeps them
  * readable), over transparent bars. It hosts the navigation graph, turns notification taps into deep links (the
  * `nightbaseline://` data URI or the night date extra, both validated) and lists the keyboard shortcuts for the system helper (Meta+/).
+ * While it is in use it asks for the panel's highest refresh rate ([HighRefreshRate], ADR 0008).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val root: AppRootViewModel by viewModels()
     private val deepLink = mutableStateOf<DeepLink?>(null)
+    private val refreshRate = HighRefreshRate(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) handle(intent)
         setContent { AppRoot() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshRate.onResume()
+    }
+
+    override fun onPause() {
+        refreshRate.onPause()
+        super.onPause()
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        refreshRate.onUserInteraction()
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        val handled = super.dispatchTouchEvent(ev)
+        refreshRate.onTouch(ev.actionMasked)
+        return handled
     }
 
     override fun onNewIntent(intent: Intent) {

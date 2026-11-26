@@ -5,6 +5,8 @@
 # build). Libraries on the tab-switch and push / pop path whose AARs ship no or only a thin profile are listed below
 # (checked in build/intermediates/merged_art_profile): navigation-compose and the navigation runtime, the lifecycle /
 # ViewModel / Hilt Compose glue, saveable state, lazy lists and the animation library (crossfades, transitions).
+# Haze ships a profile for its core and blur modules only; the whole library is listed because the glass shell
+# draws with every scrolled frame (the top bar's progressive blur and Haze's trace helpers were not covered).
 HSPLio/github/alien2003/nightbaseline/**->**(**)**
 Lio/github/alien2003/nightbaseline/**;
 HSPLandroidx/navigation/compose/**->**(**)**
@@ -23,3 +25,5 @@ HSPLandroidx/compose/foundation/lazy/**->**(**)**
 Landroidx/compose/foundation/lazy/**;
 HSPLandroidx/compose/animation/**->**(**)**
 Landroidx/compose/animation/**;
+HSPLdev/chrisbanes/haze/**->**(**)**
+Ldev/chrisbanes/haze/**;
