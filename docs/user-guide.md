@@ -354,7 +354,7 @@ Re-tapping History in the navigation jumps back to the newest night.
 | Data source | "Source" | The app the nights are read from; opens "Choose a source". See [changing the source](#can-i-change-the-source). |
 | | "Health Connect permissions" | Opens NightBaseline's permissions in Health Connect. |
 | | "Last read" | When the last daily check finished ("Not read yet" before the first one). |
-| | "Set up again" | Runs the first-run steps again from the source step. |
+| | "Set up again" | Asks first, then runs the first-run steps again from the source step. Back on the source step returns to Settings. |
 | Notifications | "Night results" | The morning note. Disabled with "Turned off in system settings" when Android blocks it; tapping the row then opens the system notification settings. |
 | | "Problems reading data" | Silent notifications when NightBaseline can't read your nights ([Notifications](#notifications)). |
 | Sensitivity | "Sensitivity" | See [below](#sensitivity). |

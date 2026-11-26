@@ -46,9 +46,14 @@ data class MetricRoute(
     val point: Int = -1,
 )
 
-/** `onboarding/{step}`: the first run (outside the shell); [step] is an `OnboardingStep` name. */
+/**
+ * `onboarding/{step}`: the first run (outside the shell); [step] is an `OnboardingStep` name. [rerun] marks "Set up
+ * again" from Settings: pushed over Settings (Back on its first step returns there) while onboarding stays done.
+ */
 @Serializable
 data class OnboardingRoute(
     /** First step shown. */
     val step: String = "Welcome",
+    /** Started by "Set up again" over the existing back stack, not the first run. */
+    val rerun: Boolean = false,
 )

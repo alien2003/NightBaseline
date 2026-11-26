@@ -18,6 +18,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +38,8 @@ import io.github.alien2003.nightbaseline.nav.AppNavHost
 import io.github.alien2003.nightbaseline.nav.AppRootViewModel
 import io.github.alien2003.nightbaseline.nav.DeepLink
 import io.github.alien2003.nightbaseline.nav.DeepLinks
+import io.github.alien2003.nightbaseline.nav.KeyShortcuts
+import io.github.alien2003.nightbaseline.nav.LocalKeyShortcuts
 import io.github.alien2003.nightbaseline.nav.rememberSystemActions
 import io.github.alien2003.nightbaseline.nav.rememberWindowLayoutInputs
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
@@ -60,7 +63,8 @@ import io.github.alien2003.nightbaseline.work.notify.NightIntents
  * without recreation (manifest `configChanges`), and the layout follows the live window metrics and folding features.
  * The system bar icons follow the app's own theme, not the system's (a forced light or dark theme keeps them
  * readable), over transparent bars. It hosts the navigation graph, turns notification taps into deep links (the
- * `nightbaseline://` data URI or the night date extra, both validated) and lists the keyboard shortcuts for the system helper (Meta+/).
+ * `nightbaseline://` data URI or the night date extra, both validated), lists the keyboard shortcuts for the system helper
+ * (Meta+/) and hands keys nothing focused consumed to them ([KeyShortcuts]), so they work right after a touch.
  * While it is in use it asks for the panel's highest refresh rate ([HighRefreshRate], ADR 0008).
  */
 @AndroidEntryPoint
@@ -68,13 +72,18 @@ class MainActivity : ComponentActivity() {
     private val root: AppRootViewModel by viewModels()
     private val deepLink = mutableStateOf<DeepLink?>(null)
     private val refreshRate = HighRefreshRate(this)
+    private val shortcuts = KeyShortcuts()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) handle(intent)
-        setContent { AppRoot() }
+        setContent { CompositionLocalProvider(LocalKeyShortcuts provides shortcuts) { AppRoot() } }
     }
+
+    // The app-wide shortcuts work without keyboard focus too (after a touch nothing is focused): a key the window
+    // leaves unconsumed goes to the shortcut handler of the navigation graph.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean = shortcuts.dispatch(event) { super.dispatchKeyEvent(it) }
 
     override fun onResume() {
         super.onResume()

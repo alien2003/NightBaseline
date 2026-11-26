@@ -16,6 +16,7 @@ import io.github.alien2003.nightbaseline.ui.material.GlassPreference
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
@@ -69,6 +70,11 @@ class SettingsViewModel
                 .map { it.page }
                 .stateIn(viewModelScope, SharingStarted.Eagerly, options.value.page)
 
+        private val setupAgain = MutableStateFlow(handle.get<Boolean>(KEY_SETUP_AGAIN) == true)
+
+        /** The `ST-SETUP-AGAIN` confirmation is open (saved, so it survives fold / unfold and recreation). */
+        val setupAgainPending: StateFlow<Boolean> = setupAgain.asStateFlow()
+
         init {
             if (options.value.page == SettingsPage.SourcePicker || options.value.section == SettingsSection.Source) loadSources()
         }
@@ -79,7 +85,7 @@ class SettingsViewModel
                 SettingsState(
                     page = o.page,
                     section = o.section,
-                    sourceLabel = access?.sourceLabel ?: s.sourcePackage,
+                    sourceLabel = SourceNames.display(access?.sourceLabel, s.sourcePackage),
                     sourcePackage = s.sourcePackage,
                     sources = o.sources,
                     lastRead = data.lastRead(runs),
@@ -165,8 +171,20 @@ class SettingsViewModel
         fun setGlass(preference: GlassPreference) =
             launch { data.settingsRepository.setGlassMode(if (preference == GlassPreference.Off) GlassMode.OFF else GlassMode.AUTO) }
 
-        /** "Set up again": onboarding restarts at the source step; nothing stored is deleted. */
-        fun setupAgain() = launch { data.settingsRepository.setOnboardingDone(false) }
+        /**
+         * "Set up again": asks first (`ST-SETUP-AGAIN`). Confirming runs onboarding again from the source step over
+         * Settings (the navigation graph pushes it); nothing stored is deleted and onboarding stays done, so Back from
+         * the rerun returns to Settings.
+         */
+        fun askSetupAgain() = setSetupAgain(true)
+
+        /** The confirmation closed: cancelled, or confirmed (the rerun is pushed by the caller). */
+        fun cancelSetupAgain() = setSetupAgain(false)
+
+        private fun setSetupAgain(open: Boolean) {
+            setupAgain.value = open
+            handle[KEY_SETUP_AGAIN] = open
+        }
 
         /** Re-checks the system state (after the notification prompt or returning from system settings). */
         fun refresh() = launch { data.refresh() }
@@ -186,6 +204,7 @@ class SettingsViewModel
         companion object {
             private const val KEY_PAGE = "page"
             private const val KEY_SECTION = "settings_section"
+            private const val KEY_SETUP_AGAIN = "setup_again"
             private const val STOP_TIMEOUT_MS = 5_000L
 
             /** Screen preset of a stored level (the z thresholds are the same: 3.0, 2.5, 2.0). */

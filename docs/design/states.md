@@ -250,6 +250,7 @@ it." Tap -> Home.
 | `ST-SENS-LEARNING` | learning period | sensitivity preview hidden; `settings_sens_preview_learning`: "A preview appears after the learning period." | yes |
 | sensitivity presets | always | `sens_fewer`: "Fewer notes" / `sens_fewer_desc`: "Only larger changes count, so you get fewer notes. Two measurements still need to move."; `sens_balanced`: "Balanced" / `sens_balanced_desc`: "Recommended. Clear changes count. Two measurements need to move."; `sens_more`: "More notes" / `sens_more_desc`: "Smaller changes count too, so you get more notes. Two measurements still need to move."; preview `sens_preview` (plurals): "With this setting, {k} of your last {n} nights would have sent a note." | yes |
 | `ST-SOURCE-CHANGE` | person picks another source | `GlassDialog`: `source_change_title`: "Switch to {source}?" / `source_change_body`: "Devices measure a little differently, so NightBaseline learns your usual range again from {source}'s nights. Your history stays." Buttons `action_switch`: "Switch", `action_cancel`: "Cancel". (Proposal: ranges restart per source; confirm in the algorithm ADR.) | yes |
+| `ST-SETUP-AGAIN` | person taps "Set up again" in Settings | `GlassDialog` like `ST-SOURCE-CHANGE`: `setup_again_title`: "Set up again?" / `setup_again_body`: "You choose the source and the permissions again. Your stored nights and history stay." Buttons `settings_setup_again`: "Set up again", `action_cancel`: "Cancel". Confirming pushes onboarding at the source step over Settings; Back on that step returns to Settings, and onboarding stays done until the rerun finishes. | yes |
 | appearance | always | `settings_theme`: "Theme" (`theme_system`: "System", `theme_light`: "Light", `theme_dark`: "Dark"); `settings_glass`: "Glass effects" (`glass_auto`: "Automatic", `glass_off`: "Off"); summary when auto resolved to off: `glass_off_battery`: "Off now: battery saver is on", `glass_off_transparency`: "Off now: reduce transparency is on", `glass_off_animations`: "Off now: animations are off", `glass_off_unsupported`: "Not available on this Android version", `glass_off_device`: "Off on this device to keep scrolling smooth" | yes |
 
 ## 8. Range explainer sheet (copy)
@@ -319,6 +320,7 @@ Every visible string named in `screens.md` that is not a state above. Same rules
 | `settings_hc_permissions` | Health Connect permissions | yes |
 | `settings_last_read_title` | Last read | yes |
 | `settings_setup_again` | Set up again | yes |
+| `setup_again_title` / `setup_again_body` | Set up again? / You choose the source and the permissions again. Your stored nights and history stay. | yes |
 | `settings_group_notifications` | Notifications | yes |
 | `settings_notif_results` | Night results | yes |
 | `settings_notif_problems` | Problems reading data | yes |

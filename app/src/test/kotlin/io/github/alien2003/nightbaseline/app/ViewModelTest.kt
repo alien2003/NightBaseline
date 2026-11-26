@@ -45,6 +45,7 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -298,6 +299,29 @@ class ViewModelTest {
                     .nights.size,
             )
             assertTrue(home(app) is HomeUi.Learning)
+        }
+
+    @Test
+    fun `settings names a source that is not installed, never by its raw package id`() =
+        runTest {
+            val app = TestApp(access = TestApp.allowed(sourceLabel = null))
+            val vm = SettingsViewModel(SavedStateHandle(), app.data)
+            backgroundScope.launch { vm.ui.collect {} }
+            assertEquals("OHealth", vm.ui.ready { it != null }!!.sourceLabel)
+        }
+
+    @Test
+    fun `set up again asks first and keeps onboarding done`() =
+        runTest {
+            val app = TestApp()
+            val handle = SavedStateHandle()
+            val vm = SettingsViewModel(handle, app.data)
+            vm.askSetupAgain()
+            assertTrue(vm.setupAgainPending.value)
+            assertTrue(SettingsViewModel(handle, app.data).setupAgainPending.value, "the open confirmation is saved")
+            vm.cancelSetupAgain()
+            assertFalse(vm.setupAgainPending.value)
+            assertTrue(app.settings.current.value.onboardingDone)
         }
 
     @Test

@@ -47,6 +47,7 @@ import io.github.alien2003.nightbaseline.ui.components.GlassDialog
 import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.ModalHost
 import io.github.alien2003.nightbaseline.ui.components.ModalKind
+import io.github.alien2003.nightbaseline.ui.components.ModalScope
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
@@ -94,30 +95,40 @@ fun SettingsScreen(
     onMore: () -> Unit = {},
     scroll: ScrollState = rememberScrollState(),
     systemBack: SettingsSystemBack? = null,
+    setupAgain: SetupAgainConfirm = SetupAgainConfirm(),
 ) {
     CountComposition("SettingsScreen")
     val twoPanes = layout.twoPanes && layout.mode != LayoutMode.Tabletop && layout.mode != LayoutMode.Glance
+    val singlePane = !twoPanes && layout.mode != LayoutMode.Glance && layout.mode != LayoutMode.Tabletop
     val page = if (twoPanes) SettingsPage.Main else state.page
-    val back = if (page == SettingsPage.Main) null else actions.onBack
     val scrolls = remember(scroll) { PageScrolls(scroll) }
     // Sub-pages push and pop like screens (coloros-conformance.md P2) on a seekable transition, so a predictive back
     // gesture can hold the pop at its start: the parent page waits under the previewing one (ADR 0009).
     val (pages, seek) = rememberSeekablePages(page)
     if (systemBack != null) SettingsBackHandler(systemBack, state.page, layout, twoPanes, seek)
+    val dialogs: @Composable () -> Unit = {
+        SourceChangeDialog(state, layout, actions)
+        SetupAgainDialog(setupAgain, layout)
+    }
+    if (singlePane) {
+        // Every page is a whole shell page (top bar, content and, on the list, the bar): a pushed sub-page and the
+        // back preview move its title and back button with it, as a pushed screen does.
+        Box(modifier.fillMaxSize()) {
+            SinglePanePages(state, layout, actions, page, scrolls, pages, seek, systemBack?.preview, onSelectTab)
+            dialogs()
+        }
+        return
+    }
     ShellPage(
         layout = layout,
         tab = TopLevel.Settings,
         title = stringResource(pageTitle(page)),
-        scroll = if (twoPanes) scroll else scrolls.of(page),
+        scroll = scroll,
         modifier = modifier,
         onSelectTab = onSelectTab,
-        onBack = back,
-        column =
-            when {
-                twoPanes || layout.verticalFold != null -> TitleColumn.atStart(layout.gutter)
-                else -> TitleColumn.centred(layout.gutter, NbDimens.textMax)
-            },
-        overlay = { SourceChangeDialog(state, layout, actions) },
+        onBack = if (page == SettingsPage.Main) null else actions.onBack,
+        column = if (twoPanes) TitleColumn.atStart(layout.gutter) else titleColumn(layout),
+        overlay = { dialogs() },
     ) { padding ->
         when {
             layout.mode == LayoutMode.Glance -> {
@@ -128,16 +139,30 @@ fun SettingsScreen(
                 TabletopSettings(state, layout, actions, padding, scroll)
             }
 
-            twoPanes -> {
-                TwoPaneSettings(state, layout, actions, padding, scroll, systemBack?.preview)
-            }
-
             else -> {
-                SinglePanePages(state, layout, actions, page, padding, scrolls, pages, seek, systemBack?.preview)
+                TwoPaneSettings(state, layout, actions, padding, scroll, systemBack?.preview)
             }
         }
     }
 }
+
+/** The title column of a single-pane page: at the start beside a vertical fold, centred over the content otherwise. */
+private fun titleColumn(layout: LayoutSpec): TitleColumn =
+    if (layout.verticalFold != null) TitleColumn.atStart(layout.gutter) else TitleColumn.centred(layout.gutter, NbDimens.textMax)
+
+/**
+ * `ST-SETUP-AGAIN`: the confirmation before "Set up again" runs onboarding again.
+ *
+ * @property open the dialog is shown.
+ * @property onConfirm "Set up again".
+ * @property onCancel "Cancel", Back, the scrim.
+ */
+@Stable
+class SetupAgainConfirm(
+    val open: Boolean = false,
+    val onConfirm: () -> Unit = {},
+    val onCancel: () -> Unit = {},
+)
 
 /**
  * System Back for the Settings sub-pages (ADR 0009): the screen registers a previewing Back handler while a sub-page
@@ -227,9 +252,10 @@ private fun SettingsBackHandler(
 }
 
 /**
- * The single-pane pages: sub-pages push and pop like screens; depth decides the direction. Each page is opaque (the
- * covered page never shows through the incoming one), scrolls on its own state and keeps the padding it was laid out
- * with while it leaves (review round 5). A page a back gesture previews draws its pose and keeps it while it leaves.
+ * The single-pane pages: sub-pages push and pop like screens; depth decides the direction. Each page is a whole,
+ * opaque shell page (the covered page never shows through the incoming one, its top bar included), scrolls on its own
+ * state and lays out with its own shell padding. A page a back gesture previews draws its pose, top bar included, and
+ * keeps it while it leaves.
  */
 @Suppress("LongParameterList")
 @Composable
@@ -238,11 +264,11 @@ private fun SinglePanePages(
     layout: LayoutSpec,
     actions: SettingsActions,
     page: SettingsPage,
-    padding: PaddingValues,
     scrolls: PageScrolls,
     pages: SeekableTransitionState<SettingsPage>,
     seek: PredictiveSeek,
     preview: BackPreview?,
+    onSelectTab: (TopLevel) -> Unit,
 ) {
     val transitions = rememberPageTransitions()
     rememberTransition(pages, label = "settingsPage").AnimatedContent(
@@ -250,15 +276,21 @@ private fun SinglePanePages(
             transitions.content(forward = depth(targetState) > depth(initialState), predictiveEdge = seek.edge)
         },
     ) { shown ->
-        val own = remember { PaddingHolder(padding) }
-        if (shown == page) own.value = padding
-        SinglePaneColumn(
-            layout,
-            own.value,
-            scrolls.of(shown),
-            if (preview != null) Modifier.backPreviewPage(preview, shown) else Modifier,
-        ) {
-            PageContent(state, actions, shown, inlineSensitivity(layout))
+        val scroll = scrolls.of(shown)
+        ShellPage(
+            layout = layout,
+            tab = TopLevel.Settings,
+            title = stringResource(pageTitle(shown)),
+            scroll = scroll,
+            modifier = if (preview != null) Modifier.backPreviewPage(preview, shown) else Modifier,
+            onSelectTab = onSelectTab,
+            // A leaving sub-page keeps its back button until it is gone; only the shown page acts on it.
+            onBack = if (shown == SettingsPage.Main) null else ({ if (shown == page) actions.onBack() }),
+            column = titleColumn(layout),
+        ) { padding ->
+            SinglePaneColumn(layout, padding, scroll) {
+                PageContent(state, actions, shown, inlineSensitivity(layout))
+            }
         }
         if (preview != null) ReleaseBackPreviewOnDispose(preview, shown)
     }
@@ -272,11 +304,6 @@ private class PageScrolls(
 
     fun of(page: SettingsPage): ScrollState = if (page == SettingsPage.Main) main else pages.getOrPut(page) { ScrollState(0) }
 }
-
-/** The padding a page was last laid out with while shown; plain (not state), read only by that page. */
-private class PaddingHolder(
-    var value: PaddingValues,
-)
 
 private fun pageTitle(page: SettingsPage): Int =
     when (page) {
@@ -341,7 +368,6 @@ private fun SinglePaneColumn(
     layout: LayoutSpec,
     padding: PaddingValues,
     scroll: ScrollState,
-    pose: Modifier,
     content: @Composable () -> Unit,
 ) {
     // With a vertical (non-separating) fold the column is start-aligned so controls keep off the crease.
@@ -349,8 +375,6 @@ private fun SinglePaneColumn(
     Column(
         Modifier
             .fillMaxSize()
-            .then(pose)
-            .background(NbTheme.colors.background)
             .verticalScroll(scroll)
             .padding(padding)
             .padding(horizontal = layout.gutter),
@@ -618,6 +642,50 @@ private fun SourceChangeDialog(
     layout: LayoutSpec,
     actions: SettingsActions,
 ) {
+    ConfirmDialog(state.pendingSource, layout, onCancel = actions.onCancelSource) { source, modifier ->
+        GlassDialog(
+            title = stringResource(R.string.source_change_title, source.label),
+            body = stringResource(R.string.source_change_body, source.label),
+            confirm = stringResource(R.string.action_switch),
+            onConfirm = actions.onConfirmSource,
+            dismiss = stringResource(R.string.action_cancel),
+            onDismiss = { dismiss() },
+            modifier = modifier,
+        )
+    }
+}
+
+/** `ST-SETUP-AGAIN` (`coloros-conformance.md` H1), placed like [SourceChangeDialog]. */
+@Composable
+private fun SetupAgainDialog(
+    confirm: SetupAgainConfirm,
+    layout: LayoutSpec,
+) {
+    ConfirmDialog(if (confirm.open) Unit else null, layout, onCancel = confirm.onCancel) { _, modifier ->
+        GlassDialog(
+            title = stringResource(R.string.setup_again_title),
+            body = stringResource(R.string.setup_again_body),
+            confirm = stringResource(R.string.settings_setup_again),
+            onConfirm = confirm.onConfirm,
+            dismiss = stringResource(R.string.action_cancel),
+            onDismiss = { dismiss() },
+            modifier = modifier,
+        )
+    }
+}
+
+/**
+ * A confirmation dialog of Settings while [value] is not null: docked at the bottom on phone-width windows (16 dp
+ * margins above the navigation inset), centred on wider windows, in the end pane in Book (never across the fold) and
+ * in the bottom half in Tabletop. [dialog] gets the dialog's placement modifier; `dismiss()` animates it out.
+ */
+@Composable
+private fun <T : Any> ConfirmDialog(
+    value: T?,
+    layout: LayoutSpec,
+    onCancel: () -> Unit,
+    dialog: @Composable ModalScope.(value: T, modifier: Modifier) -> Unit,
+) {
     val bookFold = layout.verticalFold?.takeIf { layout.mode == LayoutMode.Book }
     val tabletopFold = layout.horizontalFold?.takeIf { layout.mode == LayoutMode.Tabletop }
     val docked = bookFold == null && tabletopFold == null && layout.widthDp < ShellDimens.DIALOG_DOCK_MAX_WIDTH
@@ -629,31 +697,25 @@ private fun SourceChangeDialog(
         }
     val alignment = if (docked) Alignment.BottomCenter else Alignment.Center
     ModalHost(
-        state.pendingSource,
-        onDismiss = actions.onCancelSource,
+        value,
+        onDismiss = onCancel,
         kind = if (docked) ModalKind.DockedDialog else ModalKind.Dialog,
-    ) { source ->
+    ) { shown ->
         // Scrolls when the window is too short for the dialog (cover screen, tabletop half, 200 % font).
         BoxWithConstraints(Modifier.fillMaxSize().then(placement)) {
             Box(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
                 contentAlignment = alignment,
             ) {
-                GlassDialog(
-                    title = stringResource(R.string.source_change_title, source.label),
-                    body = stringResource(R.string.source_change_body, source.label),
-                    confirm = stringResource(R.string.action_switch),
-                    onConfirm = actions.onConfirmSource,
-                    dismiss = stringResource(R.string.action_cancel),
-                    onDismiss = { dismiss() },
-                    modifier =
-                        if (docked) {
-                            Modifier
-                                .windowInsetsPadding(WindowInsets.navigationBars)
-                                .padding(ShellDimens.dialogMargin)
-                        } else {
-                            Modifier.padding(layout.gutter)
-                        },
+                dialog(
+                    shown,
+                    if (docked) {
+                        Modifier
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                            .padding(ShellDimens.dialogMargin)
+                    } else {
+                        Modifier.padding(layout.gutter)
+                    },
                 )
             }
         }

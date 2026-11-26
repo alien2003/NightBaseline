@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -237,6 +238,64 @@ class PredictiveBackTest {
     }
 
     @Test
+    fun `a second gesture during a cancel over the History tab pops once and keeps the tab`() {
+        launch()
+        compose.onAllNodesWithText("History")[0].performClick()
+        idle()
+        compose.runOnIdle { nav.navigate(NightRoute(SampleData.LAST_WAKE.minusDays(3).toString(), TopLevel.History.name)) }
+        idle()
+        val night = nav.currentBackStackEntry!!.id
+        val depth = nav.currentBackStack.value.size
+        startGesture()
+        progress(0.5f)
+        assertPose(night, 0.5f)
+        // Cancel, and start the next gesture while the page is still on its way back to rest: the History section
+        // underneath is composed for the preview, and its own tab -> Home handler must not take this gesture.
+        compose.mainClock.autoAdvance = false
+        back.dispatchOnBackCancelled()
+        compose.mainClock.advanceTimeBy(48)
+        back.dispatchOnBackStarted(BackEventCompat(0f, TOUCH_Y, 0f, BackEventCompat.EDGE_LEFT))
+        back.dispatchOnBackProgressed(BackEventCompat(400f, TOUCH_Y, 0.4f, BackEventCompat.EDGE_LEFT))
+        compose.mainClock.advanceTimeBy(32)
+        assertTrue("the second gesture previews the Night page", poses[night]?.atRest == false)
+        back.onBackPressed()
+        compose.mainClock.autoAdvance = true
+        idle()
+        assertEquals("one pop", depth - 1, nav.currentBackStack.value.size)
+        assertEquals("back on the History tab", TopLevel.History, nav.currentBackStackEntry?.topLevelTab())
+        assertTrue("History still takes Back (to Home)", back.hasEnabledCallbacks())
+    }
+
+    @Test
+    fun `a gesture during the cancel of the same page resumes where the page is`() {
+        launch()
+        openNight()
+        compose.runOnIdle { nav.navigate(MetricRoute("respiratory_rate", SampleData.LAST_WAKE.toString(), TopLevel.Home.name)) }
+        idle()
+        val metric = nav.currentBackStackEntry!!.id
+        startGesture()
+        progress(0.8f)
+        assertPose(metric, 0.8f)
+        compose.mainClock.autoAdvance = false
+        back.dispatchOnBackCancelled()
+        compose.mainClock.advanceTimeBy(32)
+        val during = poses.getValue(metric).progress
+        assertTrue("on its way back: $during", during > 0.05f && during < 0.8f)
+        back.dispatchOnBackStarted(BackEventCompat(0f, TOUCH_Y, 0f, BackEventCompat.EDGE_LEFT))
+        back.dispatchOnBackProgressed(BackEventCompat(0f, TOUCH_Y, 0f, BackEventCompat.EDGE_LEFT))
+        compose.mainClock.advanceTimeByFrame()
+        val resumed = poses.getValue(metric).progress
+        assertTrue("no jump back to rest: $resumed after $during", resumed >= during - 0.1f && resumed > 0.05f)
+        back.dispatchOnBackProgressed(BackEventCompat(1080f, TOUCH_Y, 1f, BackEventCompat.EDGE_LEFT))
+        compose.mainClock.advanceTimeByFrame()
+        assertEquals("the end of the gesture is the end of the preview", 1f, poses.getValue(metric).progress, EPS)
+        back.onBackPressed()
+        compose.mainClock.autoAdvance = true
+        idle()
+        assertTrue(route(), route().contains("NightRoute"))
+    }
+
+    @Test
     fun `tab to Home previews the section over Home in its covered pose`() {
         launch()
         assertFalse("Home: no handler", back.hasEnabledCallbacks())
@@ -287,6 +346,25 @@ class PredictiveBackTest {
         assertEquals(TopLevel.Settings, nav.currentBackStackEntry?.topLevelTab())
         assertFalse("the sub-page is closed", shown("Fewer notes"))
         assertRest(SettingsPage.Main)
+    }
+
+    @Test
+    fun `settings sub-page previews its top bar with the page`() {
+        launch()
+        compose.onAllNodesWithText("Settings")[0].performClick()
+        idle()
+        compose.onNode(hasText("Balanced") and hasClickAction()).performScrollTo().performClick()
+        idle()
+        val backButton = hasContentDescription("Back") and hasClickAction()
+        val rest = compose.onNode(backButton).fetchSemanticsNode().boundsInRoot
+        startGesture()
+        progress(0.5f)
+        assertPose(SettingsPage.Sensitivity, 0.5f)
+        val moved = compose.onNode(backButton).fetchSemanticsNode().boundsInRoot
+        assertTrue("the back button moves with the page: $rest -> $moved", moved.left > rest.left + 1f)
+        assertTrue("and scales with it", moved.width < rest.width)
+        cancel()
+        assertEquals(rest, compose.onNode(backButton).fetchSemanticsNode().boundsInRoot)
     }
 
     @Test

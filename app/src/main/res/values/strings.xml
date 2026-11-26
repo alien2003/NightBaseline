@@ -381,6 +381,8 @@
     <string name="settings_hc_permissions">Health Connect permissions</string>
     <string name="settings_last_read_title">Last read</string>
     <string name="settings_setup_again">Set up again</string>
+    <string name="setup_again_title">Set up again?</string>
+    <string name="setup_again_body">You choose the source and the permissions again. Your stored nights and history stay.</string>
     <string name="settings_group_notifications">Notifications</string>
     <string name="settings_notif_results">Night results</string>
     <string name="settings_notif_problems">Problems reading data</string>

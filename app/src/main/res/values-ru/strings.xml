@@ -423,6 +423,8 @@
     <string name="settings_hc_permissions">Разрешения Health Connect</string>
     <string name="settings_last_read_title">Последнее чтение</string>
     <string name="settings_setup_again">Настроить заново</string>
+    <string name="setup_again_title">Настроить заново?</string>
+    <string name="setup_again_body">Вы снова выберете источник и разрешения. Сохранённые ночи и история останутся.</string>
     <string name="settings_group_notifications">Уведомления</string>
     <string name="settings_notif_results">Результаты ночи</string>
     <string name="settings_notif_problems">Проблемы с чтением данных</string>

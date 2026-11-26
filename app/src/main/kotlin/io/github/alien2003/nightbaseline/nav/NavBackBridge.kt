@@ -6,6 +6,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -103,6 +106,19 @@ internal fun BackPreviewDestination(
         body()
     } else {
         CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides bridge.outer, content = body)
+    }
+}
+
+/**
+ * Whether [entry] is the top page of the back stack now. A page under a pushed one is composed again while a back
+ * gesture previews the pop; its own Back handlers must stay disabled then, or they would take the next gesture from
+ * the NavHost's handler (they register later, so they come first). Read the value where it is used.
+ */
+@Composable
+internal fun NavHostController.isTopEntry(entry: NavBackStackEntry): State<Boolean> {
+    val stack = currentBackStack.collectAsState()
+    return remember(entry) {
+        derivedStateOf { stack.value.lastOrNull { it.destination.navigatorName == COMPOSE_NAVIGATOR }?.id == entry.id }
     }
 }
 
