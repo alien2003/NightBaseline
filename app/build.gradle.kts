@@ -374,4 +374,6 @@ dependencies {
     androidTestImplementation(libs.androidx.work.testing)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    // Raises Compose's transitive espresso-core 3.5.0, which fails on Android 17 (see libs.versions.toml).
+    androidTestImplementation(libs.androidx.test.espresso.core)
 }
