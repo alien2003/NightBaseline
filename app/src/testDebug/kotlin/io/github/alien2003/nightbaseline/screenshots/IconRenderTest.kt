@@ -78,11 +78,12 @@ class IconRenderTest {
         val out = Bitmap.createBitmap(size * 3 + 40, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
         canvas.drawColor(Color.rgb(40, 40, 44))
-        val guide = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 2f
-            color = Color.argb(200, 255, 80, 80)
-        }
+        val guide =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 2f
+                color = Color.argb(200, 255, 80, 80)
+            }
         listOf(icon.background, icon.foreground, icon.monochrome).forEachIndexed { i, layer ->
             val left = i * (size + 20)
             canvas.save()
@@ -132,10 +133,19 @@ class IconRenderTest {
         s: Float,
     ): Path =
         when (mask) {
-            Mask.Circle -> Path().apply { addCircle(s / 2, s / 2, s / 2, Path.Direction.CW) }
-            Mask.RoundedSquare -> Path().apply { addRoundRect(RectF(0f, 0f, s, s), s * 0.22f, s * 0.22f, Path.Direction.CW) }
-            Mask.Squircle -> superellipse(s, 5.0)
-            Mask.Teardrop ->
+            Mask.Circle -> {
+                Path().apply { addCircle(s / 2, s / 2, s / 2, Path.Direction.CW) }
+            }
+
+            Mask.RoundedSquare -> {
+                Path().apply { addRoundRect(RectF(0f, 0f, s, s), s * 0.22f, s * 0.22f, Path.Direction.CW) }
+            }
+
+            Mask.Squircle -> {
+                superellipse(s, 5.0)
+            }
+
+            Mask.Teardrop -> {
                 Path().apply {
                     val r = s / 2
                     val small = s * 0.15f
@@ -147,6 +157,7 @@ class IconRenderTest {
                     arcTo(RectF(0f, 0f, s, s), 90f, 180f)
                     close()
                 }
+            }
         }
 
     /** |x|^n + |y|^n = 1, scaled to [s]. */
@@ -181,21 +192,31 @@ class IconRenderTest {
         for (i in 0 until 3) {
             val top = (i * panelH).toFloat()
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            val bottom = top + panelH
+            val clamp = Shader.TileMode.CLAMP
             when (i) {
-                0 -> paint.shader =
-                    LinearGradient(0f, top, panelW.toFloat(), top + panelH, Color.rgb(244, 245, 249), Color.rgb(214, 222, 236), Shader.TileMode.CLAMP)
-                1 -> paint.shader =
-                    LinearGradient(0f, top, panelW.toFloat(), top + panelH, Color.rgb(10, 10, 12), Color.rgb(30, 32, 40), Shader.TileMode.CLAMP)
-                else -> paint.shader =
-                    LinearGradient(
-                        0f,
-                        top,
-                        panelW.toFloat(),
-                        top + panelH,
-                        intArrayOf(Color.rgb(255, 150, 60), Color.rgb(220, 60, 130), Color.rgb(40, 110, 220), Color.rgb(30, 200, 170)),
-                        null,
-                        Shader.TileMode.CLAMP,
-                    )
+                0 -> {
+                    paint.shader =
+                        LinearGradient(0f, top, panelW.toFloat(), bottom, Color.rgb(244, 245, 249), Color.rgb(214, 222, 236), clamp)
+                }
+
+                1 -> {
+                    paint.shader =
+                        LinearGradient(0f, top, panelW.toFloat(), bottom, Color.rgb(10, 10, 12), Color.rgb(30, 32, 40), clamp)
+                }
+
+                else -> {
+                    paint.shader =
+                        LinearGradient(
+                            0f,
+                            top,
+                            panelW.toFloat(),
+                            top + panelH,
+                            intArrayOf(Color.rgb(255, 150, 60), Color.rgb(220, 60, 130), Color.rgb(40, 110, 220), Color.rgb(30, 200, 170)),
+                            null,
+                            Shader.TileMode.CLAMP,
+                        )
+                }
             }
             canvas.save()
             canvas.clipRect(0f, top, panelW.toFloat(), top + panelH)
@@ -214,22 +235,24 @@ class IconRenderTest {
         w: Int,
         h: Int,
     ) {
-        val blobs = listOf(
-            Triple(120f, 60f, Color.argb(200, 255, 240, 120)),
-            Triple(420f, 220f, Color.argb(200, 20, 20, 60)),
-            Triple(300f, 40f, Color.argb(180, 255, 255, 255)),
-            Triple(520f, 90f, Color.argb(200, 120, 255, 160)),
-            Triple(60f, 250f, Color.argb(200, 90, 20, 120)),
-        )
+        val blobs =
+            listOf(
+                Triple(120f, 60f, Color.argb(200, 255, 240, 120)),
+                Triple(420f, 220f, Color.argb(200, 20, 20, 60)),
+                Triple(300f, 40f, Color.argb(180, 255, 255, 255)),
+                Triple(520f, 90f, Color.argb(200, 120, 255, 160)),
+                Triple(60f, 250f, Color.argb(200, 90, 20, 120)),
+            )
         blobs.forEach { (x, y, c) ->
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
             p.shader = RadialGradient(x, top + y, 110f, c, c and 0x00FFFFFF, Shader.TileMode.CLAMP)
             canvas.drawCircle(x, top + y, 110f, p)
         }
-        val stripe = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(70, 255, 255, 255)
-            strokeWidth = 10f
-        }
+        val stripe =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(70, 255, 255, 255)
+                strokeWidth = 10f
+            }
         for (k in -4..w / 60) canvas.drawLine(k * 60f, top + h, k * 60f + 200f, top, stripe)
     }
 
@@ -262,7 +285,11 @@ class IconRenderTest {
             val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
             val c = Canvas(bmp)
             c.drawPath(superellipse(px.toFloat(), 5.0), Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bg })
-            val mono = icon.monochrome!!.constantState!!.newDrawable().mutate()
+            val mono =
+                icon.monochrome!!
+                    .constantState!!
+                    .newDrawable()
+                    .mutate()
             mono.colorFilter = BlendModeColorFilter(fg, BlendMode.SRC_IN)
             val full = px * 108 / 72
             val offset = -(full - px) / 2
