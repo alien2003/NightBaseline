@@ -108,6 +108,7 @@ subprojects {
  *   data-local -> core-algo
  *   algo-cli -> core-algo
  *   core-algo -> (nothing)
+ *   hc-seeder -> core-algo (debug-only emulator tool: writes SyntheticNights into Health Connect)
  * It also asserts that :core-algo applies no Android Gradle plugin. The runtime-classpath purity of :core-algo is
  * verified by :core-algo:verifyPureJvmRuntimeClasspath (resolution must happen in the owning project).
  * Both run as dependencies of :core-algo:test, so `./gradlew test` always enforces them.
@@ -126,6 +127,7 @@ val verifyModuleGraph =
                 ":algo-cli" to listOf(":core-algo"),
                 ":core-algo" to emptyList(),
                 ":hc-exporter" to emptyList(),
+                ":hc-seeder" to listOf(":core-algo"),
             )
         val androidPluginIds =
             listOf(

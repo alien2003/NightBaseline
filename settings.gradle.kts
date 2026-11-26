@@ -38,3 +38,7 @@ include(":work")
 // Debug-only dataset exporter (never shipped): reads Health Connect, writes JSONL into its private files dir.
 include(":hc-exporter")
 project(":hc-exporter").projectDir = file("tools/hc-exporter")
+
+// Debug-only synthetic Health Connect seeder for emulators (never shipped): writes SyntheticNights as its own source.
+include(":hc-seeder")
+project(":hc-seeder").projectDir = file("tools/hc-seeder")
