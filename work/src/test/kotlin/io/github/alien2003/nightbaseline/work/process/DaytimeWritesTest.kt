@@ -26,23 +26,24 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 
 /**
- * Regression (release 0.1.0-dev.5, UTC-03): a complete night was not evaluated in the morning because the "source
- * still writing" check counted every record of the source written since the night started, including the day's step
- * records and all-day heart rate, so a check soon after any daytime sync always waited. Synthetic data with the
- * shape of that morning: the source re-saves the previous night at 08:00, a short nap of the previous day is written
- * with it, the new night is published about 10 min after its end, step records of the source and of the phone keep
- * arriving all morning, and "Check now" runs about two hours after the end.
+ * Regression (release 0.1.0-dev.5): a complete night was not evaluated in the morning because the "source still
+ * writing" check counted every record of the source written since the night started, including the day's step records
+ * and all-day heart rate, so a check soon after any daytime sync always waited. Synthetic data (dates, zone and times
+ * are made up) with the shape of that morning: the source re-saves the previous night in the early morning, a short
+ * nap of the previous day is written with it, the new night is published about 10 min after its end, step records of
+ * the source and of the phone keep arriving all morning, and "Check now" runs about two hours after the end.
  */
 class DaytimeWritesTest {
-    private val zone: ZoneId = ZoneId.of("America/Argentina/Buenos_Aires")
+    private val offset: ZoneOffset = ZoneOffset.ofHours(2)
+    private val zone: ZoneId = offset
     private val h = Harness(zone)
     private val gen =
         SyntheticNights(
             SyntheticNights.Config(
                 seed = 26,
                 nights = 30,
-                firstWakeDate = LocalDate.of(2026, 10, 28),
-                offset = ZoneOffset.ofHours(-3),
+                firstWakeDate = LocalDate.of(2026, 5, 4),
+                offset = offset,
                 missingNightP = 0.0,
                 shortNightP = 0.0,
                 napP = 0.0,
@@ -69,11 +70,11 @@ class DaytimeWritesTest {
         h.clock.nowMs = endOf(previous) + 3 * HOUR
         assertEquals(previous.wakeDate, (h.processor.process() as ProcessOutcome.Evaluated).date)
 
-        // 08:00: the source re-saves the previous day, with a short nap of that afternoon.
-        val resave = local("2026-11-26T08:00")
+        // Early morning: the source re-saves the previous day, with a short nap of that afternoon.
+        val resave = local("2026-06-02T07:40")
         SyntheticSource.rewriteNight(h.gateway, previous, previous, rewrittenAtMs = resave)
         h.gateway.sessions +=
-            HcSession("nap", SyntheticSource.ORIGIN, local("2026-11-25T12:39"), local("2026-11-25T12:54"), -3 * 3600, resave)
+            HcSession("nap", SyntheticSource.ORIGIN, local("2026-06-01T14:10"), local("2026-06-01T14:25"), offset.totalSeconds, resave)
 
         // The new night is published about 10 min after its end, the person is up 5 min after it.
         SyntheticSource.loadNight(h.gateway, last, writeDelayMs = 10 * MIN, stepsAfterEndMs = 5 * MIN)
@@ -100,7 +101,7 @@ class DaytimeWritesTest {
             // "Check now" runs the same NightRun as the daily work.
             val result = NightRun(h.backfill, h.processor, h.runLog, h.problemNotifier, h.settings).run()
             val outcome = (result as RunResult.Outcome).outcome as ProcessOutcome.Evaluated
-            assertEquals("2026-11-26", outcome.date)
+            assertEquals("2026-06-02", outcome.date)
             assertEquals(last.wakeDate, outcome.date)
             // The previous night, re-saved by the source, gets its one re-evaluation in the same run.
             assertEquals(listOf(previous.wakeDate), outcome.reevaluated)
@@ -109,11 +110,11 @@ class DaytimeWritesTest {
 
             // Home's newest stored night is now the expected wake date; the chain continues at the next daily time.
             assertEquals(last.wakeDate, h.nights.all.maxOf { it.date })
-            val nextDaily = local("2026-11-27T08:00")
+            val nextDaily = local("2026-06-03T08:00")
             assertEquals(WorkStep.RunAt(nextDaily), WorkPlanner.plan(result, attempt = 0, nextDailyMs = nextDaily))
 
-            assertTrue(h.diagnostics.any { it.startsWith("night 2026-11-26 end ") && it.endsWith("-> COMPLETE") }, h.diagnostics.toString())
-            assertTrue("night 2026-11-26 evaluated and stored" in h.diagnostics, h.diagnostics.toString())
+            assertTrue(h.diagnostics.any { it.startsWith("night 2026-06-02 end ") && it.endsWith("-> COMPLETE") }, h.diagnostics.toString())
+            assertTrue("night 2026-06-02 evaluated and stored" in h.diagnostics, h.diagnostics.toString())
         }
 
     @Test

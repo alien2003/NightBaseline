@@ -617,7 +617,7 @@ Requirement: fold/unfold keeps the same screen, scroll position, selected period
 
 ## 9. Owner's device mapping
 
-OPPO CPH2765, book foldable, Android 17, ColorOS 17.0 **[verified, STATUS.md / env.txt]**.
+OPPO book foldable, Android 17, ColorOS 17.0 **[verified, STATUS.md / env.txt]**.
 
 | Screen / posture | px | density | dp (approx.) | Mode |
 |---|---|---|---|---|

@@ -77,6 +77,8 @@ mise exec -- ./gradlew :app:testDebugUnitTest              # app unit, Robolectr
 mise exec -- ./gradlew test                                # everything
 mise exec -- ./gradlew ktlintFormat                        # fix formatting
 bash tools/check-language.sh                               # English only
+bash tools/check-leaks.sh                                  # no home paths, keys, passwords, tokens, personal emails
+bash tools/check-ripple.sh                                 # no Material ripple in the app sources
 mise exec -- python3 tools/design/contrast_check.py docs/design/tokens.md
 ```
 
@@ -85,13 +87,18 @@ mise exec -- python3 tools/design/contrast_check.py docs/design/tokens.md
 | `:core-algo:test` | Night selection, completeness, extraction, baseline and evaluation; `SyntheticBehaviourTest` (200 synthetic people × 90 nights: false-note rate and episodes found, [ALGORITHM.md §7](../ALGORITHM.md#7-validation)); the classpath purity check |
 | `:data-local:test`, `:data-hc:test`, `:work:test` | Room and DataStore, Health Connect mapping and error handling (fakes), the daily run, scheduling and notifications |
 | `:app:testDebugUnitTest` | ViewModels, navigation and deep links, layout resolution; `MergedManifestTest` (no `INTERNET` / `ACCESS_NETWORK_STATE` in the debug and release merged manifests); `StringResourcesTest` (en and ru have the same keys); `ContrastTest` (the Kotlin contrast pairs equal the pairs table of `docs/design/tokens.md` and reach their minimum in both themes); the JVM screenshot tests in `src/testDebug` |
-| `tools/check-language.sh` | No Cyrillic in tracked files outside `res/values-ru*` and `README.ru.md` ([ADR 0002](adr/0002-project-language-and-history.md)); `--staged` checks the index (pre-commit hook). New files are checked once they are added to git |
+| `tools/check-language.sh` | No Cyrillic in tracked files outside the modules' `res/values-ru*` folders (`app/`, `work/`) and `README.ru.md` ([ADR 0002](adr/0002-project-language-and-history.md)); `--staged` checks the index (pre-commit hook). New files are checked once they are added to git |
+| `tools/check-leaks.sh` | No absolute home paths, private keys, signing passwords, tokens or personal email addresses in tracked files; `--staged` checks the index (pre-commit hook) |
+| `tools/check-ripple.sh` | No Material ripple in the app's main and debug sources: press feedback is the ColorOS highlight ([tokens.md 2.8](design/tokens.md#28-state-layers)); the same rule runs as `RippleBanTest` |
 | `tools/design/contrast_check.py` | WCAG contrast of every pair in the contrast table of `docs/design/tokens.md`, glass tints over white and black |
+| `tools/device-test/run-device-tests.sh` | The on-device end-to-end suite against the installed release app ([On-device tests](#on-device-tests)); only with the phone owner's permission, never in CI |
 
 The app tests need a lot of memory: Robolectric's native graphics live outside the Java heap. The defaults are a 3 GB
 test heap and one JVM for all classes; `-PtestMaxHeap=2g -PtestForkEvery=1` (as CI does) uses less.
 
-Every test runs on synthetic data. Never point a test at `.data/`.
+Every test in the repository's builds and in CI runs on synthetic data. Never point a test at `.data/`. The only
+exception is the on-device suite, which reads the phone's real Health Connect data and keeps its reports on the
+computer, git-ignored ([On-device tests](#on-device-tests)).
 
 ## Modules
 
@@ -199,6 +206,26 @@ interop: `.mise.toml` sets `ADB_WIN=adb.exe`, which works when `adb.exe` is on t
 **Native Linux.** The Linux `adb` from `.tooling/android-sdk/platform-tools` works directly
 (`mise exec -- adb install -r …`). This path has not been tested.
 
+### On-device tests
+
+`tools/device-test/run-device-tests.sh` runs the end-to-end suite (`app/src/androidTest/kotlin/…/e2e/`) on the phone,
+inside the **installed release app**, without replacing it ([ADR 0007](adr/0007-on-device-e2e-suite.md)). Only with
+the owner's permission for that run (see [Phone access](#phone-access)):
+
+```sh
+mise exec -- tools/device-test/run-device-tests.sh --dry-run        # prints every adb command, runs nothing
+mise exec -- tools/device-test/run-device-tests.sh                  # everything except the single test write
+mise exec -- tools/device-test/run-device-tests.sh --grant-write    # with the single write and delete
+bash tools/device-test/selftest/run-selftest.sh                     # the runner against a fake adb, no phone
+```
+
+It needs the release signing key and a checkout at the commit the installed release was built from: the runner
+refuses to install anything unless the installed APK's dex equals this checkout's release build, the certificates
+match and the resource ids match. Only the test APK is installed and uninstalled. Reports go to
+`tools/device-test/out/<timestamp>/` (git-ignored; its screenshots show real screens and never go into the
+repository). What each step does, the single tagged test write and its deletion, the permissions and the safety
+guarantees: [tools/device-test/README.md](../tools/device-test/README.md).
+
 ### Night check diagnostics
 
 Every night check (the daily work and "Check now") writes its decisions to logcat, tag `NightBaseline`, info level
@@ -231,12 +258,13 @@ and `docs/design/tokens.md` is read by tests and the contrast check.
 
 | Job | What it does |
 |---|---|
-| `checks` | `tools/check-language.sh` and `tools/design/contrast_check.py docs/design/tokens.md` (5 min) |
+| `checks` | `tools/check-language.sh`, `tools/check-leaks.sh`, `tools/design/contrast_check.py docs/design/tokens.md` and `tools/check-ripple.sh` (5 min) |
 | `build` | `verifyModuleGraph ktlintCheck detekt :app:assembleDebug :app:processReleaseMainManifest`, then the module tests, then a direct check that the merged release manifest has no network permission. On `main` it uploads the debug APK (`nightbaseline-debug-apk`, 2 days); on failure, the reports (7 days) |
 | `app-tests` | `:app:testDebugUnitTest` on a fresh runner; uploads the synthetic screenshots (`screenshots`, 3 days) and, on failure, the reports |
 
-**Memory.** Hosted runners for private repositories have about 7 GB of RAM, and one Robolectric screenshot class peaks
-at about 4.7 GB RSS with a 2 GB heap (native graphics memory). Therefore:
+**Memory.** One Robolectric screenshot class peaks at about 4.7 GB RSS with a 2 GB heap (native graphics memory). The
+limits below were set while the repository was private, on hosted runners with about 7 GB of RAM; the standard
+runners of a public repository have more, and the limits stay as a margin:
 
 - `build` runs with `--max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g -Dkotlin.daemon.jvmargs=-Xmx1g`, and the module tests
   in a separate step with `--max-workers=1` and a 1.5 GB Gradle heap.
@@ -266,13 +294,18 @@ release), so every later version updates the installed one. Local builds are `0.
 2. decodes the signing key from the [signing secrets](#signing-secrets) and opens it with `keytool` (a missing secret
    fails the run with the names of the missing secrets);
 3. builds `:app:assembleRelease` without configuration cache, build cache or Gradle cache;
-4. verifies the APK: `apksigner` signature, not an Android debug key, the expected versionName and versionCode, no
-   network permission; prints the signing certificate SHA-256 in the log and the job summary;
-5. hands the APK to the `publish` job (the only job with `contents: write`, holding no key), which creates the GitHub
-   release "NightBaseline X.Y.Z" with `NightBaseline-X.Y.Z.apk` and `SHA256SUMS.txt`. The notes are the tag's section
-   of [CHANGELOG.md](../CHANGELOG.md) (`.github/scripts/changelog-section.sh`), or GitHub's generated notes when there
-   is none, followed by a downloads table and the release signing certificate SHA-256;
-6. deletes the keystore, also after a failure.
+4. verifies the APK: `apksigner` signature, not an Android debug key, the signing certificate SHA-256 equal to the
+   pinned release certificate (any other signer fails), the expected versionName and versionCode, no network
+   permission; prints the certificate SHA-256 in the log and the job summary;
+5. deletes the keystore, also after a failure.
+
+`build-apks.yml` exposes `signed`, `version`, `prerelease` and `release_cert` as `workflow_call` outputs and hands the
+APK over as a 1-day artifact. Both callers in `release.yml` grant it `contents: read` only. Then the `publish` job of
+`release.yml` (`needs` the build; the only job with `contents: write`, holding no key) creates the GitHub release
+"NightBaseline X.Y.Z" with `NightBaseline-X.Y.Z.apk` and `SHA256SUMS.txt`. The notes are the tag's section of
+[CHANGELOG.md](../CHANGELOG.md) (`.github/scripts/changelog-section.sh`), followed by a downloads table and the release
+signing certificate SHA-256. There is no fallback to generated notes: a tag without a non-empty CHANGELOG section fails
+before the build, and again in `publish`.
 
 `build-apks.yml` also runs on every push to `main` and on manual dispatch as a check build (versionName
 `0.0.0-dry.<run number>`, versionCode 1): the signed APK is verified and discarded. Without the secrets the check build
@@ -286,9 +319,9 @@ unchecked on a `v*` tag it publishes that tag's release like a tag push.
 
 ### Release checklist
 
-1. On `main` with CI green, rename `## [0.1.0] - unreleased` (or move the entries of `## [Unreleased]` into a new
-   section) to `## [X.Y.Z] - YYYY-MM-DD`, leave an empty `## [Unreleased]` and update the link definitions at the end
-   of the file. Use absolute links inside a version section: it becomes the release notes.
+1. On `main` with CI green, move the entries of `## [Unreleased]` into a new section `## [X.Y.Z] - YYYY-MM-DD` (for
+   0.1.0 the section exists; check its date), leave an empty `## [Unreleased]` and update the link definitions at the
+   end of the file. Use absolute links inside a version section: it becomes the release notes.
 2. Check the notes: `bash .github/scripts/changelog-section.sh X.Y.Z CHANGELOG.md`.
 3. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 4. Check the release: two assets, and the certificate line equals

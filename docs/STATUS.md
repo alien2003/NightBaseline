@@ -14,7 +14,7 @@ Live project state. A new session starts here. Updated after every step. Last fu
   SHA-256 `26:EC:1D:EC:35:93:AD:CE:D2:68:BB:64:1E:CB:74:7B:2E:8B:15:42:D5:66:24:78:20:2F:E0:C6:B1:F4:D3:77`. Uploaded
   as repo secrets NIGHTBASELINE_KEYSTORE_BASE64 / _KEYSTORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD. **The owner must back
   it up.** Local signed builds: a script reading the properties file (never prints secrets).
-- Phone: OPPO CPH2765 (book foldable, outer 1140×2616, inner 2248×2480), Android 17, ColorOS 17.0, time zone UTC−03.
+- Phone: an OPPO book foldable (outer 1140×2616, inner 2248×2480), Android 17, ColorOS 17.0.
   Installed: NightBaseline 0.1.0-dev.5 (release key) and the debug exporter.
 
 ## Done
@@ -32,13 +32,13 @@ Live project state. A new session starts here. Updated after every step. Last fu
   split width, theme, rotation; frames: scroll 0.71 % janky, tab switch 3.6 %.
 
 ## In progress
-- BUG (found 2026-11-26 10:15 −03): the night 25→26 Nov is in Health Connect and complete (session 01:57–08:20,
-  written 08:32, all channels to the end, steps at 08:25) but NightBaseline keeps showing "Last night isn't in yet"
-  even after "Check now". Reproduced locally with the exported dataset; cause: the "source still writing" rule
-  counted every record of the source written since the night started (the morning's step records, all-day heart
-  rate), so a check within 15 min of any daytime sync waited, up to the 12 h cap. Fixed: only the night's own records
-  count (`readNight(writesBeforeMs)`), synthetic regression test `DaytimeWritesTest`, logcat diagnostics (tag
-  `NightBaseline`, docs/development.md). Not yet confirmed on the phone.
+- BUG (found 2026-11-26): a complete night was in Health Connect (all channels written to the end of the session, the
+  person already up), but NightBaseline kept showing "Last night isn't in yet", even after "Check now". Reproduced
+  locally with the exported dataset; cause: the "source still writing" rule counted every record of the source written
+  since the night started (the morning's step records, all-day heart rate), so a check within 15 min of any daytime
+  sync waited, up to the 12 h cap. Fixed: only the night's own records count (`readNight(writesBeforeMs)`), synthetic
+  regression test `DaytimeWritesTest`, system-log diagnostics (tag `NightBaseline`, docs/development.md). Still to
+  confirm on the phone: a real night processed automatically after the fix.
 - On-device e2e suite (instrumentation, single write+delete of a year-2000 tagged record, before/after snapshots).
 
 ## Next

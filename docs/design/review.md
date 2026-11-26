@@ -191,7 +191,7 @@ placeholders, clipped text and controls on a fold). The PNGs were read by eye; t
 
 ## Round 2: live check on the owner's phone (2026-11-26)
 
-Device: OPPO CPH2765 (book foldable), Android 17, ColorOS 17, release build 0.1.0-dev.1 signed with the release key.
+Device: an OPPO book foldable, Android 17, ColorOS 17, release build 0.1.0-dev.1 signed with the release key.
 Driven over adb (taps on NightBaseline only; system settings restored afterwards). Device screenshots contain real
 data and stay in the git-ignored `.data/device-shots/`.
 
@@ -215,8 +215,8 @@ Findings to fix:
 2. Unfolding returned Metric detail to the detail pane with the period reset from 90 to 30 nights (state must persist).
 3. Explainer copy says "last 14 to 28 nights"; the algorithm uses the last 28 valid nights, at least 7.
 4. Night label differs between screens ("Night of 25 Nov" on Home, "Night of 24–25 Nov" in Metric detail).
-5. Sleep duration range on real data reads "2 h 33 min – 11 h 30 min": correct for a very variable person but its lower
-   edge is below the 3 h short-night cut-off. Clamp the lower edge to the short-night limit and explain the width.
+5. Sleep duration range on real data: the lower edge is below the 3 h short-night cut-off (arithmetically correct
+   for a very variable person). Clamp the lower edge to the short-night limit and explain the width.
 6. Onboarding on the wide inner screen: the start pane (step and illustration) floats in empty space.
 
 ### Round 2 fixes

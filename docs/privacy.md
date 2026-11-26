@@ -61,7 +61,8 @@ Health Connect itself shows which apps read your data and when (Health Connect â
 ## 3. What is written
 
 Nothing. The app declares no Health Connect write permission, so it cannot write, change or delete any health data. It
-writes no files outside its private storage and exports nothing.
+writes no files outside its private storage and exports nothing; the only other output is a few value-free
+diagnostic lines in Android's system log ([section 5](#5-what-is-stored-on-the-device)).
 
 ## 4. Everything stays on the device
 
@@ -86,6 +87,15 @@ In the app's private storage, which other apps cannot read:
 
 The nightly values are needed to build your usual range from your recent nights and to draw the charts and History.
 No raw heart rate, blood oxygen, respiratory rate, step or other samples are stored.
+
+**Diagnostic lines in the system log.** Every night check (the morning check and "Check now") writes a few lines to
+Android's system log (logcat) under the tag `NightBaseline`, in every build including the release. They contain only
+dates and local clock times of its decisions and the reasons: when the check ran, which night it looked at and that
+night's start and end as the source recorded them, when the newest data of the night arrived, when the next check
+runs, and why it waited or what it did ("evaluated and stored", "waits"). They never contain a measured value, a
+duration or a count. Android keeps the system log in a small buffer that is overwritten within hours to days and
+cleared on restart; other apps cannot read it. It can be read only with a computer over USB debugging (`adb`) or in a
+bug report that you create yourself, so if you share a bug report, it includes your recent sleep start and end times.
 
 ## 6. Notifications
 

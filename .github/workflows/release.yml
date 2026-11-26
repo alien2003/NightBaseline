@@ -1,15 +1,19 @@
 name: Release
 
-# Tag push vX.Y.Z or vX.Y.Z-{alpha|beta|rc}.N: builds the signed release APK, verifies it and publishes the GitHub
-# release "NightBaseline X.Y.Z" with NightBaseline-X.Y.Z.apk and SHA256SUMS.txt. A pre-release tag gives a GitHub
-# pre-release. versionName / versionCode come from the tag (.github/scripts/version-from-tag.sh documents the rule);
-# the notes are the tag's CHANGELOG.md section (.github/scripts/changelog-section.sh), or GitHub's generated notes when
-# there is none. Adapted from PulseStages' release.yml.
+# Tag push vX.Y.Z or vX.Y.Z-{alpha|beta|rc}.N: builds the signed release APK, verifies it (build-apks.yml) and publishes
+# the GitHub release "NightBaseline X.Y.Z" with NightBaseline-X.Y.Z.apk and SHA256SUMS.txt (the "publish" job below).
+# A pre-release tag gives a GitHub pre-release. versionName / versionCode come from the tag
+# (.github/scripts/version-from-tag.sh documents the rule); the notes are the tag's CHANGELOG.md section
+# (.github/scripts/changelog-section.sh). There is no fallback to generated notes: without a non-empty section for the
+# tag the build fails before anything is built or published. Adapted from PulseStages' release.yml.
 #
 # Run workflow (Actions tab), dry_run checked (the default): builds and verifies the signed APK from the selected
 # branch or tag as versionName 0.0.0-dry.<run number>, versionCode 1, then discards it; nothing is published, so this
 # checks the signing secrets before the first tag. With dry_run unchecked on a v* tag, it publishes that tag's release
 # like a tag push.
+#
+# Permissions: both callers of build-apks.yml (the job that holds the signing key) get contents: read only. The
+# "publish" job holds no key and is the only job with contents: write.
 #
 # Repository secrets (all required for a release): NIGHTBASELINE_KEYSTORE_BASE64, NIGHTBASELINE_KEYSTORE_PASSWORD,
 # NIGHTBASELINE_KEY_ALIAS, NIGHTBASELINE_KEY_PASSWORD.
@@ -47,11 +51,10 @@ jobs:
       NIGHTBASELINE_KEY_PASSWORD: ${{ secrets.NIGHTBASELINE_KEY_PASSWORD }}
 
   release:
-    name: Release
+    name: Release build
     if: github.event_name == 'push' || inputs.dry_run == false
-    # The ceiling for build-apks.yml: its build job lowers this to contents: read, only its publish job writes.
     permissions:
-      contents: write
+      contents: read
     uses: ./.github/workflows/build-apks.yml
     with:
       publish: true
@@ -60,3 +63,71 @@ jobs:
       NIGHTBASELINE_KEYSTORE_PASSWORD: ${{ secrets.NIGHTBASELINE_KEYSTORE_PASSWORD }}
       NIGHTBASELINE_KEY_ALIAS: ${{ secrets.NIGHTBASELINE_KEY_ALIAS }}
       NIGHTBASELINE_KEY_PASSWORD: ${{ secrets.NIGHTBASELINE_KEY_PASSWORD }}
+
+  publish:
+    name: Publish GitHub release
+    needs: release
+    if: needs.release.outputs.signed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The only job that can write: creating the release and uploading its assets needs contents: write.
+    permissions:
+      contents: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Only CHANGELOG.md and the scripts are read; gh gets the token through GH_TOKEN.
+          persist-credentials: false
+
+      - name: Download the verified APK
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-apk
+          path: ${{ runner.temp }}/apks
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION_NAME: ${{ needs.release.outputs.version }}
+          PRERELEASE: ${{ needs.release.outputs.prerelease }}
+          RELEASE_CERT: ${{ needs.release.outputs.release_cert }}
+          OUT_DIR: ${{ runner.temp }}/apks
+        # The release text is the CHANGELOG.md section (written by hand, never health data) plus the fixed text below;
+        # nothing in it comes from a measurement, a dataset or a device.
+        run: |
+          set -euo pipefail
+          (cd "$OUT_DIR" && sha256sum -c SHA256SUMS.txt)
+          section=$(bash .github/scripts/changelog-section.sh "$VERSION_NAME" CHANGELOG.md)
+          if [ -z "$section" ]; then
+            # Checked before the build too; generated notes could contain PR text, so there is no fallback.
+            echo "::error::CHANGELOG.md has no non-empty \"## [$VERSION_NAME]\" section: nothing is published."
+            exit 1
+          fi
+          notes="$RUNNER_TEMP/release-notes.md"
+          {
+            printf '%s\n\n' "$section"
+            cat <<EOF
+          ### Downloads
+
+          | File | Use |
+          |---|---|
+          | \`NightBaseline-$VERSION_NAME.apk\` | Signed release build. Later releases install over it as updates. |
+          | \`SHA256SUMS.txt\` | SHA-256 checksum of the APK: \`sha256sum -c SHA256SUMS.txt\` |
+
+          NightBaseline reads Health Connect on the phone and processes everything locally; the APK has no INTERNET
+          permission. It is not a medical device.
+
+          Release signing certificate SHA-256: \`$RELEASE_CERT\`
+          EOF
+          } > "$notes"
+
+          args=(--verify-tag --title "NightBaseline $VERSION_NAME" --notes-file "$notes")
+          if [ "$PRERELEASE" = true ]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            "$OUT_DIR/NightBaseline-$VERSION_NAME.apk" \
+            "$OUT_DIR/SHA256SUMS.txt" \
+            "${args[@]}"

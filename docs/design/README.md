@@ -16,11 +16,15 @@ Design, Luminous Effect) with our own tokens and no vendor resources (ADR 0003).
 | [`app/src/main/res/values-ru/strings.xml`](../../app/src/main/res/values-ru/strings.xml) | the Russian copy for every key in `states.md` (moved from the design draft into the app; English in `app/src/main/res/values/strings.xml`) | Russian wording; the only place with Cyrillic (ADR 0002) |
 | [`layouts.md`](layouts.md) | layout modes and breakpoints, pane widths, navigation shell geometry, per-mode layouts of every screen, fold/hinge/posture rules, state preservation, the owner's device mapping, keyboard/mouse, screenshot-test device matrix | where things go in every window size and posture; it wins on geometry |
 | [`reference-analysis.md`](reference-analysis.md) | measurements of the owner's system apps (outer screen, dark theme) | the calibration numbers behind `[measured]` tokens |
+| [`coloros-conformance.md`](coloros-conformance.md) | the ColorOS 17 conformance plan: deviations found by five audits, the token diff and the work packages | why the UI looks the way it does after the restyle ([ADR 0005](../adr/0005-coloros-canon-vs-accessibility.md)) |
 | [`review.md`](review.md) | review rounds: findings, fixes and the requirement checklist | what was checked and what is still open |
+| [`review-home.md`](review-home.md), [`review-metric.md`](review-metric.md), [`review-history.md`](review-history.md), [`review-setup.md`](review-setup.md) | per-screen reviews of the rendered screenshots (Home and Night detail, Metric detail, History, onboarding / learning / settings) | the findings per screen |
 
-Research inputs (not design decisions): `docs/research/design-coloros17.md`, `docs/research/large-screens.md`,
-`docs/research/analogs.md`. Decisions: `docs/adr/0002-project-language-and-history.md` (English only, Russian only in
-`res/values-ru*`), `docs/adr/0003-ui-library-and-blur.md` (own design layer, Haze blur, fallback).
+Research inputs (not design decisions): `docs/research/design-coloros17.md`, `docs/research/coloros17-glass.md`,
+`docs/research/large-screens.md`, `docs/research/analogs.md`. Decisions: `docs/adr/0002-project-language-and-history.md`
+(English only, Russian only in the modules' `res/values-ru*`), `docs/adr/0003-ui-library-and-blur.md` (own design
+layer, Haze blur, fallback), `docs/adr/0005-coloros-canon-vs-accessibility.md` (ColorOS 17 canon, where accessibility
+wins), `docs/adr/0006-top-level-sections-stay-composed.md` (cheap tab switches).
 
 ## Ownership rules
 
@@ -36,7 +40,8 @@ Research inputs (not design decisions): `docs/research/design-coloros17.md`, `do
 
 | Check | Command | Status |
 |---|---|---|
-| Text >= 4.5:1, graphics and focus >= 3:1, both themes, glass over white and black backdrops | `python3 -I tools/design/contrast_check.py` | runs locally, passes; pre-commit/CI wiring open (`review.md`) |
-| English-only repository | `tools/check-language.sh` (pre-commit hook) | in place |
-| Screenshot matrix and layout assertions (clipping, fold intersection, 48 dp targets) | `layouts.md` 11, `screens.md` 10 | stage 4 |
-| Frame timing on the owner's phone (glass and solid) | `tokens.md` 7.4 | stage 4, with the owner's permission |
+| Text >= 4.5:1, graphics and focus >= 3:1, both themes, glass over white and black backdrops | `python3 -I tools/design/contrast_check.py docs/design/tokens.md`; `ContrastTest` | in place: CI `checks` job and `:app:testDebugUnitTest` |
+| English-only repository | `tools/check-language.sh` (pre-commit hook) | in place: pre-commit and CI |
+| No Material ripple (ColorOS press feedback only, `tokens.md` 2.8) | `tools/check-ripple.sh`; `RippleBanTest` | in place: CI |
+| Screenshot matrix and layout assertions (clipping, fold intersection, 48 dp targets) | `layouts.md` 11, `screens.md` 10; JVM screenshot tests in `app/src/testDebug` | screenshot matrix in place (CI `app-tests` job); which layout assertions are automated: the per-screen reviews |
+| Frame timing on the owner's phone (glass and solid) | `tokens.md` 7.4 | manual, with the owner's permission (results in `docs/STATUS.md`) |

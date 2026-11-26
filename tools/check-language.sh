@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Fails when Cyrillic text appears in tracked (or staged) files outside the allowed places: the project is English;
-# Russian is allowed only in Android resources for the ru locale and in README.ru.md.
+# Russian is allowed only in the Android modules' resources for the ru locale (<module>/src/<source set>/res/values-ru*/,
+# e.g. app/src/main/res/values-ru/) and in README.ru.md. A values-ru folder anywhere else (docs, tools) is not allowed.
 #   tools/check-language.sh            check the working tree (tracked files)
 #   tools/check-language.sh --staged   check the staged content (pre-commit hook)
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
-allowed='(^|/)res/values-ru(-[^/]*)?/|^README\.ru\.md$'
+allowed='^(app|work)/src/[^/]+/res/values-ru(-[^/]*)?/[^/]+$|^README\.ru\.md$'
 if [[ "${1:-}" == "--staged" ]]; then
   files=$(git diff --cached --name-only --diff-filter=ACMR)
   show() { git show ":$1"; }

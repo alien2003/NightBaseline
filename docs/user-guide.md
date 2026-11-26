@@ -94,7 +94,7 @@ The button gives Obtainium these settings:
 | "App source URL" | `https://github.com/alien2003/NightBaseline` | The releases of this repository. |
 | "Include prereleases" | Off | Final releases only; a tag such as `v0.2.0-beta.1` is a pre-release. |
 | "Filter APKs by regular expression" | `^NightBaseline-[0-9.]+\.apk$` | Picks `NightBaseline-<version>.apk` and nothing else. |
-| "Expected signing certificate hashes" | `26ec1dec3593adced268bb641ecb747b2e8b1542d5662478202fe0c6b1f4d377` | The release signing certificate: Obtainium refuses an APK signed with another key. Older Obtainium versions ignore this setting. |
+| "Expected signing certificate hashes" | `26ec1dec3593adced268bb641ecb747b2e8b1542d5662478202fe0c6b1f4d377` | The release signing certificate: Obtainium 1.6.16 and later refuse an APK signed with another key; older versions ignore this setting. |
 
 **Adding it by hand.** If the button does not work, open Obtainium's "Add app" screen, enter
 `https://github.com/alien2003/NightBaseline` as "App source URL", set the filter and, optionally, the certificate hash
@@ -105,8 +105,9 @@ from the table, and add it. Labels may differ between Obtainium versions.
 1. Download `NightBaseline-<version>.apk` from the
    [latest release](https://github.com/alien2003/NightBaseline/releases/latest).
 2. Open it. Android asks once to allow the browser or file manager to install apps.
-3. Optional check: the signing certificate SHA-256 printed by `apksigner verify --print-certs` must be
-   `26:EC:1D:EC:35:93:AD:CE:D2:68:BB:64:1E:CB:74:7B:2E:8B:15:42:D5:66:24:78:20:2F:E0:C6:B1:F4:D3:77`
+3. Optional check: the `SHA-256 digest` that `apksigner verify --print-certs` prints (lowercase hex, no colons) must
+   be `26ec1dec3593adced268bb641ecb747b2e8b1542d5662478202fe0c6b1f4d377`; tools that print colon form show the same
+   value as `26:EC:1D:EC:35:93:AD:CE:D2:68:BB:64:1E:CB:74:7B:2E:8B:15:42:D5:66:24:78:20:2F:E0:C6:B1:F4:D3:77`
    ([SECURITY.md](../SECURITY.md#verifying-a-download)).
 
 **Updates.** Install a newer `NightBaseline-<version>.apk` over the installed one, or let Obtainium do it. Your nights,

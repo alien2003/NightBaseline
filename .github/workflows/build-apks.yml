@@ -1,12 +1,13 @@
 name: Build APKs
 
-# Builds the signed release APK and verifies it: apksigner signature check, the signing certificate's SHA-256 digest in
-# the log and the job summary, versionName / versionCode, and no network permission in the APK. Adapted from
-# PulseStages' build-apks.yml.
+# Builds the signed release APK and verifies it: apksigner signature check, the signing certificate's SHA-256 digest
+# against the pinned release certificate, versionName / versionCode, and no network permission in the APK. Adapted
+# from PulseStages' build-apks.yml.
 #
 # Triggers:
-# - workflow_call from release.yml (publish: true, a v* tag): the verified APK is handed to the "publish" job, which
-#   creates the GitHub release "NightBaseline X.Y.Z" with NightBaseline-X.Y.Z.apk and SHA256SUMS.txt.
+# - workflow_call from release.yml (publish: true, a v* tag): the verified APK and SHA256SUMS.txt are uploaded as the
+#   1-day artifact "release-apk", and the workflow outputs (signed, version, prerelease, release_cert) are handed to
+#   the "publish" job of release.yml, which creates the GitHub release. This workflow never writes to the repository.
 # - push to main and manual dispatch (Actions tab -> Build APKs -> Run workflow): a check build, versionName
 #   0.0.0-dry.<run number>, versionCode 1. The release-signed APK never leaves the runner: release-signed APKs come
 #   from v* tags only. Without the signing secrets the check build is skipped with a notice (a tag release fails).
@@ -16,9 +17,8 @@ name: Build APKs
 # NIGHTBASELINE_KEYSTORE_PATH, NIGHTBASELINE_KEYSTORE_PASSWORD, NIGHTBASELINE_KEY_ALIAS and NIGHTBASELINE_KEY_PASSWORD
 # from the environment; without all four the release APK is unsigned and this workflow fails.
 #
-# Permissions are set per job: the job that holds the signing key only reads, the job that publishes holds no key.
-# Under workflow_call the caller's permissions are the ceiling, so "publish" gets contents: write only from the release
-# job of release.yml.
+# Permissions: the only job holds the signing key and reads only (contents: read). Publishing lives in release.yml,
+# so every caller of this workflow can stay at contents: read.
 
 on:
   workflow_call:
@@ -27,6 +27,19 @@ on:
         description: "true: publish a GitHub release for the v* tag; false: check build, publish nothing"
         type: boolean
         required: true
+    outputs:
+      signed:
+        description: "true when the signing secrets were set and the APK was built and verified"
+        value: ${{ jobs.apks.outputs.signed }}
+      version:
+        description: "versionName of the APK (from the tag, or 0.0.0-dry.N for a check build)"
+        value: ${{ jobs.apks.outputs.version }}
+      prerelease:
+        description: "true for a pre-release tag (and for check builds)"
+        value: ${{ jobs.apks.outputs.prerelease }}
+      release_cert:
+        description: "SHA-256 digest of the signing certificate (lowercase hex, equal to the pinned value)"
+        value: ${{ jobs.apks.outputs.release_cert }}
     # All optional here: the "Decode signing key" step fails (or, for a check build, skips) with the missing names.
     secrets:
       NIGHTBASELINE_KEYSTORE_BASE64:
@@ -49,6 +62,9 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+    env:
+      # The release certificate's SHA-256 digest (SECURITY.md, Obtainium link): any other signer fails the build.
+      EXPECTED_CERT: 26ec1dec3593adced268bb641ecb747b2e8b1542d5662478202fe0c6b1f4d377
     concurrency:
       # Never cancelled: a release build must finish once started.
       group: build-apks-${{ github.ref }}-${{ inputs.publish == true && 'publish' || 'check' }}
@@ -76,7 +92,14 @@ jobs:
               echo "::error::Publishing needs a v* tag."
               exit 1
             fi
-            bash .github/scripts/version-from-tag.sh "$GITHUB_REF_NAME" | tee -a "$GITHUB_OUTPUT"
+            derived=$(bash .github/scripts/version-from-tag.sh "$GITHUB_REF_NAME")
+            printf '%s\n' "$derived" | tee -a "$GITHUB_OUTPUT"
+            # Fail before the build: the release notes are the tag's CHANGELOG.md section, there is no fallback.
+            name=$(sed -n 's/^name=//p' <<< "$derived")
+            if [ -z "$(bash .github/scripts/changelog-section.sh "$name" CHANGELOG.md)" ]; then
+              echo "::error::CHANGELOG.md has no non-empty \"## [$name]\" section: write the release notes first."
+              exit 1
+            fi
           else
             # Never published. versionCode 1 is below every release, so a release installs over a check build.
             printf 'name=0.0.0-dry.%s\ncode=1\nprerelease=true\n' "$GITHUB_RUN_NUMBER" | tee -a "$GITHUB_OUTPUT"
@@ -108,7 +131,8 @@ jobs:
           fi
           umask 077
 
-          keystore="$RUNNER_TEMP/nightbaseline-release.jks"
+          # The file name must not contain the key alias: the runner masks the alias, which would garble the path.
+          keystore="$RUNNER_TEMP/release-signing.jks"
           if ! printf '%s' "$NIGHTBASELINE_KEYSTORE_BASE64" | base64 --decode > "$keystore"; then
             echo "::error::NIGHTBASELINE_KEYSTORE_BASE64 is not valid base64"
             exit 1
@@ -207,6 +231,10 @@ jobs:
               ;;
           esac
           echo "Release signing certificate SHA-256: $release_cert"
+          if [ "$release_cert" != "$EXPECTED_CERT" ]; then
+            echo "::error::The signing certificate is not the release certificate (expected SHA-256 $EXPECTED_CERT)"
+            exit 1
+          fi
 
           badging=$("$build_tools/aapt2" dump badging "$release_apk" | sed -n '1p')
           case "$badging" in
@@ -247,8 +275,8 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Tag releases only: hands the verified APK to the publish job, which holds no key. The release makes it public
-      # right after, so a 1-day artifact adds no exposure.
+      # Tag releases only: hands the verified APK to the publish job of release.yml, which holds no key. The release
+      # makes it public right after, so a 1-day artifact adds no exposure.
       - name: Hand the APK to the publish job
         if: ${{ inputs.publish == true }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -261,73 +289,5 @@ jobs:
 
       - name: Remove signing key
         if: always()
-        run: rm -f "$RUNNER_TEMP/nightbaseline-release.jks"
+        run: rm -f "$RUNNER_TEMP/release-signing.jks"
 
-  publish:
-    name: Publish GitHub release
-    needs: apks
-    if: ${{ inputs.publish == true && needs.apks.outputs.signed == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    # The only job that can write: creating the release and uploading its assets needs contents: write.
-    permissions:
-      contents: write
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Only CHANGELOG.md and the scripts are read; gh gets the token through GH_TOKEN.
-          persist-credentials: false
-
-      - name: Download the verified APK
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: release-apk
-          path: ${{ runner.temp }}/apks
-
-      - name: Create the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          VERSION_NAME: ${{ needs.apks.outputs.version }}
-          PRERELEASE: ${{ needs.apks.outputs.prerelease }}
-          RELEASE_CERT: ${{ needs.apks.outputs.release_cert }}
-          OUT_DIR: ${{ runner.temp }}/apks
-        # The release text is the CHANGELOG.md section (written by hand, never health data) plus the fixed text below;
-        # nothing in it comes from a measurement, a dataset or a device.
-        run: |
-          set -euo pipefail
-          (cd "$OUT_DIR" && sha256sum -c SHA256SUMS.txt)
-          notes="$RUNNER_TEMP/release-notes.md"
-          section=$(bash .github/scripts/changelog-section.sh "$VERSION_NAME" CHANGELOG.md)
-          {
-            if [ -n "$section" ]; then
-              printf '%s\n\n' "$section"
-            fi
-            cat <<EOF
-          ### Downloads
-
-          | File | Use |
-          |---|---|
-          | \`NightBaseline-$VERSION_NAME.apk\` | Signed release build. Later releases install over it as updates. |
-          | \`SHA256SUMS.txt\` | SHA-256 checksum of the APK: \`sha256sum -c SHA256SUMS.txt\` |
-
-          NightBaseline reads Health Connect on the phone and processes everything locally; the APK has no INTERNET
-          permission. It is not a medical device.
-
-          Release signing certificate SHA-256: \`$RELEASE_CERT\`
-          EOF
-          } > "$notes"
-
-          args=(--verify-tag --title "NightBaseline $VERSION_NAME" --notes-file "$notes")
-          if [ -z "$section" ]; then
-            # No "## [$VERSION_NAME]" section in CHANGELOG.md: GitHub's generated notes follow the downloads table.
-            args+=(--generate-notes)
-          fi
-          if [ "$PRERELEASE" = true ]; then
-            args+=(--prerelease)
-          fi
-          gh release create "$GITHUB_REF_NAME" \
-            "$OUT_DIR/NightBaseline-$VERSION_NAME.apk" \
-            "$OUT_DIR/SHA256SUMS.txt" \
-            "${args[@]}"

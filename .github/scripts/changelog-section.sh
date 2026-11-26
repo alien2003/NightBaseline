@@ -3,7 +3,7 @@
 # "## " heading or the end of the file, without leading and trailing blank lines. Trailing link reference definitions of
 # the file's own "## [...]" headings ("[0.1.0]: https://...", the block at the end of a Keep a Changelog file) are
 # dropped too. Every other line is kept, including link reference and footnote definitions inside the section.
-# Prints nothing when the file or the section is missing or empty; the release workflow then uses generated notes.
+# Prints nothing when the file or the section is missing or empty; the release workflow then fails (no generated notes).
 #
 # Usage: changelog-section.sh VERSION [CHANGELOG.md]
 set -euo pipefail

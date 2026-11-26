@@ -73,5 +73,5 @@ value above without colons, and the same for every release. The release notes pr
   key. No checkout keeps the token (`persist-credentials: false`).
 - Signed builds use no Gradle cache, build cache or configuration cache, so nothing from another run can end up in a
   signed APK.
-- The signed APK is checked before publishing: valid signature, not a debug key, the expected versionName and
-  versionCode, no network permission.
+- The signed APK is checked before publishing: valid signature, not a debug key, the signing certificate equal to the
+  pinned release certificate above, the expected versionName and versionCode, no network permission.

@@ -291,10 +291,10 @@ Everything below is the PulseStages author's observations: OHealth 4.62.7, OPPO 
 [verified in code/docs]; **for NightBaseline it is [hypothesis] until re-observed** (section 5).
 
 **A night in several uploads** (`docs/health-connect.md:703-709, 822-840`; `PLAN.md:792-799`):
-- first a preliminary session, cut off around **07:29** while the person is still asleep (3 of 3 nights Oct 17–19;
-  same on Oct 20); on Oct 18 an intermediate version around 09:30; the final on Oct 18 and 19 arrived 2 and 7 min
-  after actual waking, but on Oct 17 up to 2 h 56 min after session end (`SourceSettlement.kt:472-477`),
-  so "2–7 min" is not a rule;
+- first a preliminary session, cut off at a nearly fixed early-morning clock time while the person is still asleep
+  (every observed night); on one night an intermediate version a few hours later; on two nights the final arrived a
+  few minutes after actual waking, but on another up to about 3 h after session end (`SourceSettlement.kt:472-477`),
+  so "a few minutes" is not a rule;
 - the **same uuid** is updated with a later end;
 - OHealth rewrites the session even without time changes: new version, same clientRecordId, no stages;
   `lastModifiedTime` changes even if start and end stay the same (`SourceSettlement.kt:18-19`);
@@ -321,7 +321,7 @@ with a `tools/hc-export.sh` export. [hypothesis]
 - if there is no HR inside the session at all — the session has not changed for `QUIET_MS = 60 min`;
 - steps rule for a source with per-minute steps: after the threshold there is a record with ≥ 5 steps/min
   (`AWAKE_STEPS_PER_MIN = 5`, `STEPS_LOOKBACK_MS = 7 d`). This guards against an "HR only" upload during a back-to-sleep period,
-  in which the 07:29 cutoff would look final;
+  in which the early-morning cutoff would look final;
 - the margin cannot be reduced: the back-to-sleep fragment arrived after gaps of 21–36 min, and OHealth needs 20–27 min to
   report a sleep period; that leaves 3–11 min (`SourceSettlement.kt:479-484`, `PLAN.md:410-411`; in
   `health-connect.md:755` the same 20–27 min are called session length — sources disagree, we trust the code and PLAN);
@@ -721,7 +721,7 @@ Everything below is [hypothesis] for NightBaseline until confirmed by a `tools/h
    `SkinTemperatureRecord` at night; if not — how many metrics are actually available for the "≥ 2" rule.
 2. Whether OHealth provides `RestingHeartRateRecord` (e.g. at 00:00) and whether it gets confused with sleeping HR.
 3. HR density at night (~every 2 min?) and the structure of `HeartRateRecord` (one point or a series per record).
-4. Preliminary night cutoff around 07:29, intermediate versions, updates of the same uuid, `lastModifiedTime` change
+4. Preliminary early-morning night cutoff, intermediate versions, updates of the same uuid, `lastModifiedTime` change
    without time change.
 5. How long after waking the final session, post-end HR and steps arrive; whether OHealth must be opened.
 6. Per-minute steps after waking (≥ 5 steps/min) — whether the steps rule works on the current firmware.
@@ -768,8 +768,8 @@ Corrected:
 7. `FakeHealthConnectClient` is not in testFixtures but in `data-hc/src/test`; the fake's "30-day limit" is actually
    the configurable `historyStartMs`.
 8. Reference for the 30-day history limit: added §3.4 `health-connect.md:181-191` (lines 58-66 are the permissions table).
-9. The final OHealth night version "within 2–7 min after waking": this held only on Oct 18 and 19; on Oct 17
-   the final arrived up to 2 h 56 min after session end (`SourceSettlement.kt:472-477`).
+9. The final OHealth night version "within a few minutes after waking": this held only on two of the observed
+   nights; on another the final arrived up to about 3 h after session end (`SourceSettlement.kt:472-477`).
 10. "Back-to-sleep fragments lasted 20–27 min": per the code and PLAN, 20–27 min is the time OHealth needs to report
     a sleep period; `health-connect.md:755` says otherwise — discrepancy noted.
 11. `PLAN.md:828` → `:826` (open question about SpO2/RR).

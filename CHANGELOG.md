@@ -10,7 +10,7 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 
 ## [Unreleased]
 
-## [0.1.0] - unreleased
+## [0.1.0] - 2026-11-27
 
 First release. NightBaseline reads last night's measurements from Health Connect once a day, compares each one with
 your own recent nights and tells you, calmly, when two or more measurements moved outside your usual range. It is not
@@ -25,9 +25,10 @@ a medical device.
   ([ALGORITHM.md](https://github.com/alien2003/NightBaseline/blob/main/ALGORITHM.md)).
 - **Main-night selection.** Sessions less than 90 minutes apart are joined, naps are ignored, nights under 3 hours are
   shown but not compared, and a date with two sleeps of 3 hours or more is not compared.
-- **Night-complete rule.** The night is evaluated once you are up and the source has finished uploading it (late
-  respiratory rate and blood oxygen included), or at the latest 12 hours after it ended; one re-evaluation after the
-  source's next-morning rewrite.
+- **Night-complete rule.** The night is evaluated once you are up and the source has finished uploading that night
+  (late respiratory rate and blood oxygen included), or at the latest 12 hours after it ended; one re-evaluation after
+  the source's next-morning rewrite. Only the night's own records count as "still uploading": daytime syncs (steps,
+  all-day heart rate) no longer keep a complete night waiting, a problem found in the development builds.
 - **One calm note.** A notification in the morning only when two or more measurements moved outside your usual range on
   the side that counts; sleep duration counts only together with another measurement. No values in the notification
   and a lock-screen version without details. A separate silent channel for problems reading data.
@@ -47,9 +48,17 @@ a medical device.
   and the first tested source. PulseStages sessions are always ignored.
 - **Adaptive layouts** for phones, foldables (outer and inner screen, tabletop and book postures), tablets, split
   screen and very small windows, keeping your place across fold, unfold and resize; keyboard shortcuts.
-- **Look.** Frosted-glass navigation and sheets with an automatic plain fallback, light and dark themes, status shapes
-  that never rely on colour alone, TalkBack descriptions and text summaries for every chart, support for 200 % text.
+- **ColorOS 17 look.** The whole interface follows the ColorOS 17 style of OPPO's system apps (own implementation
+  and art, no vendor resources): frosted-glass navigation with an automatic plain fallback, reworked bottom sheets,
+  light and dark themes, status shapes that never rely on colour alone, TalkBack descriptions and text summaries for
+  every chart, support for 200 % text.
+- **Aurora launcher icon**, an own design with an adaptive and a monochrome (themed) layer.
+- **Smooth on the phone.** Scrolling and press feedback do no per-frame work, and switching between Home, History and
+  Settings keeps each section composed instead of rebuilding it.
 - **English and Russian.**
+- **On-device end-to-end suite** for developers: runs inside the installed release app, compares other apps'
+  Health Connect data before and after, and makes one tagged test write that it deletes right away
+  ([tools/device-test/README.md](https://github.com/alien2003/NightBaseline/blob/main/tools/device-test/README.md)).
 
 ### Privacy and security
 
@@ -57,6 +66,9 @@ a medical device.
   signed release APK.
 - Health Connect READ permissions only; nothing is written.
 - Only nightly summaries are stored, in private storage excluded from backups.
+- Each night check writes a few diagnostic lines to Android's system log (tag `NightBaseline`): dates, local clock
+  times of its decisions and reasons, never a measured value; readable only over USB debugging or in a bug report
+  ([privacy policy](https://github.com/alien2003/NightBaseline/blob/main/docs/privacy.md#5-what-is-stored-on-the-device)).
 - Release APKs are signed with one release key; certificate SHA-256
   `26:EC:1D:EC:35:93:AD:CE:D2:68:BB:64:1E:CB:74:7B:2E:8B:15:42:D5:66:24:78:20:2F:E0:C6:B1:F4:D3:77`.
 

@@ -22,7 +22,7 @@ the numbers are used as calibration targets for our own tokens.
 
 | Item | Value | Tag |
 |---|---|---|
-| Device / OS | OPPO CPH2765, Android 17 (SDK 37), ColorOS 17.0, device state CLOSED (outer screen) | [measured on device screenshot] (`env.txt`) |
+| Device / OS | OPPO book foldable, Android 17 (SDK 37), ColorOS 17.0, device state CLOSED (outer screen) | [measured on device screenshot] (`env.txt`) |
 | Screen | 1140 × 2616 px, density override 378 dpi (physical 520) | [measured on device screenshot] |
 | Conversion | 1 dp = 378 / 160 = **2.3625 px**; screen = **482.5 × 1107.3 dp** (compact width class) | [measured on device screenshot] |
 | System font scale | **1.35** (all text below was rendered at this scale) | [measured on device screenshot] (`env.txt`) |

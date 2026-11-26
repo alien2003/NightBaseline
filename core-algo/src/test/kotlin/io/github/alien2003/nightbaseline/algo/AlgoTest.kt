@@ -237,10 +237,10 @@ class EvaluatorTest {
 
     @Test
     fun `sleep duration range never reaches below the short-night limit`() {
-        // Very variable sleep: 3 h 10 min to 11 h 30 min, median about 7 h; median - 2.5 · spread is far below 3 h.
+        // Very variable sleep: 3 h 10 min to 11 h, median about 7 h; median - 2.5 · spread is far below 3 h.
         val variable =
             (0 until 28).map { i ->
-                summary(d0.plusDays(i.toLong()), 55.0, 14.0, 96.0, minutes = listOf(190.0, 300.0, 420.0, 540.0, 690.0)[i % 5])
+                summary(d0.plusDays(i.toLong()), 55.0, 14.0, 96.0, minutes = listOf(190.0, 300.0, 420.0, 540.0, 660.0)[i % 5])
             }
         val day = d0.plusDays(28).toString()
         val b = Evaluator.baseline(DefaultMetrics.SLEEP_DURATION, day, variable, p)!!
