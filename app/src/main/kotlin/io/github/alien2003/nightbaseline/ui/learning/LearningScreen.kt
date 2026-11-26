@@ -45,6 +45,7 @@ import io.github.alien2003.nightbaseline.ui.settings.ShellPage
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.dataType
 
 /** Two tile columns need 2 x 260 dp plus the gap (`screens.md` 7.1 Medium). */
 private val TwoColumnMin = 532.dp
@@ -206,7 +207,7 @@ private fun TabletopLearning(
         ) {
             Text(
                 rememberUiText().nightLabel(state.night),
-                style = NbTheme.typography.label,
+                style = NbTheme.dataType.segment,
                 color = NbTheme.colors.textSecondary,
                 modifier = Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth(),
             )
@@ -260,7 +261,7 @@ private fun GlanceLearning(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text.nightLabel(state.night),
-                style = NbTheme.typography.labelSmall,
+                style = NbTheme.dataType.statusCalm,
                 color = colors.textSecondary,
                 modifier = Modifier.weight(1f),
             )
@@ -268,7 +269,7 @@ private fun GlanceLearning(
         }
         Text(
             text.nightTitle(state.night, state.source),
-            style = NbTheme.typography.headline,
+            style = NbTheme.dataType.headline,
             color = colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )

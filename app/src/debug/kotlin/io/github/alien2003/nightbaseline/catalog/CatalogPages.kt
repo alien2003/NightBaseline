@@ -63,7 +63,7 @@ import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
 import io.github.alien2003.nightbaseline.ui.components.StatsRow
-import io.github.alien2003.nightbaseline.ui.components.StatusChip
+import io.github.alien2003.nightbaseline.ui.components.StatusLabel
 import io.github.alien2003.nightbaseline.ui.components.TonalButton
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.TrendChart
@@ -427,7 +427,7 @@ private fun MetricsPage(metricCount: Int) {
         val text = rememberUiText()
         MetricState.entries.forEach { state ->
             Entry(state.name, width) {
-                StatusChip(text.status(SampleData.metric(MetricId.SLEEPING_HR, state), SampleData.SOURCE), state.glyph, state.tone)
+                StatusLabel(text.status(SampleData.metric(MetricId.SLEEPING_HR, state), SampleData.SOURCE), state.glyph, state.tone)
             }
         }
     }

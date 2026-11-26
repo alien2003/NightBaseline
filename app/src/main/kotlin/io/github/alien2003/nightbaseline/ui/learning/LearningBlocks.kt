@@ -42,10 +42,14 @@ import io.github.alien2003.nightbaseline.ui.material.nbClickable
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.MetricUi
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.theme.NbDataDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.data
+import io.github.alien2003.nightbaseline.ui.theme.dataType
+import io.github.alien2003.nightbaseline.ui.theme.hairline
 
 /**
  * The view-only learning summary (tabletop top half, `layouts.md` 6.4): title, progress and the "n more nights" body,
@@ -62,13 +66,13 @@ internal fun LearningSummary(
     NbCard(modifier.fillMaxWidth()) {
         Text(
             text.nightTitle(state.night, state.source),
-            style = NbTheme.typography.headline,
+            style = NbTheme.dataType.headline,
             color = NbTheme.colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )
         LearningProgress(state.collected, skipped = if (state.lastNightShort) 1 else 0)
         if (body) {
-            Text(text.nightBody(state.night, state.source), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
+            Text(text.nightBody(state.night, state.source), style = NbTheme.dataType.summary, color = NbTheme.colors.textSecondary)
         }
     }
 }
@@ -91,17 +95,27 @@ internal fun AlreadyVisible(
         modifier.widthIn(max = maxWidth).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
+        // A ColorOS section header outside the card, the intro as grey text under it (conformance K2).
         Text(
             stringResource(R.string.home_already_visible),
-            style = NbTheme.typography.title,
-            color = colors.textPrimary,
-            modifier = Modifier.padding(top = NbSpace.s3).semantics { heading() },
+            style = NbTheme.dataType.sectionHeader,
+            color = colors.textTertiary,
+            modifier =
+                Modifier
+                    .padding(
+                        top = NbDataDimens.sectionHeaderTop,
+                        start = NbDataDimens.sectionHeaderStart,
+                        end = NbDataDimens.sectionHeaderStart,
+                    ).semantics { heading() },
         )
-        if (state.nothingYet) {
-            Text(stringResource(R.string.setup_learning_visible_empty), style = NbTheme.typography.body, color = colors.textSecondary)
-            return@Column
-        }
-        Text(stringResource(R.string.setup_learning_visible_body), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+        val intro = if (state.nothingYet) R.string.setup_learning_visible_empty else R.string.setup_learning_visible_body
+        Text(
+            stringResource(intro),
+            style = NbTheme.dataType.summary,
+            color = colors.textSecondary,
+            modifier = Modifier.padding(horizontal = NbDataDimens.sectionHeaderStart),
+        )
+        if (state.nothingYet) return@Column
         val rows = state.night.metrics.chunked((state.night.metrics.size + columns - 1) / columns)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
             rows.forEach { part ->
@@ -132,9 +146,9 @@ private fun VisibleRow(
         if (divider) {
             Spacer(
                 Modifier
-                    .padding(start = NbSpace.s5)
+                    .padding(horizontal = NbSpace.s5)
                     .fillMaxWidth()
-                    .height(1.dp)
+                    .height(hairline)
                     .background(colors.separator),
             )
         }
@@ -151,7 +165,7 @@ private fun VisibleRow(
             horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-                Text(text.name(metric.metric), style = NbTheme.typography.titleSmall, color = colors.textPrimary)
+                Text(text.name(metric.metric), style = NbTheme.dataType.itemTitle, color = colors.textPrimary)
                 RangeBand(null, metric.value, metric.state, Modifier.widthIn(max = 160.dp))
             }
             Text(text.value(metric)?.text ?: "–", style = NbTheme.typography.numericSmall, color = colors.textPrimary)
@@ -179,7 +193,7 @@ internal fun WhatToExpect(modifier: Modifier = Modifier) {
     NbCard(modifier.fillMaxWidth()) {
         Text(
             stringResource(R.string.home_expect_title),
-            style = NbTheme.typography.title,
+            style = NbTheme.dataType.title,
             color = colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )
@@ -203,9 +217,9 @@ internal fun WhatToExpect(modifier: Modifier = Modifier) {
                         if (now) NowLabel()
                         Text(
                             line,
-                            style = NbTheme.typography.body,
+                            style = NbTheme.dataType.summary,
                             color = if (now) colors.textPrimary else colors.textSecondary,
-                            fontWeight = if (now) FontWeight.SemiBold else null,
+                            fontWeight = if (now) FontWeight.Medium else null,
                         )
                     }
                 }
@@ -228,9 +242,9 @@ private fun TimelineMarker(
         val radius = MarkerSize.toPx() / 2
         val center = Offset(size.width / 2, radius + MarkerTop.toPx())
         val stroke = 2.dp.toPx()
-        if (!last) drawLine(colors.outline, center, Offset(center.x, size.height), stroke)
+        if (!last) drawLine(colors.separator, center, Offset(center.x, size.height), stroke)
         if (now) {
-            drawCircle(colors.accent, radius, center)
+            drawCircle(colors.primary, radius, center)
         } else {
             drawCircle(colors.surface1, radius, center)
             drawCircle(colors.outline, radius - stroke / 2, center, style = Stroke(stroke))
@@ -238,18 +252,13 @@ private fun TimelineMarker(
     }
 }
 
-/** The "Now" pill of the current timeline step. */
+/** The "Now" marker of the current timeline step: plain accent text, no chip (conformance K8). */
 @Composable
 private fun NowLabel() {
-    val colors = NbTheme.colors
     Text(
         stringResource(R.string.setup_expect_now),
-        style = NbTheme.typography.labelSmall,
-        color = colors.onPrimaryContainer,
-        modifier =
-            Modifier
-                .background(colors.primaryContainer, NbShapes.pill)
-                .padding(horizontal = NbSpace.s3, vertical = NbSpace.s1),
+        style = NbTheme.dataType.marker,
+        color = NbTheme.colors.data.primaryText,
     )
 }
 
@@ -274,7 +283,7 @@ internal fun GlanceMetricLines(state: LearningState) {
         ) {
             MetricGlyphIcon(metric.state.glyph, colors.statusNeutral, Modifier.size(NbDimens.iconChip))
             Column(Modifier.weight(1f)) {
-                Text(text.shortName(metric.metric), style = NbTheme.typography.titleSmall, color = colors.textPrimary)
+                Text(text.shortName(metric.metric), style = NbTheme.dataType.itemTitle, color = colors.textPrimary)
                 Text(text.status(metric, state.source), style = NbTheme.typography.caption, color = colors.textSecondary)
             }
             Text(value, style = NbTheme.typography.numericSmall, color = colors.textPrimary)

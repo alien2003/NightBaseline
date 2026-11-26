@@ -398,6 +398,16 @@
     </plurals>
     <string name="stats_range">Обычный диапазон: %1$s–%2$s</string>
     <string name="stats_median">Среднее значение: %1$s</string>
+    <string name="stats_label_inside">В обычном диапазоне</string>
+    <plurals name="stats_value_inside">
+        <item quantity="one">%1$s из %2$s ночи</item>
+        <item quantity="few">%1$s из %2$s ночей</item>
+        <item quantity="many">%1$s из %2$s ночей</item>
+        <item quantity="other">%1$s из %2$s ночи</item>
+    </plurals>
+    <string name="stats_label_range">Обычный диапазон</string>
+    <string name="stats_value_range">%1$s–%2$s</string>
+    <string name="stats_label_median">Среднее значение</string>
     <string name="detail_computed_title">Как считается ваш обычный диапазон</string>
     <string name="detail_source_line">Измерено: %1$s. Последняя синхронизация %2$s.</string>
     <string name="history_title">История</string>

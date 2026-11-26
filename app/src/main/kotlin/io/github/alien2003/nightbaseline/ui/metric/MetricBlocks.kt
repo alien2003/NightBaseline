@@ -46,7 +46,7 @@ import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
 import io.github.alien2003.nightbaseline.ui.components.RangeBand
 import io.github.alien2003.nightbaseline.ui.components.StateCard
 import io.github.alien2003.nightbaseline.ui.components.StatsRow
-import io.github.alien2003.nightbaseline.ui.components.StatusChip
+import io.github.alien2003.nightbaseline.ui.components.StatusLabel
 import io.github.alien2003.nightbaseline.ui.components.TrendChart
 import io.github.alien2003.nightbaseline.ui.components.chartSummary
 import io.github.alien2003.nightbaseline.ui.components.markerColor
@@ -57,10 +57,13 @@ import io.github.alien2003.nightbaseline.ui.model.NightGlyph
 import io.github.alien2003.nightbaseline.ui.model.StatusTone
 import io.github.alien2003.nightbaseline.ui.model.UiText
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.theme.NbDataDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.data
+import io.github.alien2003.nightbaseline.ui.theme.dataType
 
 /** The header sentence of the anchor night: `detail_*`, with the low-side variant of `M-SIDE-IGNORED`. */
 internal fun UiText.headerSentence(
@@ -133,9 +136,9 @@ internal fun HeaderCard(
             Modifier.clearAndSetSemantics { contentDescription = description },
             verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
         ) {
-            Text(text.nightLabelOf(state), style = NbTheme.typography.labelSmall, color = colors.textSecondary)
+            Text(text.nightLabelOf(state), style = NbTheme.dataType.statusCalm, color = colors.textSecondary)
             if (metric.state != MetricState.NotProvided && metric.state != MetricState.AccessOff) HeaderValue(metric)
-            StatusChip(text.status(metric, state.source), metric.state.glyph, metric.state.tone)
+            StatusLabel(text.status(metric, state.source), metric.state.glyph, metric.state.tone)
             if (metric.range != null && metric.value != null) {
                 RangeBand(metric.range, metric.value, metric.state)
             }
@@ -154,7 +157,7 @@ internal fun HeaderCard(
                 if (state.series != null) {
                     Text(
                         text.string(R.string.detail_not_provided_title, state.source, text.name(metric.metric)),
-                        style = NbTheme.typography.titleSmall,
+                        style = NbTheme.dataType.itemTitle,
                         color = colors.textPrimary,
                         modifier = Modifier.semantics { heading() },
                     )
@@ -351,7 +354,7 @@ internal fun EmptyChart(
         ) {
             val stroke = NbDimens.bandEdgeStroke.toPx()
             drawRoundRect(
-                colors.bandEdge,
+                colors.data.learningOutline,
                 topLeft = Offset(stroke, size.height * 0.3f),
                 size = Size(size.width - 2 * stroke, size.height * 0.4f),
                 cornerRadius = CornerRadius(8.dp.toPx()),
@@ -428,11 +431,15 @@ internal fun StatsBlock(state: MetricDetailState) {
     val series = state.shownSeries ?: return
     if (series.points.none { it.state.compared }) return
     Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s3), modifier = Modifier.widthIn(max = NbDimens.chartMax)) {
+        // A ColorOS section header outside the readout card (conformance K2).
         Text(
             text.string(R.string.metric_stats_title),
-            style = NbTheme.typography.titleSmall,
-            color = NbTheme.colors.textPrimary,
-            modifier = Modifier.semantics { heading() },
+            style = NbTheme.dataType.sectionHeader,
+            color = NbTheme.colors.textTertiary,
+            modifier =
+                Modifier
+                    .padding(top = NbDataDimens.sectionHeaderTop, start = NbDataDimens.sectionHeaderStart)
+                    .semantics { heading() },
         )
         StatsRow(series, decimals = text.decimals(state.metric))
     }
@@ -482,10 +489,10 @@ private fun ExplainerCard(
 ) {
     val colors = NbTheme.colors
     NbCard(modifier.fillMaxWidth()) {
-        Text(title, style = NbTheme.typography.title, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
-        paragraphs.forEach { Text(it, style = NbTheme.typography.body, color = colors.textSecondary) }
+        Text(title, style = NbTheme.dataType.itemTitle, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
+        paragraphs.forEach { Text(it, style = NbTheme.dataType.summary, color = colors.textSecondary) }
         emphasis?.let {
-            Text(it, style = NbTheme.typography.body.copy(fontWeight = FontWeight.Medium), color = colors.textPrimary)
+            Text(it, style = NbTheme.dataType.summary.copy(fontWeight = FontWeight.Medium), color = colors.textPrimary)
         }
     }
 }

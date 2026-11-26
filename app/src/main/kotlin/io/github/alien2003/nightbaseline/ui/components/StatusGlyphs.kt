@@ -4,11 +4,9 @@
 package io.github.alien2003.nightbaseline.ui.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Icon
@@ -33,10 +31,11 @@ import io.github.alien2003.nightbaseline.ui.model.MetricGlyph
 import io.github.alien2003.nightbaseline.ui.model.NightGlyph
 import io.github.alien2003.nightbaseline.ui.model.StatusTone
 import io.github.alien2003.nightbaseline.ui.theme.NbColors
+import io.github.alien2003.nightbaseline.ui.theme.NbDataDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
-import io.github.alien2003.nightbaseline.ui.theme.NbShapes
-import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.data
+import io.github.alien2003.nightbaseline.ui.theme.dataType
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sqrt
@@ -48,24 +47,6 @@ fun NbColors.tone(tone: StatusTone): Color =
         StatusTone.Moved -> statusMoved
         StatusTone.Neutral -> statusNeutral
         StatusTone.Info -> statusInfo
-    }
-
-/** `color.status.*.container` of [tone]. */
-fun NbColors.toneContainer(tone: StatusTone): Color =
-    when (tone) {
-        StatusTone.Within -> statusWithinContainer
-        StatusTone.Moved -> statusMovedContainer
-        StatusTone.Neutral -> statusNeutralContainer
-        StatusTone.Info -> statusInfoContainer
-    }
-
-/** `color.status.*.onContainer` of [tone]. */
-fun NbColors.toneOnContainer(tone: StatusTone): Color =
-    when (tone) {
-        StatusTone.Within -> statusWithinOnContainer
-        StatusTone.Moved -> statusMovedOnContainer
-        StatusTone.Neutral -> statusNeutralOnContainer
-        StatusTone.Info -> statusInfoOnContainer
     }
 
 /**
@@ -318,46 +299,77 @@ private fun VectorGlyph(
 }
 
 /**
- * A status chip: tonal container (`status.*.container`) with the shape [glyph] in the status colour and the text
- * [label] in `status.*.onContainer`. Status is never carried by colour alone. Merged into its parent for TalkBack.
+ * The ColorOS status label (conformance K1): no container, a small shape in the status colour and the text label
+ * 6 dp apart. Inside the range: 8 dp dot and a calm grey 13 sp label; higher / lower: 10 dp triangle and the label in
+ * `status.moved` 14 sp medium; learning / missing: ring or dash in the neutral colour and a grey label; data access:
+ * the label in `primaryText`. Status is never colour alone (shape + words). Merged into its parent for TalkBack.
  */
 @Composable
-fun StatusChip(
+fun StatusLabel(
     label: String,
     glyph: MetricGlyph,
     tone: StatusTone,
     modifier: Modifier = Modifier,
 ) {
     val colors = NbTheme.colors
+    val type = NbTheme.dataType
+    val moved = tone == StatusTone.Moved
     Row(
-        modifier =
-            modifier
-                .sizeIn(minHeight = 28.dp)
-                .background(colors.toneContainer(tone), NbShapes.pill)
-                .padding(horizontal = NbSpace.s4, vertical = NbSpace.s2),
-        horizontalArrangement = Arrangement.spacedBy(NbSpace.s3),
+        modifier = modifier.sizeIn(minHeight = NbDimens.iconInline),
+        horizontalArrangement = Arrangement.spacedBy(NbDataDimens.statusGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MetricGlyphIcon(glyph, colors.tone(tone))
-        Text(label, style = NbTheme.typography.label, color = colors.toneOnContainer(tone))
+        Box(Modifier.size(STATUS_GLYPH_BOX), contentAlignment = Alignment.Center) {
+            MetricGlyphIcon(glyph, colors.statusGlyph(tone), size = glyph.statusBox())
+        }
+        Text(
+            label,
+            style = if (moved) type.statusMoved else type.statusCalm,
+            color =
+                when (tone) {
+                    StatusTone.Moved -> colors.statusMoved
+                    StatusTone.Info -> colors.data.primaryText
+                    else -> colors.textSecondary
+                },
+        )
     }
 }
 
-/** Night glyph inside a tonal circle container (summary card, 40 dp glyph in a 56 dp container). */
+/** The box a status glyph is drawn in: every shape is centred in it, so labels line up whatever the state. */
+private val STATUS_GLYPH_BOX: Dp = 16.dp
+
+/** Size passed to [MetricGlyphIcon] so the drawn shape gets the canon size (dot 8, triangle 10, ring 12 dp). */
+private fun MetricGlyph.statusBox(): Dp =
+    when (this) {
+        // The dot is drawn at 0.76 of its box, the triangle side at 0.9, rings at 0.72.
+        MetricGlyph.FilledCircle -> NbDataDimens.statusDot / 0.76f
+
+        MetricGlyph.TriangleUp, MetricGlyph.TriangleDown -> NbDataDimens.statusTriangle / 0.9f
+
+        MetricGlyph.Key -> STATUS_GLYPH_BOX
+
+        else -> NbDataDimens.statusRing / 0.72f
+    }
+
+/** Colour of the status shape: the status hue; information uses the accent text colour. */
+fun NbColors.statusGlyph(tone: StatusTone): Color = if (tone == StatusTone.Info) data.primaryText else tone(tone)
+
+/**
+ * A night glyph drawn directly on its surface, in the status colour, without a tonal container (conformance K4: the
+ * summary card shows a 28 dp glyph on the card). [container] is the box the glyph is centred in (layout only, nothing
+ * is drawn there); [background] is the surface behind it, used to cut the check and the triangles.
+ */
 @Composable
 fun NightGlyphBadge(
     glyph: NightGlyph,
     tone: StatusTone,
     modifier: Modifier = Modifier,
-    container: Dp = NbDimens.iconSummaryContainer,
-    glyphSize: Dp = NbDimens.iconSummary,
+    container: Dp = NbDataDimens.summaryGlyph,
+    glyphSize: Dp = NbDataDimens.summaryGlyph,
+    background: Color = NbTheme.colors.surface1,
 ) {
     val colors = NbTheme.colors
-    val containerColor = colors.toneContainer(tone)
-    Box(
-        modifier = modifier.size(container).background(containerColor, NbShapes.circle),
-        contentAlignment = Alignment.Center,
-    ) {
-        NightGlyphIcon(glyph, colors.tone(tone), size = glyphSize, background = containerColor)
+    Box(modifier = modifier.size(container), contentAlignment = Alignment.Center) {
+        NightGlyphIcon(glyph, colors.statusGlyph(tone), size = glyphSize, background = background)
     }
 }
