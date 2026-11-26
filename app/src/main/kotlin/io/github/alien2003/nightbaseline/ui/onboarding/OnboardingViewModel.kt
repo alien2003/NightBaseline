@@ -237,8 +237,22 @@ class OnboardingViewModel
                     }
                 }
                 val source = data.settings.first().sourcePackage
-                val valid = data.nightRepository.since(source, FIRST_DATE).count { it.summary.valid }
-                state.update { it.copy(pastNights = valid) }
+                val stored =
+                    data.nightRepository
+                        .since(source, FIRST_DATE)
+                        .filter { it.summary.valid }
+                        .map { it.date }
+                // The newest night is left to the first check: counted here too, so this step says what Home will
+                // ("3 of 7" on both for the same three nights; NightUi.collectedNights counts the shown night).
+                val unsettled =
+                    withContext(data.io) {
+                        try {
+                            data.backfill.unsettledValidDates()
+                        } catch (_: HcError) {
+                            emptySet()
+                        }
+                    }
+                state.update { it.copy(pastNights = (stored + unsettled).toSet().size) }
             }
         }
 

@@ -86,6 +86,22 @@ class HistoryBackfillTest {
         }
 
     @Test
+    fun theNightLeftToTheDailyCheckIsReportedWithoutStoringIt() =
+        runTest {
+            val gen = nights(3)
+            SyntheticSource.load(h.gateway, gen)
+            h.clock.nowMs = endOf(gen.last()) + 2 * HOUR
+            h.backfill.runIfNeeded()
+            // Two settled nights are stored, the newest is left to the check: onboarding counts it too (3 of 7).
+            assertEquals(2, h.nights.all.size)
+            assertEquals(setOf(gen.last().wakeDate), h.backfill.unsettledValidDates())
+            assertEquals(2, h.nights.all.size)
+            // Once it settled, the backfill covers it and nothing is left over.
+            h.clock.nowMs = endOf(gen.last()) + 13 * HOUR
+            assertEquals(emptySet<String>(), h.backfill.unsettledValidDates())
+        }
+
+    @Test
     fun blockedWithoutRequiredPermission() =
         runTest {
             SyntheticSource.load(h.gateway, nights(5))

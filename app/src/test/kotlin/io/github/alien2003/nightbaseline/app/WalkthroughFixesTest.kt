@@ -8,8 +8,10 @@ import io.github.alien2003.nightbaseline.algo.MetricId
 import io.github.alien2003.nightbaseline.algo.MetricStatus
 import io.github.alien2003.nightbaseline.algo.MetricValue
 import io.github.alien2003.nightbaseline.algo.MissingReason
+import io.github.alien2003.nightbaseline.algo.SyntheticNights
 import io.github.alien2003.nightbaseline.data.hc.HcPermissions
 import io.github.alien2003.nightbaseline.data.hc.HcSession
+import io.github.alien2003.nightbaseline.data.hc.fake.SyntheticSource
 import io.github.alien2003.nightbaseline.data.local.RunLogKind
 import io.github.alien2003.nightbaseline.data.local.settings.AppSettings
 import io.github.alien2003.nightbaseline.testing.TestApp
@@ -44,6 +46,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.time.Instant
 import java.time.ZoneId
 
 /**
@@ -219,6 +222,24 @@ class WalkthroughFixesTest {
                 setOf(HcPermissions.READ_HEALTH_DATA_IN_BACKGROUND, HcPermissions.READ_HEALTH_DATA_HISTORY),
                 vm.ui.value.missingOptional,
             )
+        }
+
+    @Test
+    fun `the ready step counts the newest night the first check will show, as Home does`() =
+        runTest {
+            val gen =
+                SyntheticNights(SyntheticNights.Config(seed = 11, nights = 3, missingNightP = 0.0, shortNightP = 0.0)).generate()
+            val app = TestApp(nights = 0, settings = AppSettings())
+            SyntheticSource.load(app.gateway, gen)
+            // Two hours after the third night: the backfill stores two, the newest is left to the first check.
+            app.clock.now = Instant.ofEpochMilli(SyntheticSource.nightEndMs(gen.last()) + 2 * HOUR_MS)
+            val vm = OnboardingViewModel(SavedStateHandle(), app.data)
+            vm.skipNotifications()
+            val ready = vm.ui.ready { it.pastNights > 0 }
+            assertEquals(OnboardingStep.Ready, ready.step)
+            assertEquals(2, app.nights.all.size)
+            // Home says "3 of 7" for these three nights (NightUi.collectedNights counts the shown night).
+            assertEquals(3, ready.pastNights)
         }
 
     private companion object {

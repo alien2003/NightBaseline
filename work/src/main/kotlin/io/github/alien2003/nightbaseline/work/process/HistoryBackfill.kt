@@ -90,6 +90,35 @@ class HistoryBackfill
             return BackfillOutcome.Done(summaries.size, whole)
         }
 
+        /**
+         * Wake dates of the valid nights of the configured source that [runIfNeeded] leaves to the daily check (they
+         * ended less than the completeness cap ago). Nothing is stored. The onboarding counts them with the stored
+         * nights, so its learning progress is the count Home shows once the first check has run (the newest night
+         * included). Throws [HcError].
+         */
+        suspend fun unsettledValidDates(): Set<String> {
+            val s = settings.settings.first()
+            val params = s.algoParams()
+            val now = clock.millis()
+            val settledBefore = now - (NightProcessor.COMPLETENESS.capHours * NightProcessor.HOUR_MS).toLong()
+            val from = settledBefore - DAY_MS
+            val candidates =
+                NightSelector
+                    .select(
+                        reader.readSessions(s.sourcePackage, from, now),
+                        params,
+                    ).filter { it.endMs > settledBefore }
+            if (candidates.isEmpty()) return emptySet()
+            val provided = reader.channelsOf(s.sourcePackage, now - WITHOUT_HISTORY_DAYS * DAY_MS, now) - HcChannels.STEPS_ID
+            val noAccess = reader.noAccessChannels()
+            val data = reader.readNight(s.sourcePackage, candidates.first().startMs, candidates.last().endMs + 1)
+            return candidates
+                .map { MetricExtractor.summarize(it.withSamples(data.channels), provided, params, noAccess) }
+                .filter { it.valid }
+                .map { it.date }
+                .toSet()
+        }
+
         /** Consecutive candidates grouped so that each group spans at most [CHUNK_DAYS] days. */
         private fun chunks(candidates: List<NightCandidate>): List<List<NightCandidate>> {
             val out = mutableListOf<MutableList<NightCandidate>>()
