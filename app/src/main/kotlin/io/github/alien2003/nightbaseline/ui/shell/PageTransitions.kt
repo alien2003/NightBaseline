@@ -16,7 +16,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import io.github.alien2003.nightbaseline.ui.motion.NbDurations
-import io.github.alien2003.nightbaseline.ui.motion.NbEasing
 import io.github.alien2003.nightbaseline.ui.motion.NbSprings
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 
@@ -24,9 +23,9 @@ import io.github.alien2003.nightbaseline.ui.theme.NbTheme
  * Page transitions of `coloros-conformance.md` P1 / P2, measured on the ColorOS Settings back gesture
  * (`reference-analysis.md` 8.1): a pushed page slides in from the end edge over the full width while the covered page
  * moves a third of the width towards the start (parallax) and dims; pop is the mirror image. All on the critically
- * damped `spring.page` (1.0 / 220), no scale. Top-level switches crossfade in 150 ms. Under reduced motion every change
- * is a 120 ms crossfade. Slides follow the layout direction (Compose mirrors horizontal offsets in RTL only for
- * layout, so the sign is applied here from [rtl]).
+ * damped `spring.page` (1.0 / 220), no scale. Top-level switches crossfade in 150 ms (in `TopLevelHost`). Under
+ * reduced motion every change is a 120 ms crossfade. Slides follow the layout direction (Compose mirrors horizontal
+ * offsets in RTL only for layout, so the sign is applied here from [rtl]).
  *
  * @param reduced reduced motion.
  * @param dim the covered page fades towards the window background; on the dark theme's black window this is the
@@ -66,12 +65,6 @@ data class PageTransitions(
     /** Leaving page of a pop. */
     fun popExit(): ExitTransition =
         if (reduced) fadeOut(tween(NbDurations.REDUCED)) else slideOutHorizontally(page<IntOffset>()) { sign * it }
-
-    /** Top-level switch: a short crossfade. */
-    fun switchEnter(): EnterTransition = fadeIn(tween(if (reduced) NbDurations.REDUCED else NbDurations.SHORT, easing = NbEasing.Standard))
-
-    /** Top-level switch: a short crossfade. */
-    fun switchExit(): ExitTransition = fadeOut(tween(if (reduced) NbDurations.REDUCED else NbDurations.SHORT, easing = NbEasing.Standard))
 
     /** A push ([forward]) or pop for `AnimatedContent`. */
     fun content(forward: Boolean): ContentTransform =

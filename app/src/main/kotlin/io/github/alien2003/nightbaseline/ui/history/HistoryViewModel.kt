@@ -4,10 +4,14 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.alien2003.nightbaseline.app.AccessStatus
 import io.github.alien2003.nightbaseline.app.AppData
 import io.github.alien2003.nightbaseline.app.NightPresenter
+import io.github.alien2003.nightbaseline.data.local.NightRecord
+import io.github.alien2003.nightbaseline.data.local.settings.AppSettings
 import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.NightUi
+import io.github.alien2003.nightbaseline.ui.shell.PerfProbe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +21,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 import javax.inject.Inject
+
+/** Everything the night mapping of History depends on (its cache key; Home also depends on the time and maps anew). */
+private data class MapKey(
+    val settings: AppSettings,
+    val access: AccessStatus?,
+    val records: List<NightRecord>,
+    val zone: ZoneId,
+)
 
 /** View options of History, kept in the [SavedStateHandle] (`layouts.md` 8.1). */
 private data class HistoryOptions(
@@ -52,10 +65,22 @@ class HistoryViewModel
                 ),
             )
 
+        /** The last inputs and their nights: a re-subscription (screen back after the stop timeout) maps nothing. */
+        @Volatile
+        private var last: Pair<MapKey, List<NightUi>>? = null
+
         private val nights =
             combine(data.settings, data.access.status, data.allNights) { settings, access, all ->
-                val records = NightPresenter.mergeSources(all, settings.sourcePackage)
-                Triple(NightPresenter.nights(records, settings.algoParams(), data.zoneId(), access), access, settings)
+                val zone = data.zoneId()
+                val key = MapKey(settings, access, all, zone)
+                val cached = last?.takeIf { it.first == key }?.second
+                val list =
+                    cached ?: run {
+                        PerfProbe.hit(MAP_PROBE)
+                        val records = NightPresenter.mergeSources(all, settings.sourcePackage)
+                        NightPresenter.nights(records, settings.algoParams(), zone, access).also { last = key to it }
+                    }
+                Triple(list, access, settings)
             }
 
         /** The screen state ([HistoryUiState.loading] until the first read). */
@@ -110,11 +135,15 @@ class HistoryViewModel
             options.value = options.value.change()
         }
 
-        private companion object {
-            const val KEY_VIEW = "history_view"
-            const val KEY_FILTER = "history_filter"
-            const val KEY_MONTH = "history_month"
-            const val KEY_SELECTED = "history_selected"
-            const val STOP_TIMEOUT_MS = 5_000L
+        /** Keys and constants. */
+        companion object {
+            /** [PerfProbe] name of one mapping of the stored nights. */
+            const val MAP_PROBE: String = "HistoryViewModel.nights"
+
+            private const val KEY_VIEW = "history_view"
+            private const val KEY_FILTER = "history_filter"
+            private const val KEY_MONTH = "history_month"
+            private const val KEY_SELECTED = "history_selected"
+            private const val STOP_TIMEOUT_MS = 5_000L
         }
     }

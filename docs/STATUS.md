@@ -67,6 +67,16 @@ Live project state. A new session starts here. Updated after every step.
   NbColors, one round button (ShellRoundButton) and one segmented control (period selector), README screenshots
   re-recorded. Not verified on the phone yet: blur strength, page dim, overscroll feel (ask the owner first).
 
+## Tab-switch cost and title alignment (2026-11-26)
+- Owner's measurement (unfolded, release dev.4): 12 % janky frames when switching Last night <-> History (about two
+  slow UI-thread frames per switch), 0.76 % when scrolling. Cause: every switch rebuilt the whole destination.
+  Fix (ADR 0006): the sections stay composed in `TopLevelHost`; ICU formatters and night labels cached in `UiText`;
+  History's derived lists computed once per state off the main thread; History's mapping cached by input; baseline
+  profile extended to navigation-compose, lifecycle / Hilt Compose glue, saveable, lazy and animation.
+  `TabSwitchCostTest` guards it. Not measured on the phone yet (ask the owner first).
+- Page titles start at the card column's start edge on wide windows (`TitleColumn`; `CardAlignmentTest` checks
+  every top-level screen).
+
 ## In progress (2026-11-25 evening)
 - Screens workflow: 4 agents in isolated worktrees (home+night, metric, history, setup) → merge into worktree-dev.
 - CI workflows agent (.github only).

@@ -48,6 +48,7 @@ import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NightRow
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
+import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
@@ -55,6 +56,7 @@ import io.github.alien2003.nightbaseline.ui.layout.NavigationKind
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
 import io.github.alien2003.nightbaseline.ui.shell.AppScaffold
+import io.github.alien2003.nightbaseline.ui.shell.CountComposition
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
@@ -95,6 +97,7 @@ fun HistoryScreen(
         HistoryNightPreview(night, state.source, interactive, onOpen = { actions.onOpenNight(night.wakeDate) })
     },
 ) {
+    CountComposition("HistoryScreen")
     val density = LocalDensity.current
     val arrangement = HistoryArrangement.of(layout)
     var barHeight by remember { mutableStateOf(0.dp) }
@@ -120,6 +123,17 @@ fun HistoryScreen(
                             if (atRest || barHeight == 0.dp) barHeight = with(density) { size.height.toDp() }
                         },
                     actions.onView,
+                    column =
+                        if (arrangement.twoPanes) {
+                            TitleColumn.atStart(arrangement.listGutter)
+                        } else {
+                            TitleColumn.centred(
+                                layout.gutter,
+                                NbDimens.textMax,
+                                end =
+                                    layout.gutter + padding.calculateRightPadding(LayoutDirection.Ltr),
+                            )
+                        },
                 )
             }
         },
@@ -220,6 +234,7 @@ private fun HistoryTopBar(
     listState: LazyListState,
     modifier: Modifier,
     onView: (HistoryView) -> Unit,
+    column: TitleColumn,
 ) {
     val density = LocalDensity.current
     val large = layout.mode == LayoutMode.Compact
@@ -235,6 +250,7 @@ private fun HistoryTopBar(
             large = large,
             height = shellToolbarHeight(short, large),
             scrollOffset = scrolled,
+            column = column,
             actions = {
                 if (arrangement.toggleInBar && !state.empty && !state.loading) {
                     HistoryViewButton(state.view, onView)
@@ -303,8 +319,7 @@ private class HistoryContent(
 
     private fun LazyListScope.listItems() {
         controlRow(filters = true)
-        val visible = state.visibleNights
-        if (visible.isEmpty()) {
+        if (state.visibleNights.isEmpty()) {
             item(key = "filter-empty") {
                 HistoryEmptyCard(
                     modifier = Modifier.widthIn(max = NbDimens.textMax).padding(top = GAP),
@@ -320,7 +335,7 @@ private class HistoryContent(
             return
         }
         val selected = state.selectedNight?.wakeDate
-        visible.groupBy { YearMonth.from(it.wakeDate) }.forEach { (month, nights) ->
+        state.visibleByMonth.forEach { (month, nights) ->
             stickyHeader(key = "month:$month") {
                 val text = rememberUiText()
                 Box(Modifier.fillMaxWidth().background(NbTheme.colors.background), contentAlignment = Alignment.TopCenter) {

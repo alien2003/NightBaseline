@@ -54,6 +54,7 @@ import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.SecondaryButton
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
+import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.history.CompactNightSummary
 import io.github.alien2003.nightbaseline.ui.home.BlockHeading
@@ -69,6 +70,7 @@ import io.github.alien2003.nightbaseline.ui.home.ScreenFrame
 import io.github.alien2003.nightbaseline.ui.home.TABLETOP_COMPACT_FONT
 import io.github.alien2003.nightbaseline.ui.home.contentWidth
 import io.github.alien2003.nightbaseline.ui.home.tileColumns
+import io.github.alien2003.nightbaseline.ui.home.tileTitleColumn
 import io.github.alien2003.nightbaseline.ui.home.topInset
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
@@ -109,6 +111,14 @@ fun NightDetailScreen(
         modifier = modifier.then(keys),
         largeTitle = false,
         onBack = actions.onBack,
+        column =
+            if (layout.mode == LayoutMode.Book &&
+                layout.verticalFold != null
+            ) {
+                TitleColumn.atStart(layout.gutter)
+            } else {
+                tileTitleColumn(layout.gutter)
+            },
         actions = { if (layout.mode != LayoutMode.Tabletop) PrevNextIcons(state, actions) },
     ) { padding, contentTop ->
         val fold = layout.horizontalFold

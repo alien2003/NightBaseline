@@ -574,12 +574,12 @@ Requirement: fold/unfold keeps the same screen, scroll position, selected period
 | State | Holder | Survives |
 |---|---|---|
 | Night results, baselines, chart series, sync/permission state | `ViewModel` (`StateFlow`, `stateIn(viewModelScope, WhileSubscribed(5_000))`), backed by Room | config changes; reloaded from Room (not Health Connect) after process death |
-| Current top-level section | nav back stack (saved) | everything |
+| Current top-level section | saved state of the `TopLevelRoute` entry (`TOP_LEVEL_TAB`); sections stay composed (ADR 0006) | everything |
 | Selected metric (Home) | `rememberListDetailPaneScaffoldNavigator<MetricKey>()`, `MetricKey` is `@Parcelable` (metric id string) | everything |
 | Selected night (History) | navigator with `NightKey(epochDay: Long)` `@Parcelable` | everything |
 | Selected period (7/30/90) | `MetricDetailViewModel` `SavedStateHandle["period"]`, per metric | everything |
 | Chart scrub position (selected night on chart) | `rememberSaveable` epochDay, hoisted above the layout switch | everything |
-| History view (List/Calendar), shown month | `rememberSaveable` (enum name, `YearMonth` as string) in `HistoryRoute` | everything |
+| History view (List/Calendar), shown month | `rememberSaveable` (enum name, `YearMonth` as string) in the History section of `TopLevelRoute` | everything |
 | Scroll positions | hoisted per screen (section 8.2) | everything |
 | Open sheet / dialog and which one | `rememberSaveable` enum at the screen route | everything |
 | Settings drafts (sensitivity before release) | `rememberSaveable` | everything |

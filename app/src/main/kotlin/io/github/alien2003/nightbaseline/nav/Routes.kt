@@ -3,15 +3,16 @@ package io.github.alien2003.nightbaseline.nav
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import kotlinx.serialization.Serializable
 
-/** Typed destinations of the navigation graph (`screens.md` 2). Arguments are strings so they survive process death. */
+/**
+ * Typed destinations of the navigation graph (`screens.md` 2). Arguments are strings so they survive process death.
+ *
+ * The top-level sections Home, History and the Settings list share this one destination ([TopLevelHost], ADR 0006);
+ * the selected section is saved state of its back stack entry ([TOP_LEVEL_TAB], set by [toTop]).
+ */
 @Serializable
-data object HomeRoute
+data object TopLevelRoute
 
-/** History. */
-@Serializable
-data object HistoryRoute
-
-/** Settings; [page] is a `SettingsPage` name (`settings/source`, `settings/sensitivity`, ...). */
+/** A pushed Settings sub-page; [page] is a `SettingsPage` name (`settings/source`, `settings/about`, ...). */
 @Serializable
 data class SettingsRoute(
     /** Sub-page. */

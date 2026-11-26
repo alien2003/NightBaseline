@@ -21,7 +21,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
+import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.components.withEnd
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.shell.AppScaffold
@@ -48,6 +50,7 @@ internal fun ShellPage(
     onSelectTab: (TopLevel) -> Unit = {},
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
+    column: TitleColumn? = null,
     overlay: @Composable BoxScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
@@ -84,6 +87,7 @@ internal fun ShellPage(
                         height = barHeight,
                         scrollOffset = { with(density) { scroll.value.toDp() } },
                         onBack = onBack,
+                        column = column?.withEnd(padding.calculateEndPadding(direction)),
                     )
                 }
             }

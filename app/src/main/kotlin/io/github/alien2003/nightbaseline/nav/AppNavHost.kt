@@ -2,7 +2,6 @@ package io.github.alien2003.nightbaseline.nav
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,6 +90,7 @@ import io.github.alien2003.nightbaseline.ui.settings.SettingsViewModel
 import io.github.alien2003.nightbaseline.ui.shell.rememberPageTransitions
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 
 /**
@@ -286,39 +287,59 @@ fun AppNavHost(
             },
     ) {
         val transitions = rememberPageTransitions()
-        // Push / pop with parallax (coloros-conformance.md P1); top-level switches crossfade.
+        val onSheet: (AppSheet, String, String) -> Unit = { s, source, title ->
+            sheet = s
+            sheetSource = source
+            sheetTitle = title
+        }
+        // Push / pop with parallax (coloros-conformance.md P1); top-level switches crossfade inside TopLevelHost.
         NavHost(
             navController = navController,
-            startDestination = if (onboardingDone) HomeRoute else OnboardingRoute(),
-            enterTransition = { if (isSwitch()) transitions.switchEnter() else transitions.pushEnter() },
-            exitTransition = { if (isSwitch()) transitions.switchExit() else transitions.pushExit() },
-            popEnterTransition = { if (isSwitch()) transitions.switchEnter() else transitions.popEnter() },
-            popExitTransition = { if (isSwitch()) transitions.switchExit() else transitions.popExit() },
+            startDestination = if (onboardingDone) TopLevelRoute else OnboardingRoute(),
+            enterTransition = { transitions.pushEnter() },
+            exitTransition = { transitions.pushExit() },
+            popEnterTransition = { transitions.popEnter() },
+            popExitTransition = { transitions.popExit() },
         ) {
-            composable<HomeRoute> { entry ->
-                HomeDestination(
-                    entry = entry,
-                    layout = layout,
-                    navController = navController,
-                    onSelectTab = openTab,
-                    onStateAction = nightActions,
-                    onStateSecondary = nightSecondary,
-                    onBannerAction = bannerAction,
-                    onSheet = { s, source, title ->
-                        sheet = s
-                        sheetSource = source
-                        sheetTitle = title
-                    },
-                    onAbout = about,
-                    onMore = more,
-                    debugAction = debugAction,
-                )
-            }
-            composable<HistoryRoute> { entry ->
-                HistoryDestination(entry, layout, navController, openTab, more, requestPermissions, system)
+            composable<TopLevelRoute> { entry ->
+                val tabName by entry.savedStateHandle
+                    .getStateFlow(TOP_LEVEL_TAB, TopLevel.Home.name)
+                    .collectAsStateWithLifecycle()
+                val tab = TopLevel.entries.firstOrNull { it.name == tabName } ?: TopLevel.Home
+                // Back from History or Settings returns to Home (the old popUpTo(Home) stack); the sections' own
+                // Back handlers (Settings sub-pages) are registered later and win.
+                BackHandler(enabled = tab != TopLevel.Home) { openTab(TopLevel.Home) }
+                TopLevelHost(tab) { shown, active ->
+                    when (shown) {
+                        TopLevel.Home -> {
+                            HomeDestination(
+                                entry = entry,
+                                active = active,
+                                layout = layout,
+                                navController = navController,
+                                onSelectTab = openTab,
+                                onStateAction = nightActions,
+                                onStateSecondary = nightSecondary,
+                                onBannerAction = bannerAction,
+                                onSheet = onSheet,
+                                onAbout = about,
+                                onMore = more,
+                                debugAction = debugAction,
+                            )
+                        }
+
+                        TopLevel.History -> {
+                            HistoryDestination(entry, active, layout, navController, openTab, more, requestPermissions, system)
+                        }
+
+                        TopLevel.Settings -> {
+                            SettingsDestination(active, layout, navController, openTab, more, system)
+                        }
+                    }
+                }
             }
             composable<SettingsRoute> {
-                SettingsDestination(layout, navController, openTab, more, system)
+                SettingsDestination(ALWAYS, layout, navController, openTab, more, system)
             }
             composable<NightRoute> { entry ->
                 val route = entry.toRoute<NightRoute>()
@@ -452,26 +473,37 @@ const val SELECT_POINT: String = "select_point"
 /** Saved-state key on History's entry: a night to select in the detail pane after an unfold. */
 const val SELECT_NIGHT: String = "select_night"
 
-/** Runs [action] once when [condition] becomes true (a layout change, never a reload). */
+/**
+ * Runs [action] once when [condition] becomes true (a layout change, never a reload); in a hidden top-level section
+ * it waits until the section is shown again ([active]).
+ */
 @Composable
 private fun FoldBack(
     condition: Boolean,
+    active: () -> Boolean = ALWAYS,
     action: () -> Unit,
 ) {
     val current by rememberUpdatedState(action)
-    LaunchedEffect(condition) { if (condition) current() }
+    LaunchedEffect(condition) {
+        if (condition) {
+            snapshotFlow(active).first { it }
+            current()
+        }
+    }
 }
 
-/** Both ends of the transition are top-level destinations (a tab switch, not a push or pop). */
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.isSwitch(): Boolean = initialState.isTopLevel() && targetState.isTopLevel()
-
-/** Home, History or the Settings list. */
-private fun NavBackStackEntry.isTopLevel(): Boolean {
-    val destination = destination
-    return destination.hasRoute<HomeRoute>() ||
-        destination.hasRoute<HistoryRoute>() ||
-        (destination.hasRoute<SettingsRoute>() && toRoute<SettingsRoute>().page == SettingsPage.Main.name)
+/** A [BackHandler] that is enabled only while the section is shown; [active] is read in its own small scope. */
+@Composable
+private fun ActiveBackHandler(
+    enabled: Boolean,
+    active: () -> Boolean,
+    onBack: () -> Unit,
+) {
+    BackHandler(enabled = enabled && active(), onBack = onBack)
 }
+
+/** [FoldBack] / [ActiveBackHandler] outside the top-level host: always shown. */
+private val ALWAYS: () -> Boolean = { true }
 
 /**
  * Pushed detail pages carry no bottom bar on phones (`coloros-conformance.md` C7): the bar belongs to the top-level
@@ -479,25 +511,37 @@ private fun NavBackStackEntry.isTopLevel(): Boolean {
  */
 private fun LayoutSpec.forDetail(): LayoutSpec = if (navigation == NavigationKind.Bar) copy(navigation = NavigationKind.None) else this
 
-/** Top-level navigation: one entry per section, state saved and restored, Home at the root. */
+/** Saved-state key on the [TopLevelRoute] entry: the selected section (`TopLevel` name). */
+const val TOP_LEVEL_TAB: String = "top_level_tab"
+
+/**
+ * Top-level navigation: back to the [TopLevelRoute] entry at the root (pages pushed above it are popped) and select
+ * [tab] there. The sections stay composed in [TopLevelHost], so this rebuilds nothing.
+ */
 fun NavHostController.toTop(tab: TopLevel) {
-    val route: Any =
-        when (tab) {
-            TopLevel.Home -> HomeRoute
-            TopLevel.History -> HistoryRoute
-            TopLevel.Settings -> SettingsRoute()
-        }
-    navigate(route) {
-        popUpTo<HomeRoute> { saveState = true }
-        launchSingleTop = true
-        restoreState = true
+    val root = currentBackStack.value.lastOrNull { it.destination.hasRoute<TopLevelRoute>() }
+    if (root == null) {
+        navigate(TopLevelRoute) { popUpTo(0) { inclusive = true } }
+    } else if (currentBackStackEntry != root) {
+        popBackStack<TopLevelRoute>(inclusive = false)
     }
+    getBackStackEntry<TopLevelRoute>().savedStateHandle[TOP_LEVEL_TAB] = tab.name
 }
+
+/** The selected section when [this] is the [TopLevelRoute] entry, else null. */
+fun NavBackStackEntry.topLevelTab(): TopLevel? =
+    if (destination.hasRoute<TopLevelRoute>()) {
+        val name = savedStateHandle.get<String>(TOP_LEVEL_TAB) ?: TopLevel.Home.name
+        TopLevel.entries.firstOrNull { it.name == name } ?: TopLevel.Home
+    } else {
+        null
+    }
 
 @Suppress("LongParameterList")
 @Composable
 private fun HomeDestination(
     entry: NavBackStackEntry,
+    active: () -> Boolean,
     layout: LayoutSpec,
     navController: NavHostController,
     onSelectTab: (TopLevel) -> Unit,
@@ -533,7 +577,7 @@ private fun HomeDestination(
     }
     // Folded from two panes with a metric the person chose: the detail screen is on top (layouts.md 8.2 rule 4), with
     // the pane's period and selected night.
-    FoldBack(!layout.twoPanes && explicit && selected != null) {
+    FoldBack(!layout.twoPanes && explicit && selected != null, active) {
         explicit = false
         selected?.let { navController.navigate(MetricRoute(it, period = period.name, point = selection ?: -1)) }
     }
@@ -615,6 +659,7 @@ private fun HomeDestination(
 @Composable
 private fun HistoryDestination(
     entry: NavBackStackEntry,
+    active: () -> Boolean,
     layout: LayoutSpec,
     navController: NavHostController,
     onSelectTab: (TopLevel) -> Unit,
@@ -635,7 +680,7 @@ private fun HistoryDestination(
             entry.savedStateHandle[SELECT_NIGHT] = null
         }
     }
-    FoldBack(!layout.twoPanes && explicit && state.selected != null) {
+    FoldBack(!layout.twoPanes && explicit && state.selected != null, active) {
         explicit = false
         state.selected?.let { navController.navigate(NightRoute(it.toString(), TopLevel.History.name)) }
     }
@@ -701,6 +746,7 @@ private fun HistoryDestination(
 @Suppress("LongParameterList")
 @Composable
 private fun SettingsDestination(
+    active: () -> Boolean,
     layout: LayoutSpec,
     navController: NavHostController,
     onSelectTab: (TopLevel) -> Unit,
@@ -712,7 +758,7 @@ private fun SettingsDestination(
     val scroll = rememberScrollState()
     val reason = NbTheme.effects.reason
     state?.let { s ->
-        BackHandler(enabled = s.page != SettingsPage.Main && !layout.twoPanes) { vm.back() }
+        ActiveBackHandler(s.page != SettingsPage.Main && !layout.twoPanes, active) { vm.back() }
         SettingsScreen(
             s.copy(glassReason = reason),
             layout,
@@ -781,7 +827,7 @@ private fun OnboardingDestination(
                 onSkipNotifications = vm::skipNotifications,
                 onDone = {
                     vm.done {
-                        navController.navigate(HomeRoute) { popUpTo(0) { inclusive = true } }
+                        navController.navigate(TopLevelRoute) { popUpTo(0) { inclusive = true } }
                     }
                 },
             ),

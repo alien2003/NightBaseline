@@ -37,6 +37,7 @@ import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.SecondaryButton
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
+import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
@@ -82,6 +83,20 @@ fun LearningScreen(
         scroll = scroll,
         modifier = modifier,
         onSelectTab = onSelectTab,
+        column =
+            when {
+                layout.twoPanes -> {
+                    TitleColumn.atStart(layout.gutter)
+                }
+
+                layout.mode == LayoutMode.Medium || layout.mode == LayoutMode.WideShort -> {
+                    TitleColumn.centred(layout.gutter, NbDimens.chartMax)
+                }
+
+                else -> {
+                    TitleColumn.centred(layout.gutter, NbDimens.textMax)
+                }
+            },
     ) { padding ->
         when {
             layout.mode == LayoutMode.Glance -> GlanceLearning(state, actions, padding, scroll)

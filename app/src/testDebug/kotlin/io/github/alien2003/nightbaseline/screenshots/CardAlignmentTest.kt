@@ -23,6 +23,8 @@ import androidx.compose.ui.test.onRoot
 import io.github.alien2003.nightbaseline.catalog.CatalogConfig
 import io.github.alien2003.nightbaseline.catalog.CatalogFrame
 import io.github.alien2003.nightbaseline.ui.components.CARD_TAG
+import io.github.alien2003.nightbaseline.ui.components.ROW_TAG
+import io.github.alien2003.nightbaseline.ui.components.TOP_BAR_TITLE_TAG
 import io.github.alien2003.nightbaseline.ui.history.HistoryAccess
 import io.github.alien2003.nightbaseline.ui.history.HistorySamples
 import io.github.alien2003.nightbaseline.ui.history.HistoryScreen
@@ -120,6 +122,7 @@ class CardAlignmentTest(
             show { CatalogFrame(CatalogConfig(dark = true, glass = false), Modifier.fillMaxSize()) { content() } }
             write("align-$id-${device.id}-font%.1f".format(Locale.US, fontScale))
             failures += check(id, layout)
+            failures += checkTitle(id)
         }
         activity.finish()
         assertEquals("cards out of line on ${device.id} at font $fontScale", emptyList<String>(), failures)
@@ -214,6 +217,35 @@ class CardAlignmentTest(
         }
     }
 
+    /**
+     * The title rule (owner's unfolded-screen feedback): on top-level pages the page title in the top bar starts at the
+     * start edge of the first card column (or of History's grouped night rows), the same container rule as the cards.
+     */
+    private fun checkTitle(id: String): List<String> {
+        if (TOP_LEVEL.none { id.startsWith(it) }) return emptyList()
+        val density =
+            RuntimeEnvironment
+                .getApplication()
+                .resources.displayMetrics.density
+        // No title without a top bar (Tabletop, Glance); no column without cards.
+        val titles =
+            compose
+                .onAllNodes(hasTestTag(TOP_BAR_TITLE_TAG), useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .map { it.boundsInRoot.left / density }
+        val start =
+            listOf(CARD_TAG, ROW_TAG)
+                .flatMap { tag -> compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes() }
+                .map { it.boundsInRoot }
+                .filter { it.width > 1f && it.height > 1f }
+                .minOfOrNull { it.left / density }
+        return if (start == null) {
+            emptyList()
+        } else {
+            titles.filterNot { near(it, start) }.map { "$id: title at ${fmt(it)} dp, cards start at ${fmt(start)} dp" }
+        }
+    }
+
     /** Groups cards whose horizontal extents overlap (more than 1 dp) into columns. */
     private fun columns(cards: List<Rect>): List<List<Rect>> {
         val groups = mutableListOf<MutableList<Rect>>()
@@ -249,6 +281,9 @@ class CardAlignmentTest(
     /** The matrix. */
     companion object {
         private const val TOLERANCE_DP = 1f
+
+        /** Screens with a top-level page title (pushed pages lead with the back button instead). */
+        private val TOP_LEVEL = listOf("home-", "history-", "settings-main", "learning-")
 
         /**
          * The owner's book posture (strict rule) and the wide windows of the round-4 audit, including the owner's

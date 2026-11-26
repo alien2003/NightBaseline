@@ -62,11 +62,13 @@ import io.github.alien2003.nightbaseline.ui.components.RangeBand
 import io.github.alien2003.nightbaseline.ui.components.SecondaryButton
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
+import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.chartPoint
 import io.github.alien2003.nightbaseline.ui.components.chartSummary
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.components.tone
+import io.github.alien2003.nightbaseline.ui.components.withEnd
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.material.ShellMaterial
@@ -130,6 +132,7 @@ fun MetricDetailScreen(
                         height = topBarHeight(layout.mode),
                         scrollOffset = { with(density) { scroll.value.toDp() } },
                         onBack = actions.onBack,
+                        column = titleColumn(layout).withEnd(padding.calculateEndPadding(LocalLayoutDirection.current)),
                         actions = {
                             ShellRoundButton(NbIcons.Info, text.string(R.string.a11y_range_info), onClick = actions.onOpenExplainer)
                         },
@@ -151,6 +154,14 @@ fun MetricDetailScreen(
         }
     }
 }
+
+/** The card column the title row starts at (review round 4 container rule). */
+private fun titleColumn(layout: LayoutSpec): TitleColumn =
+    when (layout.mode) {
+        LayoutMode.Book, LayoutMode.WideShort -> TitleColumn.atStart(layout.gutter)
+        LayoutMode.Compact, LayoutMode.CompactShort -> TitleColumn.centred(layout.gutter, NbDimens.textMax)
+        else -> TitleColumn.centred(layout.gutter, NbDimens.chartMax)
+    }
 
 /** Top bar height per mode (`layouts.md` 4.3): 56 dp Compact, 48 dp short windows, 64 dp otherwise. */
 private fun topBarHeight(mode: LayoutMode): Dp =

@@ -12,6 +12,7 @@ import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
@@ -82,8 +83,11 @@ class NavigationTest {
         compose.waitForIdle()
     }
 
-    private fun route(): String =
-        nav.currentBackStackEntry
+    /** The route of the current entry; the top-level entry reads as its selected section ("HomeRoute", ...). */
+    private fun route(): String = routeOf(nav.currentBackStackEntry)
+
+    private fun routeOf(entry: NavBackStackEntry?): String =
+        entry?.topLevelTab()?.let { "${it.name}Route" } ?: entry
             ?.destination
             ?.route
             .orEmpty()
@@ -110,11 +114,7 @@ class NavigationTest {
         idle()
         assertTrue(route(), route().contains("NightRoute"))
         assertEquals(date, nav.currentBackStackEntry!!.toRoute<NightRoute>().date)
-        assertTrue(
-            nav.previousBackStackEntry!!
-                .destination.route!!
-                .contains("HomeRoute"),
-        )
+        assertTrue(routeOf(nav.previousBackStackEntry).contains("HomeRoute"))
         compose.runOnIdle { nav.popBackStack() }
         idle()
         assertTrue(route().contains("HomeRoute"))

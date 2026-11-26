@@ -47,6 +47,9 @@ import io.github.alien2003.nightbaseline.ui.theme.dataType
 /** Test tag of every content card: the layout tests check that the cards of one column share one width and start. */
 const val CARD_TAG: String = "nb-card"
 
+/** Test tag of a grouped list row that forms a card with its neighbours (History's night rows). */
+const val ROW_TAG: String = "nb-row"
+
 /** Marks a content card for the layout tests ([CARD_TAG]); placed right before the card surface, after any margin. */
 fun Modifier.cardTag(): Modifier = testTag(CARD_TAG)
 

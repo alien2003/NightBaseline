@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -112,6 +113,8 @@ private val TitleEasing = CubicBezierEasing(0.33f, 0f, 0.67f, 1f)
  * @param scrollOffset the scroll offset as a function, read only where it is used (the small title's layer, the large
  *   title's layout, the derived material target), so scrolling never recomposes the bar; takes precedence over
  *   [scroll] and [scrolledUnder].
+ * @param column the page's card column: the leading element (title or back button) starts at its start edge instead
+ *   of the 16 dp toolbar margin (wide single-pane and two-pane pages, review round 4 container rule).
  */
 @Suppress("CyclomaticComplexMethod") // Derives the scroll-driven states of tokens C4 / C5 in one place.
 @Composable
@@ -125,6 +128,7 @@ fun ShellTopBar(
     onBack: (() -> Unit)? = null,
     scroll: Dp? = null,
     scrollOffset: (() -> Dp)? = null,
+    column: TitleColumn? = null,
     actions: @Composable () -> Unit = {},
 ) {
     val motion = NbTheme.motion
@@ -172,7 +176,7 @@ fun ShellTopBar(
                     .fadeOutBottom(ShellDimens.topBarFade)
                     .shellSurface(ShellMaterial.TopBar, RectangleShape, strength = strength),
             )
-            Column {
+            Column(Modifier.alignStartToColumn(column)) {
                 Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
                 Row(
                     Modifier.fillMaxWidth().heightIn(min = toolbar),
@@ -194,10 +198,13 @@ fun ShellTopBar(
             }
         }
         if (large) {
-            LargeTitleBlock(title, subtitle, total, onHeight = { blockHeight.value = it })
+            LargeTitleBlock(title, subtitle, total, Modifier.alignStartToColumn(column), onHeight = { blockHeight.value = it })
         }
     }
 }
+
+/** Test tag of the page title in the top bar (the large title where there is one). */
+const val TOP_BAR_TITLE_TAG: String = "top-bar-title"
 
 /** Half the difference between the 48 dp target and the 40 dp round button. */
 private val TargetInset: Dp = (NbDimens.targetMin - ShellDimens.roundButton) / 2
@@ -219,7 +226,12 @@ private fun RowScope.ToolbarTitle(
             // On large-title pages the large title is the heading; the toolbar copy is decorative.
             .then(if (large) Modifier.clearAndSetSemantics {} else Modifier),
     ) {
-        NbText(title, style = type.topBarTitle, color = colors.onGlassPrimary, modifier = Modifier.semantics { heading() })
+        NbText(
+            title,
+            style = type.topBarTitle,
+            color = colors.onGlassPrimary,
+            modifier = Modifier.testTag(TOP_BAR_TITLE_TAG).semantics { heading() },
+        )
         subtitle?.let { NbText(it, style = type.subtitleSmall, color = colors.textTertiary) }
     }
 }
@@ -233,6 +245,7 @@ private fun LargeTitleBlock(
     title: String,
     subtitle: String?,
     scroll: () -> Dp,
+    modifier: Modifier,
     onHeight: (Dp) -> Unit,
 ) {
     val colors = NbTheme.colors
@@ -249,12 +262,12 @@ private fun LargeTitleBlock(
                     title,
                     style = NbTheme.typography.largeTitle,
                     color = colors.textPrimary,
-                    modifier = Modifier.semantics { heading() },
+                    modifier = Modifier.testTag(TOP_BAR_TITLE_TAG).semantics { heading() },
                 )
                 subtitle?.let { NbText(it, style = ShellTokens.type.subtitleSmall, color = colors.textTertiary) }
             }
         },
-        modifier = Modifier.fillMaxWidth().clipToBounds(),
+        modifier = modifier.fillMaxWidth().clipToBounds(),
     ) { measurables, constraints ->
         val placeable = measurables.first().measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
         val shift = scroll().roundToPx().coerceIn(0, placeable.height)

@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CollectionInfo
 import androidx.compose.ui.semantics.CollectionItemInfo
@@ -47,6 +48,7 @@ import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.StatusTone
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.shell.CountComposition
 import io.github.alien2003.nightbaseline.ui.theme.NbControlDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbControlType
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
@@ -124,6 +126,7 @@ fun NightRow(
     maxWidth: Dp = NbDimens.textMax,
     position: GroupPosition = GroupPosition.Single,
 ) {
+    CountComposition("NightRow")
     val text = rememberUiText()
     val colors = NbTheme.colors
     val controls = NbTheme.controls
@@ -137,6 +140,7 @@ fun NightRow(
             .widthIn(max = maxWidth)
             .then(modifier)
             .fillMaxWidth()
+            .testTag(ROW_TAG)
             .background(colors.surface1, shape)
             .clip(shape),
     ) {

@@ -86,17 +86,24 @@ data class HistoryUiState(
     /** Data-access problem shown as a banner, if any. */
     val access: HistoryAccess? = null,
 ) {
+    // Derived once per state, where the state is built (the ViewModel maps on a background dispatcher), never again
+    // in composition: the list builder and the calendar read these on every pass.
+
     /** The nights of the list view after [filter]. */
-    val visibleNights: List<NightUi> get() = nights.filter(filter::matches)
+    val visibleNights: List<NightUi> = nights.filter(filter::matches)
+
+    /** [visibleNights] grouped by month, newest month first (sticky headers of the list view). */
+    val visibleByMonth: List<Pair<YearMonth, List<NightUi>>> =
+        visibleNights.groupBy { YearMonth.from(it.wakeDate) }.map { (month, list) -> month to list }
 
     /** Nights by wake date (calendar cells). */
-    val byDate: Map<LocalDate, NightUi> get() = nights.associateBy { it.wakeDate }
+    val byDate: Map<LocalDate, NightUi> = nights.associateBy { it.wakeDate }
 
     /** The selected night, or the newest one. */
-    val selectedNight: NightUi? get() = selected?.let { date -> nights.firstOrNull { it.wakeDate == date } } ?: nights.firstOrNull()
+    val selectedNight: NightUi? = selected?.let { date -> byDate[date] } ?: nights.firstOrNull()
 
     /** Oldest month with a stored night (no "previous month" before it). */
-    val firstMonth: YearMonth get() = nights.minOfOrNull { YearMonth.from(it.wakeDate) } ?: YearMonth.from(today)
+    val firstMonth: YearMonth = nights.minOfOrNull { YearMonth.from(it.wakeDate) } ?: YearMonth.from(today)
 
     /** True for `H-EMPTY`. */
     val empty: Boolean get() = !loading && nights.isEmpty()

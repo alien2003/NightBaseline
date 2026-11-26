@@ -11,6 +11,7 @@ import io.github.alien2003.nightbaseline.data.local.RunLogLine
 import io.github.alien2003.nightbaseline.data.local.settings.AppSettings
 import io.github.alien2003.nightbaseline.ui.learning.LearningState
 import io.github.alien2003.nightbaseline.ui.model.BannerKind
+import io.github.alien2003.nightbaseline.ui.shell.PerfProbe
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -73,6 +74,7 @@ class HomeViewModel
         )
 
         private fun build(inputs: Inputs): HomeUi {
+            PerfProbe.hit(MAP_PROBE)
             val settings = inputs.settings
             val access = inputs.access
             val records = inputs.records
@@ -121,7 +123,11 @@ class HomeViewModel
             }
         }
 
-        private companion object {
-            const val STOP_TIMEOUT_MS = 5_000L
+        /** Constants. */
+        companion object {
+            private const val STOP_TIMEOUT_MS = 5_000L
+
+            /** [PerfProbe] name of one mapping of the inputs. */
+            const val MAP_PROBE: String = "HomeViewModel.build"
         }
     }

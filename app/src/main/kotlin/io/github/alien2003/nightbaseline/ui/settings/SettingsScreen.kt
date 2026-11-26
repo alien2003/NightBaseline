@@ -44,11 +44,13 @@ import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.OverlayHost
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
+import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.shell.CountComposition
 import io.github.alien2003.nightbaseline.ui.shell.rememberPageTransitions
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
@@ -77,6 +79,7 @@ fun SettingsScreen(
     onMore: () -> Unit = {},
     scroll: ScrollState = rememberScrollState(),
 ) {
+    CountComposition("SettingsScreen")
     val twoPanes = layout.twoPanes && layout.mode != LayoutMode.Tabletop && layout.mode != LayoutMode.Glance
     val page = if (twoPanes) SettingsPage.Main else state.page
     val back = if (page == SettingsPage.Main) null else actions.onBack
@@ -88,6 +91,11 @@ fun SettingsScreen(
         modifier = modifier,
         onSelectTab = onSelectTab,
         onBack = back,
+        column =
+            when {
+                twoPanes || layout.verticalFold != null -> TitleColumn.atStart(layout.gutter)
+                else -> TitleColumn.centred(layout.gutter, NbDimens.textMax)
+            },
         overlay = { SourceChangeDialog(state, layout, actions) },
     ) { padding ->
         when {

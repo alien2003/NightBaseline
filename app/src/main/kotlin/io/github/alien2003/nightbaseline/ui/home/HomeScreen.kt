@@ -53,8 +53,10 @@ import io.github.alien2003.nightbaseline.ui.components.LearningProgress
 import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
+import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
+import io.github.alien2003.nightbaseline.ui.components.withEnd
 import io.github.alien2003.nightbaseline.ui.history.CompactNightSummary
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
@@ -64,6 +66,7 @@ import io.github.alien2003.nightbaseline.ui.metric.MetricDetailState
 import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
 import io.github.alien2003.nightbaseline.ui.shell.AppScaffold
+import io.github.alien2003.nightbaseline.ui.shell.CountComposition
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.shellToolbarHeight
@@ -93,6 +96,7 @@ fun HomeScreen(
     debugAction: (@Composable () -> Unit)? = null,
     scrollState: ScrollState = rememberScrollState(),
 ) {
+    CountComposition("HomeScreen")
     val text = rememberUiText()
     // The summary card carries the night label itself; the bar repeats it only above learning and state cards.
     val noSubtitle = state.night.state.hasSummary || state.night.state == NightState.HealthConnectNone
@@ -105,6 +109,7 @@ fun HomeScreen(
         selectedTab = TopLevel.Home,
         onSelectTab = onSelectTab,
         modifier = modifier,
+        column = homeTitleColumn(layout),
         actions = { debugAction?.invoke() },
     ) { padding, contentTop ->
         val tabletopFold = layout.horizontalFold
@@ -160,6 +165,7 @@ internal fun ScreenFrame(
     modifier: Modifier = Modifier,
     largeTitle: Boolean = true,
     onBack: (() -> Unit)? = null,
+    column: TitleColumn? = null,
     actions: @Composable () -> Unit = {},
     content: @Composable (PaddingValues, Dp) -> Unit,
 ) {
@@ -203,6 +209,7 @@ internal fun ScreenFrame(
                         height = barHeight,
                         scrollOffset = { with(density) { scroll.value.toDp() } },
                         onBack = onBack,
+                        column = column?.withEnd(contentPadding.calculateEndPadding(LocalLayoutDirection.current)),
                         actions = actions,
                     )
                 }
@@ -210,6 +217,26 @@ internal fun ScreenFrame(
         },
     ) { padding -> content(padding, contentTop) }
 }
+
+/**
+ * The card column of Home for the title (review round 4 container rule): the list pane of two-pane layouts, the start
+ * column of WideShort, otherwise the centred single column whose cap widens with the two tile columns.
+ */
+internal fun homeTitleColumn(layout: LayoutSpec): TitleColumn =
+    if (layout.twoPanes || layout.mode == LayoutMode.WideShort || layout.mode == LayoutMode.Book) {
+        TitleColumn.atStart(layout.gutter)
+    } else {
+        tileTitleColumn(layout.gutter)
+    }
+
+/** A centred column capped at `textMax`, or at `chartMax` once two tile columns fit ([tileColumns]). */
+internal fun tileTitleColumn(gutter: Dp): TitleColumn =
+    TitleColumn(
+        gutter = gutter,
+        maxWidth = NbDimens.textMax,
+        wideMax = NbDimens.chartMax,
+        wideFrom = TileMinWidth * 2 + NbDimens.cardGap,
+    )
 
 /** Space above the first block: status bar + top bar + 8 dp. */
 @Composable

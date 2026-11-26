@@ -84,6 +84,14 @@ class UiText(
 ) {
     private val integer = NumberFormat.getIntegerInstance(locale)
 
+    // ICU formatters are costly to build (pattern generation, data loading) and were built per call, i.e. per row and
+    // per composition. One instance lives per remembered UiText (main thread only; formatters are not thread-safe).
+    private val decimalFormats = HashMap<Int, NumberFormat>()
+    private val percentFormat by lazy(LazyThreadSafetyMode.NONE) { NumberFormat.getPercentInstance(locale) }
+    private val dateFormats = HashMap<String, DateFormat>()
+    private val listFormatter by lazy(LazyThreadSafetyMode.NONE) { ListFormatter.getInstance(locale) }
+    private val nightLabels = HashMap<LocalDate, String>()
+
     /** String resource with arguments. */
     fun string(
         @StringRes id: Int,
@@ -159,11 +167,12 @@ class UiText(
         value: Double,
         decimals: Int,
     ): String =
-        NumberFormat
-            .getNumberInstance(locale)
-            .apply {
-                minimumFractionDigits = decimals
-                maximumFractionDigits = decimals
+        decimalFormats
+            .getOrPut(decimals) {
+                NumberFormat.getNumberInstance(locale).apply {
+                    minimumFractionDigits = decimals
+                    maximumFractionDigits = decimals
+                }
             }.format(value)
 
     /** The number only (no unit), e.g. for range ends. */
@@ -263,7 +272,7 @@ class UiText(
     }
 
     /** A share as a locale percentage. */
-    fun percent(share: Double): String = NumberFormat.getPercentInstance(locale).format(share)
+    fun percent(share: Double): String = percentFormat.format(share)
 
     /** TalkBack text of a metric tile (`a11y_tile*`). */
     fun tileDescription(
@@ -303,10 +312,11 @@ class UiText(
      * The one night label ([NightLabel], shared with the notification): always the evening before [wake] to [wake],
      * whatever time the sleep started (a sleep that began after midnight is still the night of 24–25 Nov).
      */
-    fun nightLabel(wake: LocalDate): String {
-        val (range, wakeLong, start) = NightLabel.args(wake, locale)
-        return string(R.string.night_label, range, wakeLong, start)
-    }
+    fun nightLabel(wake: LocalDate): String =
+        nightLabels.getOrPut(wake) {
+            val (range, wakeLong, start) = NightLabel.args(wake, locale)
+            string(R.string.night_label, range, wakeLong, start)
+        }
 
     /** "Nov 25". */
     fun dateShort(date: LocalDate): String = format(date, SKELETON_SHORT)
@@ -324,12 +334,15 @@ class UiText(
         date: LocalDate,
         skeleton: String,
     ): String {
-        val fmt = DateFormat.getInstanceForSkeleton(skeleton, locale).apply { timeZone = TimeZone.GMT_ZONE }
+        val fmt =
+            dateFormats.getOrPut(
+                skeleton,
+            ) { DateFormat.getInstanceForSkeleton(skeleton, locale).apply { timeZone = TimeZone.GMT_ZONE } }
         return fmt.format(java.util.Date(date.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() + NOON_MS))
     }
 
     /** "A, B and C" in the locale. */
-    fun list(items: List<String>): String = ListFormatter.getInstance(locale).format(items)
+    fun list(items: List<String>): String = listFormatter.format(items)
 
     /** Headline of a night (`state_*_title`). */
     @Suppress("CyclomaticComplexMethod") // An exhaustive state -> copy table (states.md); splitting it would hide the mapping.
