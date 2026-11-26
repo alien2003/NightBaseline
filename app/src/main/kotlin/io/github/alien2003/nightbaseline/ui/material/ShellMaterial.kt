@@ -7,9 +7,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeInput
@@ -19,66 +28,84 @@ import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
 import io.github.alien2003.nightbaseline.ui.theme.NbColors
-import io.github.alien2003.nightbaseline.ui.theme.NbElevation
 import io.github.alien2003.nightbaseline.ui.theme.NbShadow
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.ShellColors
+import io.github.alien2003.nightbaseline.ui.theme.ShellTokens
 import io.github.alien2003.nightbaseline.ui.theme.nbShadow
 
 /**
- * The shell materials of `tokens.md` 7.1 (glass) with their solid counterparts of 7.2. Glass is only for the shell:
- * cards, bands, charts, the chart tooltip, rows and calendar cells always use [solidCard] and friends.
+ * The shell materials (`coloros17-glass.md` 4.1, ColorOS 17 "Luminous Effect" acrylic): backdrop blur + static
+ * per-theme tint + 3 % noise + rim (thin bright top, faint 2 dp bottom reflection band) + soft shadow. No refraction,
+ * no reflection, no motion specular. Glass is only for the shell: cards, bands, charts, the chart tooltip, rows and
+ * calendar cells always use [solidCard] and friends. The solid fallback keeps the geometry, rim and shadow.
  */
 enum class ShellMaterial(
     /** Haze blur radius (dp). */
     val blurRadius: Dp,
     /** Noise factor of the glass (0..1). */
     val noise: Float,
-    /** Whether the 1 dp gradient rim and 0.5 dp outer hairline are drawn. */
+    /** Whether the rim (top highlight + bottom reflection band) is drawn. */
     val rim: Boolean,
 ) {
-    /** `material.glass.bar` / `material.solid.bar`: floating bottom bar. */
+    /** Floating bottom bar. */
     Bar(24.dp, GLASS_NOISE, rim = true),
 
-    /** `material.glass.rail` / `material.solid.bar`: floating navigation rail. */
+    /** Floating navigation rail. */
     Rail(24.dp, GLASS_NOISE, rim = true),
 
-    /** `material.glass.topBar` / `material.solid.topBar`: top bar while content is under it. */
-    TopBar(20.dp, 0f, rim = false),
+    /** Top bar while content is under it: progressive blur + darkening, no backing, no hairline. */
+    TopBar(12.dp, 0f, rim = false),
 
-    /** `material.glass.sheet` / `material.solid.sheet`. */
-    Sheet(40.dp, GLASS_NOISE, rim = true),
+    /** Bottom sheet: near-opaque tint, a top highlight only. */
+    Sheet(40.dp, GLASS_NOISE, rim = false),
 
-    /** `material.glass.dialog` / `material.solid.dialog`. */
-    Dialog(32.dp, GLASS_NOISE, rim = true),
+    /** Dialog: near-opaque tint, no rim. */
+    Dialog(32.dp, GLASS_NOISE, rim = false),
     ;
 
     /** Tint composited over the blur. */
-    fun tint(colors: NbColors): Color =
+    fun tint(shell: ShellColors): Color =
         when (this) {
-            Bar, Rail -> colors.glassBar
-            TopBar -> colors.glassTopBar
-            Sheet, Dialog -> colors.glassSheet
+            Bar, Rail -> shell.barTint
+            TopBar -> Color.Transparent
+            Sheet -> shell.sheetTint
+            Dialog -> shell.dialogTint
         }
 
     /** Solid fill of the fallback. */
-    fun solidFill(colors: NbColors): Brush =
+    fun solidFill(
+        shell: ShellColors,
+        colors: NbColors,
+    ): Brush =
         when (this) {
-            Bar, Rail -> Brush.verticalGradient(listOf(colors.solidBarTop, colors.solidBarBottom))
-            TopBar -> Brush.verticalGradient(listOf(colors.solidTopBar, colors.solidTopBar))
-            Sheet -> Brush.verticalGradient(listOf(colors.solidSheet, colors.solidSheet))
-            Dialog -> Brush.verticalGradient(listOf(colors.solidDialog, colors.solidDialog))
+            Bar, Rail -> Brush.verticalGradient(listOf(shell.barSolidTop, shell.barSolidBottom))
+            TopBar -> topBarScrim(colors.background, SOLID_TOP_BAR_DIM)
+            Sheet -> Brush.verticalGradient(listOf(shell.sheetSolid, shell.sheetSolid))
+            Dialog -> Brush.verticalGradient(listOf(shell.dialogSolid, shell.dialogSolid))
         }
 
-    /** Shadow token. */
-    fun shadow(elevation: NbElevation): NbShadow =
+    /** Shadow. */
+    fun shadow(shell: ShellColors): NbShadow =
         when (this) {
-            Bar, Rail -> elevation.shell
+            Bar, Rail -> shell.shellShadow
             TopBar -> NbShadow.None
-            Sheet, Dialog -> elevation.overlay
+            Sheet, Dialog -> shell.overlayShadow
         }
 }
 
 private const val GLASS_NOISE = 0.03f
+
+/** Darkening of the solid top bar under the status bar (fades to 0 at the bottom of the fade zone). */
+private const val SOLID_TOP_BAR_DIM = 0.85f
+
+/** Alpha of the 1 dp contrasting border in higher-contrast mode (`coloros17-glass.md` 4.5). */
+private const val HIGH_CONTRAST_BORDER_ALPHA = 0.6f
+
+private fun topBarScrim(
+    color: Color,
+    alpha: Float,
+): Brush = Brush.verticalGradient(listOf(color.copy(alpha = alpha), color.copy(alpha = 0f)))
 
 /**
  * The backdrop the glass shell blurs: the content root marks itself with `Modifier.hazeSource(state)` and provides
@@ -86,12 +113,18 @@ private const val GLASS_NOISE = 0.03f
  */
 val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 
+/** Higher contrast (or reduced transparency) is requested: solid shell plus a 1 dp contrasting border. */
+val highContrastShell: Boolean
+    @Composable get() = NbTheme.effects.reason == EffectsReason.Transparency
+
 /**
- * Draws [material] behind the element in [shape]: shadow, then glass (Haze backdrop blur + token tint + noise) or the
- * solid fill, then the rim. The geometry is the same in both modes; only the fill differs (`tokens.md` 7.3).
+ * Draws [material] behind the element in [shape]: shadow, then glass (Haze backdrop blur + tint + noise, plus a faint
+ * light towards the bottom) or the solid fill, then the rim; in higher-contrast mode a 1 dp border instead of the
+ * rim. The geometry is the same in both modes; only the fill differs (`tokens.md` 7.3).
  *
  * @param strength 0..1 opacity of the material (the top bar fades in with scroll); 1 for every other surface.
  */
+@Suppress("CyclomaticComplexMethod") // One modifier composing the material layers per effect mode and contrast.
 @Composable
 fun Modifier.shellSurface(
     material: ShellMaterial,
@@ -99,49 +132,169 @@ fun Modifier.shellSurface(
     strength: Float = 1f,
 ): Modifier {
     val colors = NbTheme.colors
+    val shell = ShellTokens.colors
     val effects = NbTheme.effects
     val hazeState = LocalHazeState.current
-    val shadow = material.shadow(NbTheme.elevation)
-    val tint = material.tint(colors)
+    val shadow = material.shadow(shell)
+    val tint = material.tint(shell)
+    val topBar = material == ShellMaterial.TopBar
     val style =
-        remember(material, tint, strength) {
+        remember(material, tint, strength, colors.background) {
             HazeBlurStyle {
                 blurEnabled(true)
                 blurRadius(material.blurRadius)
                 noiseFactor(material.noise)
                 backgroundColor(colors.background)
-                colorEffects(listOf(HazeColorEffect.tint(tint)))
+                if (tint.alpha > 0f) colorEffects(listOf(HazeColorEffect.tint(tint)))
                 alpha(strength)
-                if (material == ShellMaterial.TopBar) {
-                    // Progressive: full under the status bar, fading out towards the bar's bottom edge.
+                if (topBar) {
+                    // Progressive: full under the status bar, fading out towards the bottom of the fade zone.
                     progressive(HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f))
                 }
             }
         }
+    val glass = effects.glass
     val fill: Modifier =
         when {
             strength <= 0f -> Modifier
-            effects.glass && hazeState != null -> Modifier.hazeBlur(HazeInput.Sources(hazeState), style)
-            effects.glass -> Modifier.background(tint.copy(alpha = tint.alpha * strength), shape)
-            else -> Modifier.background(material.solidFill(colors), shape, alpha = strength)
+            glass && hazeState != null -> Modifier.hazeBlur(HazeInput.Sources(hazeState), style)
+            glass && topBar -> Modifier
+            glass -> Modifier.background(tint.copy(alpha = tint.alpha * strength), shape)
+            else -> Modifier.background(material.solidFill(shell, colors), shape, alpha = strength)
+        }
+    // Drawn on top of the blur: the darkening of the top bar, the bar's light towards its bottom edge.
+    val overlay: Modifier =
+        when {
+            strength <= 0f || !glass -> {
+                Modifier
+            }
+
+            topBar -> {
+                Modifier.drawWithContent {
+                    drawContent()
+                    drawRect(topBarScrim(colors.background, shell.topBarDim), alpha = strength)
+                }
+            }
+
+            material == ShellMaterial.Bar || material == ShellMaterial.Rail -> {
+                Modifier.drawWithContent {
+                    drawContent()
+                    drawRect(Brush.verticalGradient(listOf(Color.Transparent, shell.barSheen)))
+                }
+            }
+
+            else -> {
+                Modifier
+            }
+        }
+    val edge: Modifier =
+        when {
+            strength <= 0f || topBar -> Modifier
+            highContrastShell -> Modifier.border(1.dp, colors.onGlassPrimary.copy(alpha = HIGH_CONTRAST_BORDER_ALPHA), shape)
+            material.rim -> Modifier.shellRim(shell.rimTop, shell.rimTopWidth, shell.rimBottom, shell.rimBottomWidth, shape)
+            else -> Modifier.shellRim(shell.sheetHighlight, 0.5.dp, Color.Transparent, 0.dp, shape)
         }
     return this
         .nbShadow(if (strength > 0f) shadow else NbShadow.None, shape)
         .clip(shape)
+        .then(overlay)
         .then(fill)
-        .then(if (material.rim && strength > 0f) Modifier.glassRim(colors, shape) else Modifier)
+        .then(edge)
 }
 
 /**
- * The rim of `tokens.md` 2.5: a 1 dp vertical gradient stroke inside the shape (`rimTop` -> `rimMid` -> `rimBottom`)
- * plus a 0.5 dp outer hairline (`rimOuter`) that keeps the edge visible on a same-coloured backdrop.
+ * The shell rim, drawn inside the (clipped) shape: a highlight of [topWidth] along the top edge fading out towards
+ * the middle, and a reflection band of [bottomWidth] along the bottom edge (bottom brighter and thicker, as measured
+ * on the bar: 1 px top rim, 2–3 px bottom rim). Draws above the content's background, below its children.
  */
-fun Modifier.glassRim(
-    colors: NbColors,
+fun Modifier.shellRim(
+    top: Color,
+    topWidth: Dp,
+    bottom: Color,
+    bottomWidth: Dp,
     shape: Shape,
 ): Modifier =
-    border(0.5.dp, colors.glassRimOuter, shape)
-        .border(1.dp, Brush.verticalGradient(listOf(colors.glassRimTop, colors.glassRimMid, colors.glassRimBottom)), shape)
+    drawWithContent {
+        drawContent()
+        drawRimLayer(shape, top, topWidth, bottom, bottomWidth)
+    }
+
+private fun ContentDrawScope.drawRimLayer(
+    shape: Shape,
+    top: Color,
+    topWidth: Dp,
+    bottom: Color,
+    bottomWidth: Dp,
+) {
+    val outline = shape.createOutline(size, layoutDirection, this)
+    if (topWidth > 0.dp && top.alpha > 0f) {
+        // Half of a centred stroke lies outside the clipped shape, so the visible rim is [topWidth] wide.
+        drawOutline(
+            outline,
+            Brush.verticalGradient(0f to top, RIM_FADE to top.copy(alpha = 0f), 1f to top.copy(alpha = 0f)),
+            style = Stroke(width = topWidth.toPx() * 2),
+        )
+    }
+    if (bottomWidth > 0.dp && bottom.alpha > 0f) {
+        drawOutline(
+            outline,
+            Brush.verticalGradient(0f to bottom.copy(alpha = 0f), 1f - RIM_FADE to bottom.copy(alpha = 0f), 1f to bottom),
+            style = Stroke(width = bottomWidth.toPx() * 2),
+        )
+    }
+}
+
+/** Fraction of the height over which a rim fades out (top) or in (bottom). */
+private const val RIM_FADE = 0.45f
+
+/**
+ * The solid convex surface of round shell buttons (`coloros17-glass.md` 4.2, measured on the back button): a vertical
+ * gradient, a 0.5 dp top rim and a 1 dp brighter bottom rim, and a soft shadow (`elevation.control`). Never blurred.
+ * Higher contrast adds a 1 dp border.
+ */
+@Composable
+fun Modifier.convexSurface(shape: Shape): Modifier {
+    val shell = ShellTokens.colors
+    val colors = NbTheme.colors
+    val edge =
+        if (highContrastShell) {
+            Modifier.border(1.dp, colors.onGlassPrimary.copy(alpha = HIGH_CONTRAST_BORDER_ALPHA), shape)
+        } else {
+            Modifier.shellRim(shell.convexRimTop, 0.5.dp, shell.convexRimBottom, 1.dp, shape)
+        }
+    return this
+        .nbShadow(shell.controlShadow, shape)
+        .clip(shape)
+        .background(Brush.verticalGradient(listOf(shell.convexTop, shell.convexBottom)))
+        .then(edge)
+}
+
+/**
+ * Lets the element draw [extra] beyond its bottom edge without taking the space in the layout (the top bar's blur
+ * and darkening fade out over 16 dp below the toolbar). Use after a size-fixing modifier such as `matchParentSize`.
+ */
+fun Modifier.extendBottom(extra: Dp): Modifier =
+    layout { measurable, constraints ->
+        val add = extra.roundToPx()
+        val height = if (constraints.hasBoundedHeight) constraints.maxHeight + add else constraints.maxHeight
+        val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, height))
+        layout(placeable.width, (placeable.height - add).coerceAtLeast(0)) { placeable.place(0, 0) }
+    }
+
+/**
+ * Masks the element so it fades to transparent over its last [fade] (the top bar's blur ends softly even where the
+ * platform blur has no progressive mode). One offscreen layer.
+ */
+fun Modifier.fadeOutBottom(fade: Dp): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            val start = (1f - fade.toPx() / size.height).coerceIn(0f, 1f)
+            drawRect(
+                Brush.verticalGradient(0f to Color.Black, start to Color.Black, 1f to Color.Transparent),
+                blendMode = BlendMode.DstIn,
+            )
+        }
 
 /** `material.solid.card`: `surface.1` with `elevation.card`. */
 @Composable

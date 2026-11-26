@@ -66,6 +66,7 @@ import io.github.alien2003.nightbaseline.ui.model.rememberUiText
 import io.github.alien2003.nightbaseline.ui.shell.AppScaffold
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
+import io.github.alien2003.nightbaseline.ui.theme.shellToolbarHeight
 
 /** Test tag of the top bar of Home and Night detail (the screenshot tests stitch scrolled captures below it). */
 const val SCREEN_TOP_BAR_TAG: String = "screen-top-bar"
@@ -142,8 +143,11 @@ fun HomeScreen(
 }
 
 /**
- * The shell shared by Home and Night detail: [AppScaffold] with the glass top bar (large title collapsing on scroll in
- * Compact, 64 / 48 dp elsewhere, none in Glance). [content] receives the scaffold padding and the resting bar height.
+ * The shell shared by Home and Night detail: [AppScaffold] with the shell top bar (`coloros-conformance.md` C1–C7):
+ * in Compact with [largeTitle] the large title sits below the 52 dp toolbar and scrolls away with the content, the
+ * small title fading into the toolbar; 48 dp toolbar in short windows; none in Glance. Pushed pages ([onBack]) get the
+ * round back button and hide the bottom bar in Compact. [content] receives the scaffold padding and the resting bar
+ * height.
  */
 @Composable
 internal fun ScreenFrame(
@@ -160,11 +164,8 @@ internal fun ScreenFrame(
     content: @Composable (PaddingValues, Dp) -> Unit,
 ) {
     val density = LocalDensity.current
-    val scrollDp = with(density) { scroll.value.toDp() }
     val large = largeTitle && layout.mode == LayoutMode.Compact
-    val collapseRange = NbDimens.topBarLarge - NbDimens.topBarCollapsed
-    val collapse = if (large) (scrollDp / collapseRange).coerceIn(0f, 1f) else 1f
-    val scrolledUnder = if (large) (scrollDp - collapseRange).coerceAtLeast(0.dp) else scrollDp
+    val short = layout.mode == LayoutMode.CompactShort || layout.mode == LayoutMode.WideShort
     val statusBarPx =
         with(density) {
             WindowInsets.statusBars
@@ -172,16 +173,17 @@ internal fun ScreenFrame(
                 .calculateTopPadding()
                 .roundToPx()
         }
-    val barHeight = topBarHeight(layout.mode, large)
+    val barHeight = shellToolbarHeight(short, large)
     // The bar grows with the font scale (title and subtitle never clip), so the content starts below its measured
     // height at rest; while scrolling the measured value is kept so the content does not jump.
     var restingBarHeight by remember { mutableStateOf(0.dp) }
-    val contentTop = maxOf(barHeight, restingBarHeight)
+    val contentTop = if (restingBarHeight > 0.dp) restingBarHeight else barHeight
     AppScaffold(
         layout = layout,
         selected = selectedTab,
         onSelect = onSelectTab,
         modifier = modifier,
+        showBar = onBack == null,
         topBar = { contentPadding ->
             if (layout.mode != LayoutMode.Glance) {
                 Box(
@@ -198,9 +200,8 @@ internal fun ScreenFrame(
                         title = title,
                         subtitle = subtitle,
                         large = large,
-                        collapse = collapse,
                         height = barHeight,
-                        scrolledUnder = scrolledUnder,
+                        scroll = with(density) { scroll.value.toDp() },
                         onBack = onBack,
                         actions = actions,
                     )
@@ -209,18 +210,6 @@ internal fun ScreenFrame(
         },
     ) { padding -> content(padding, contentTop) }
 }
-
-/** Top bar height per mode (`layouts.md` 4.3): large title in Compact, 48 dp in short windows, 64 dp otherwise. */
-private fun topBarHeight(
-    mode: LayoutMode,
-    large: Boolean,
-): Dp =
-    when {
-        large -> NbDimens.topBarLarge
-        mode == LayoutMode.Compact -> NbDimens.topBarCollapsed
-        mode == LayoutMode.CompactShort || mode == LayoutMode.WideShort -> NbDimens.topBarShort
-        else -> NbDimens.topBarMedium
-    }
 
 /** Space above the first block: status bar + top bar + 8 dp. */
 @Composable

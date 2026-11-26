@@ -1,5 +1,6 @@
 package io.github.alien2003.nightbaseline.ui.settings
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,9 +18,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -43,9 +47,11 @@ import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.shell.rememberPageTransitions
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.ShellDimens
 
 private const val LIST_PANE_MIN = 320f
 private const val LIST_PANE_MAX = 400f
@@ -83,10 +89,29 @@ fun SettingsScreen(
         overlay = { SourceChangeDialog(state, layout, actions) },
     ) { padding ->
         when {
-            layout.mode == LayoutMode.Glance -> GlanceSettings(state, actions, padding, scroll, onMore)
-            layout.mode == LayoutMode.Tabletop -> TabletopSettings(state, layout, actions, padding, scroll)
-            twoPanes -> TwoPaneSettings(state, layout, actions, padding, scroll)
-            else -> SinglePaneColumn(layout, padding, scroll) { PageContent(state, actions, page, inlineSensitivity(layout)) }
+            layout.mode == LayoutMode.Glance -> {
+                GlanceSettings(state, actions, padding, scroll, onMore)
+            }
+
+            layout.mode == LayoutMode.Tabletop -> {
+                TabletopSettings(state, layout, actions, padding, scroll)
+            }
+
+            twoPanes -> {
+                TwoPaneSettings(state, layout, actions, padding, scroll)
+            }
+
+            else -> {
+                // Sub-pages push and pop like screens (coloros-conformance.md P2): depth decides the direction.
+                val transitions = rememberPageTransitions()
+                AnimatedContent(
+                    targetState = page,
+                    transitionSpec = { transitions.content(forward = depth(targetState) > depth(initialState)) },
+                    label = "settingsPage",
+                ) { shown ->
+                    SinglePaneColumn(layout, padding, scroll) { PageContent(state, actions, shown, inlineSensitivity(layout)) }
+                }
+            }
         }
     }
 }
@@ -99,6 +124,14 @@ private fun pageTitle(page: SettingsPage): Int =
         SettingsPage.About -> R.string.settings_about
         SettingsPage.Licenses -> R.string.about_licenses
         SettingsPage.Privacy -> R.string.setup_privacy_policy
+    }
+
+/** Navigation depth of a page: the list 0, its sub-pages 1, licenses 2. */
+private fun depth(page: SettingsPage): Int =
+    when (page) {
+        SettingsPage.Main -> 0
+        SettingsPage.Licenses -> 2
+        else -> 1
     }
 
 private fun inlineSensitivity(layout: LayoutSpec): Boolean = layout.mode == LayoutMode.Medium || layout.mode == LayoutMode.WideShort
@@ -383,8 +416,9 @@ private fun GlanceSettings(
 }
 
 /**
- * `ST-SOURCE-CHANGE`: the glass confirmation dialog, centred in the window, in the end pane in Book (never across the
- * fold) and in the bottom half in Tabletop.
+ * `ST-SOURCE-CHANGE`: the confirmation dialog (`coloros-conformance.md` H1), docked at the bottom on phone-width
+ * windows (16 dp margins above the navigation inset), centred on wider windows, in the end pane in Book (never across
+ * the fold) and in the bottom half in Tabletop.
  */
 @Composable
 private fun BoxScope.SourceChangeDialog(
@@ -393,27 +427,23 @@ private fun BoxScope.SourceChangeDialog(
     actions: SettingsActions,
 ) {
     val source = state.pendingSource ?: return
+    val bookFold = layout.verticalFold?.takeIf { layout.mode == LayoutMode.Book }
+    val tabletopFold = layout.horizontalFold?.takeIf { layout.mode == LayoutMode.Tabletop }
+    val docked = bookFold == null && tabletopFold == null && layout.widthDp < ShellDimens.DIALOG_DOCK_MAX_WIDTH
     val placement =
         when {
-            layout.mode == LayoutMode.Book && layout.verticalFold != null -> {
-                Modifier.padding(start = layout.verticalFold.positionDp.dp + NbDimens.hingeClearance)
-            }
-
-            layout.mode == LayoutMode.Tabletop && layout.horizontalFold != null -> {
-                Modifier.padding(top = layout.horizontalFold.positionDp.dp + NbDimens.hingeClearance)
-            }
-
-            else -> {
-                Modifier
-            }
+            bookFold != null -> Modifier.padding(start = bookFold.positionDp.dp + NbDimens.hingeClearance)
+            tabletopFold != null -> Modifier.padding(top = tabletopFold.positionDp.dp + NbDimens.hingeClearance)
+            else -> Modifier
         }
+    val alignment = if (docked) Alignment.BottomCenter else Alignment.Center
     Box(Modifier.matchParentSize()) {
-        OverlayHost(onDismiss = actions.onCancelSource, alignment = Alignment.Center) {
+        OverlayHost(onDismiss = actions.onCancelSource, alignment = alignment) {
             // Scrolls when the window is too short for the dialog (cover screen, tabletop half, 200 % font).
             BoxWithConstraints(Modifier.fillMaxSize().then(placement)) {
                 Box(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = alignment,
                 ) {
                     GlassDialog(
                         title = stringResource(R.string.source_change_title, source.label),
@@ -422,7 +452,15 @@ private fun BoxScope.SourceChangeDialog(
                         onConfirm = actions.onConfirmSource,
                         dismiss = stringResource(R.string.action_cancel),
                         onDismiss = actions.onCancelSource,
-                        modifier = Modifier.padding(layout.gutter),
+                        docked = docked,
+                        modifier =
+                            if (docked) {
+                                Modifier
+                                    .windowInsetsPadding(WindowInsets.navigationBars)
+                                    .padding(ShellDimens.dialogMargin)
+                            } else {
+                                Modifier.padding(layout.gutter)
+                            },
                     )
                 }
             }

@@ -1,69 +1,64 @@
 package io.github.alien2003.nightbaseline.ui.components
 
-import androidx.annotation.StringRes
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.background
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpOffset
-import androidx.compose.ui.unit.DpSize
-import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.material.SHELL_PRESS_SCALE_LARGE
 import io.github.alien2003.nightbaseline.ui.material.ShellMaterial
-import io.github.alien2003.nightbaseline.ui.material.nbClickable
+import io.github.alien2003.nightbaseline.ui.material.rememberShellPressState
+import io.github.alien2003.nightbaseline.ui.material.shellClickable
+import io.github.alien2003.nightbaseline.ui.material.shellPressGlow
+import io.github.alien2003.nightbaseline.ui.material.shellPressInput
+import io.github.alien2003.nightbaseline.ui.material.shellPressScale
 import io.github.alien2003.nightbaseline.ui.material.shellSurface
+import io.github.alien2003.nightbaseline.ui.motion.NbDurations
+import io.github.alien2003.nightbaseline.ui.motion.NbEasing
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
-import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
-
-private class ItemBounds(
-    val offset: DpOffset,
-    val size: DpSize,
-)
+import io.github.alien2003.nightbaseline.ui.theme.ShellDimens
+import io.github.alien2003.nightbaseline.ui.theme.ShellTokens
 
 /**
- * The floating glass bottom bar (`layouts.md` 4.1): a `material.glass.bar` pill (solid gradient in the fallback) with
- * a 1 dp rim and `elevation.shell`, hugging its items, at least 64 dp tall, growing with the labels (two lines max at
- * large font, never cut). Selection is a solid `primaryContainer` capsule plus filled icon plus bold label, and the
- * capsule moves between items with `spring.selection` (snaps under reduced motion). The caller centres it with its
- * bottom at the navigation-bar inset + 12 dp.
+ * The floating bottom bar (`coloros-conformance.md` A1–A6, measured on ColorOS Clock): a capsule of the bar material
+ * (acrylic blur + tint, thin top rim, faint bottom reflection band, soft shadow; solid gradient in the fallback),
+ * 56 dp tall at font 1.0 and growing when labels wrap, hugging its 70 x 48 dp items 8 dp apart with 12 dp side
+ * padding. **No selection indicator**: the selected destination has the filled icon and a bold label
+ * (`nav.selected`), the others the outline icon and a regular label (`nav.unselected`); selection is carried by shape
+ * and weight, not colour. A press shrinks the whole pill (0.98) with the touch-following glow clipped to it. The
+ * caller centres it 16 dp above the screen's bottom edge (gesture navigation).
  *
- * @param forced catalog only: shows hover / pressed / focus on one destination.
+ * @param forced catalog only: shows pressed / focus on one destination.
  */
 @Composable
 fun FloatingNavBar(
@@ -72,27 +67,27 @@ fun FloatingNavBar(
     modifier: Modifier = Modifier,
     forced: Pair<TopLevel, ForcedInteraction>? = null,
 ) {
-    val bounds = remember { mutableStateMapOf<TopLevel, ItemBounds>() }
+    val press = rememberShellPressState()
     Box(
         modifier =
             modifier
-                .sizeIn(minHeight = NbDimens.barHeight)
+                .shellPressInput(press, SHELL_PRESS_SCALE_LARGE)
+                .shellPressScale(press)
+                .sizeIn(minHeight = ShellDimens.barHeight)
                 .shellSurface(ShellMaterial.Bar, NbShapes.pill)
-                .padding(NbDimens.barInnerPadding),
-        contentAlignment = Alignment.CenterStart,
+                .shellPressGlow(press, NbShapes.pill, forcedPressed = forced?.second == ForcedInteraction.Pressed)
+                .padding(horizontal = ShellDimens.barPaddingHorizontal, vertical = ShellDimens.barPaddingVertical),
+        contentAlignment = Alignment.Center,
     ) {
-        SelectionCapsule(bounds[selected])
-        HuggingRow(Modifier.selectableGroup()) {
+        HuggingRow(Modifier.selectableGroup(), gap = ShellDimens.barItemGap) {
             TopLevel.entries.forEach { destination ->
                 NavItem(
                     destination = destination,
                     selected = destination == selected,
                     onClick = { onSelect(destination) },
-                    vertical = true,
                     showLabel = true,
-                    forced = forced?.takeIf { it.first == destination }?.second,
-                    modifier = Modifier.widthIn(min = NbDimens.barItemMinWidth),
-                    onBounds = { bounds[destination] = it },
+                    focused = forced?.takeIf { it.first == destination }?.second == ForcedInteraction.Focus,
+                    modifier = Modifier.sizeIn(minWidth = ShellDimens.barItemWidth, minHeight = ShellDimens.barItemHeight),
                 )
             }
         }
@@ -100,11 +95,15 @@ fun FloatingNavBar(
 }
 
 /**
- * The floating glass navigation rail (`layouts.md` 4.2): a vertical `material.glass.rail` pill 72 dp wide (about
- * 180 dp labelled pill in `Large`), icon + label items (icon only in `WideShort`, with the label as content
- * description), the same capsule selection as the bar. The caller places it at the start edge + 12 dp, centred
- * vertically.
+ * The floating navigation rail (`coloros-conformance.md` B1): the bar's language turned vertical, a 56 dp capsule
+ * of the same material with the same icons and selection (filled icon + bold label, no indicator), items 48 x 56 dp
+ * 8 dp apart, labels under the icons (icons only in `WideShort`, the label then being the content description). It
+ * grows with the labels at large font. The caller places it 16 dp from the start edge, centred vertically.
+ *
+ * @param wide kept for source compatibility; the labelled wide rail was removed (labels sit under the icons in
+ *   every size class).
  */
+@Suppress("UnusedParameter") // `wide` is kept so callers compile until the sweep removes it.
 @Composable
 fun FloatingNavRail(
     selected: TopLevel,
@@ -114,55 +113,37 @@ fun FloatingNavRail(
     wide: Boolean = false,
     forced: Pair<TopLevel, ForcedInteraction>? = null,
 ) {
-    val bounds = remember { mutableStateMapOf<TopLevel, ItemBounds>() }
-    val width = if (wide) NbDimens.railWidthLabelled else NbDimens.railWidth
-    Box(
-        modifier =
-            modifier
-                // Grows with the labels at large font (they wrap, never cut); the scaffold reads the actual width.
-                .width(IntrinsicSize.Max)
-                .widthIn(min = width, max = NbDimens.railWidthLabelled)
-                // The labelled wide rail keeps the narrow rail's corner radius; a full pill would turn it into a blob.
-                .shellSurface(ShellMaterial.Rail, if (wide) RoundedCornerShape(NbDimens.railWidth / 2) else NbShapes.pill)
-                .padding(vertical = NbSpace.s5, horizontal = NbSpace.s2),
-        contentAlignment = Alignment.TopCenter,
+    val press = rememberShellPressState()
+    Column(
+        modifier
+            .shellPressInput(press, SHELL_PRESS_SCALE_LARGE)
+            .shellPressScale(press)
+            .width(IntrinsicSize.Max)
+            .widthIn(min = ShellDimens.railWidth)
+            .shellSurface(ShellMaterial.Rail, NbShapes.pill)
+            .shellPressGlow(press, NbShapes.pill, forcedPressed = forced?.second == ForcedInteraction.Pressed)
+            .padding(vertical = ShellDimens.railPaddingVertical, horizontal = ShellDimens.railPaddingHorizontal)
+            .selectableGroup(),
+        verticalArrangement = Arrangement.spacedBy(ShellDimens.railItemGap),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        SelectionCapsule(bounds[selected])
-        Column(
-            Modifier.selectableGroup().width(IntrinsicSize.Max),
-            verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            TopLevel.entries.forEach { destination ->
-                NavItem(
-                    destination = destination,
-                    selected = destination == selected,
-                    onClick = { onSelect(destination) },
-                    vertical = !wide,
-                    showLabel = showLabels,
-                    forced = forced?.takeIf { it.first == destination }?.second,
-                    onBounds = { bounds[destination] = it },
-                    modifier = Modifier.fillMaxWidth().widthIn(min = if (wide) width - NbSpace.s5 else NbDimens.railWidth - NbSpace.s3),
-                )
-            }
+        TopLevel.entries.forEach { destination ->
+            NavItem(
+                destination = destination,
+                selected = destination == selected,
+                onClick = { onSelect(destination) },
+                showLabel = showLabels,
+                focused = forced?.takeIf { it.first == destination }?.second == ForcedInteraction.Focus,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .sizeIn(
+                            minWidth = NbDimens.targetMin,
+                            minHeight = if (showLabels) ShellDimens.railItemHeight else NbDimens.targetMin,
+                        ),
+            )
         }
     }
-}
-
-@Composable
-private fun SelectionCapsule(bounds: ItemBounds?) {
-    if (bounds == null) return
-    val motion = NbTheme.motion
-    val x by animateDpAsState(bounds.offset.x, motion.selection(), label = "capsuleX")
-    val y by animateDpAsState(bounds.offset.y, motion.selection(), label = "capsuleY")
-    val w by animateDpAsState(bounds.size.width, motion.selection(), label = "capsuleW")
-    val h by animateDpAsState(bounds.size.height, motion.selection(), label = "capsuleH")
-    Box(
-        Modifier
-            .offset(x, y)
-            .size(w, h)
-            .background(NbTheme.colors.primaryContainer, NbShapes.pill),
-    )
 }
 
 @Composable
@@ -170,72 +151,74 @@ private fun NavItem(
     destination: TopLevel,
     selected: Boolean,
     onClick: () -> Unit,
-    vertical: Boolean,
     showLabel: Boolean,
-    forced: ForcedInteraction?,
-    onBounds: (ItemBounds) -> Unit,
+    focused: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val colors = NbTheme.colors
-    val density = LocalDensity.current
+    val shell = ShellTokens.colors
+    val motion = NbTheme.motion
     val label = stringResource(destination.label)
-    val color = if (selected) colors.onPrimaryContainer else colors.onGlassSecondary
-    val style = NbTheme.typography.labelSmall.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold)
-    val content: @Composable () -> Unit = {
-        Icon(
-            if (selected) destination.selectedIcon else destination.icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(NbDimens.icon),
-        )
-        if (showLabel) {
-            // No line limit: at large font the label wraps and the bar or rail grows (layouts.md 4.1, never cut).
-            Text(label, style = style, color = color, textAlign = TextAlign.Center)
-        }
-    }
-    val itemModifier =
+    val color = if (selected) shell.navSelected else shell.navUnselected
+    val style = ShellTokens.type.navLabel.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+    val source = remember { MutableInteractionSource() }
+    Column(
         modifier
-            .sizeIn(minWidth = NbDimens.targetMin, minHeight = NbDimens.targetMin)
-            .onPlaced { coordinates ->
-                val position = coordinates.positionInParent()
-                with(density) {
-                    onBounds(
-                        ItemBounds(
-                            DpOffset(position.x.toDp(), position.y.toDp()),
-                            DpSize(coordinates.size.width.toDp(), coordinates.size.height.toDp()),
-                        ),
-                    )
-                }
-            }.nbClickable(onClick = onClick, shape = NbShapes.pill, role = Role.Tab, onGlass = true, forced = forced)
-            .semantics {
+            .shellClickable(
+                onClick = onClick,
+                shape = NbShapes.pill,
+                role = Role.Tab,
+                forced = if (focused) ForcedInteraction.Focus else null,
+                interactionSource = source,
+            ).semantics {
                 this.selected = selected
                 if (!showLabel) contentDescription = label
-            }.padding(horizontal = NbSpace.s3, vertical = NbSpace.s2)
-    if (vertical) {
-        Column(itemModifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
-            content()
+            },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (showLabel) Spacer(Modifier.height(ShellDimens.barItemTop))
+        // Outline -> filled icon: a 100 ms crossfade (snap under reduced motion).
+        Crossfade(
+            targetState = selected,
+            animationSpec = if (motion.reduced) snap() else tween(NbDurations.MICRO, easing = NbEasing.Standard),
+            label = "navIcon",
+        ) { filled ->
+            Icon(
+                if (filled) destination.selectedIcon else destination.icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(NbDimens.icon),
+            )
         }
-    } else {
-        Row(itemModifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
-            content()
+        if (showLabel) {
+            Spacer(Modifier.height(ShellDimens.navLabelGap))
+            // No line limit: at large font the label wraps and the bar or rail grows (layouts.md 4.1, never cut).
+            Text(label, style = style, color = color, modifier = Modifier.padding(horizontal = NbSpaceHalf))
+            Spacer(Modifier.height(ShellDimens.barItemTop))
         }
     }
 }
 
+/** Keeps a wrapped label off the item's edges. */
+private val NbSpaceHalf: Dp = ShellDimens.navLabelGap
+
 /**
- * A row that hugs its items while they fit and otherwise gives every item an equal share of the width (each still at
- * least 48 dp), so labels wrap instead of being cut (`layouts.md` 4.1). Items are centred vertically.
+ * A row that hugs its items ([gap] apart) while they fit and otherwise gives every item an equal share of the width
+ * (each still at least 48 dp), so labels wrap instead of being cut (`layouts.md` 4.1). Items are centred vertically.
  */
 @Composable
 private fun HuggingRow(
     modifier: Modifier = Modifier,
+    gap: Dp,
     content: @Composable () -> Unit,
 ) {
     Layout(content, modifier) { measurables, constraints ->
+        val gapPx = gap.roundToPx()
+        val gaps = gapPx * (measurables.size - 1).coerceAtLeast(0)
         val natural = measurables.map { it.maxIntrinsicWidth(Constraints.Infinity) }
         val share =
-            if (constraints.hasBoundedWidth && natural.sum() > constraints.maxWidth) {
-                (constraints.maxWidth / measurables.size.coerceAtLeast(1))
+            if (constraints.hasBoundedWidth && natural.sum() + gaps > constraints.maxWidth) {
+                ((constraints.maxWidth - gaps) / measurables.size.coerceAtLeast(1)).coerceAtLeast(0)
             } else {
                 null
             }
@@ -245,15 +228,20 @@ private fun HuggingRow(
                 m.measure(Constraints(minWidth = w, maxWidth = w, maxHeight = constraints.maxHeight))
             }
         val height = placeables.maxOfOrNull { it.height } ?: 0
-        layout(placeables.sumOf { it.width }, height.coerceAtLeast(constraints.minHeight)) {
+        val width = placeables.sumOf { it.width } + gaps
+        layout(width, height.coerceAtLeast(constraints.minHeight)) {
             var x = 0
             placeables.forEach {
                 it.place(x, (height - it.height) / 2)
-                x += it.width
+                x += it.width + gapPx
             }
         }
     }
 }
 
-/** Bottom clearance of scrolling content above the floating bar (`content.bottomClearance`, `tokens.md` 4). */
-val BarClearance: Dp = NbDimens.barHeight + NbDimens.barOffset + NbSpace.s5
+/**
+ * Bottom clearance of scrolling content above the floating bar at its minimum height: bar + its 16 dp offset + 16 dp
+ * (`content.bottomClearance` 88 dp). [AppScaffold][io.github.alien2003.nightbaseline.ui.shell.AppScaffold] adds the
+ * measured extra height of a grown bar and a taller navigation inset.
+ */
+val BarClearance: Dp = ShellDimens.barHeight + ShellDimens.barBottomMin + ShellDimens.barContentGap
