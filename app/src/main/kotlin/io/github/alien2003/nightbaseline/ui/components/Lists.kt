@@ -1,7 +1,6 @@
 package io.github.alien2003.nightbaseline.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,19 +10,18 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Icon
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CollectionInfo
 import androidx.compose.ui.semantics.CollectionItemInfo
@@ -42,24 +40,75 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
 import io.github.alien2003.nightbaseline.ui.material.nbClickable
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.theme.NbControlDimens
+import io.github.alien2003.nightbaseline.ui.theme.NbControlType
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.controls
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
 
+/** Where a row sits in a grouped card: its corner shape and whether a hairline separates it from the row above. */
+enum class GroupPosition {
+    /** The only row: a card of its own. */
+    Single,
+
+    /** First row of a card: top corners rounded. */
+    First,
+
+    /** A middle row: square, hairline above. */
+    Middle,
+
+    /** Last row: bottom corners rounded, hairline above. */
+    Last,
+    ;
+
+    /** The row's shape inside its 20 dp card. */
+    val shape: Shape
+        get() =
+            when (this) {
+                Single -> NbShapes.l
+                First -> RoundedCornerShape(topStart = NbShapes.lRadius, topEnd = NbShapes.lRadius)
+                Middle -> RectangleShape
+                Last -> RoundedCornerShape(bottomStart = NbShapes.lRadius, bottomEnd = NbShapes.lRadius)
+            }
+
+    /** A hairline is drawn above this row. */
+    val divider: Boolean get() = this == Middle || this == Last
+
+    /** Constants. */
+    companion object {
+        /** Position of item [index] of [count] items in one card. */
+        fun of(
+            index: Int,
+            count: Int,
+        ): GroupPosition =
+            when {
+                count <= 1 -> Single
+                index == 0 -> First
+                index == count - 1 -> Last
+                else -> Middle
+            }
+    }
+}
+
 /**
- * A History feed row (`screens.md` 4, 7.4): night label, night glyph + status label, and a wrapping row of small
- * per-metric glyphs (2..6). One merged TalkBack node ("{night label}: {status}. {k} moved: {metrics}."), role button.
+ * A History feed row (`screens.md` 4, `coloros-conformance.md` L11): one row of a month's grouped 20 dp card (see
+ * [position]): a 24 dp night glyph, night label (16/500) and status summary, and a wrapping set of small per-metric
+ * glyphs (2..6) at the end; >= 48 dp, 10 dp vertical padding; hairline above inset 56 dp / 16 dp; the selected row on
+ * a neutral fill (never a tonal colour). Rows in a grouped card light up on press but do not shrink. One merged
+ * TalkBack node ("{night label}: {status}. {k} moved: {metrics}."), role button.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -70,49 +119,62 @@ fun NightRow(
     selected: Boolean = false,
     forced: ForcedInteraction? = null,
     maxWidth: Dp = NbDimens.textMax,
+    position: GroupPosition = GroupPosition.Single,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
+    val controls = NbTheme.controls
     val label = text.nightLabel(night)
     val status = text.nightStatusLabel(night)
     val moved = night.movedMetrics.map { text.name(it.metric) }
     val description = if (moved.isEmpty()) "$label: $status." else "$label: $status. ${text.list(moved)}."
-    Row(
+    val shape = position.shape
+    Column(
         Modifier
             .widthIn(max = maxWidth)
             .then(modifier)
             .fillMaxWidth()
-            .sizeIn(minHeight = NbDimens.rowMinHeight)
-            .background(if (selected) colors.surface3 else colors.surface1, NbShapes.l)
-            .nbClickable(onClick = onClick, shape = NbShapes.l, forced = forced)
-            .semantics {
-                contentDescription = description
-                this.selected = selected
-            }.padding(horizontal = NbSpace.s5, vertical = NbDimens.rowPaddingVertical),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
+            .background(colors.surface1, shape)
+            .clip(shape),
     ) {
-        NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), background = if (selected) colors.surface3 else colors.surface1)
-        Column(Modifier.weight(1f).clearAndSetSemantics {}, verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
-            Text(label, style = NbTheme.typography.titleSmall, color = colors.textPrimary)
-            Text(status, style = NbTheme.typography.bodySmall, color = colors.textSecondary)
-        }
-        FlowRow(
-            Modifier.widthIn(max = 72.dp).clearAndSetSemantics {},
-            maxItemsInEachRow = METRIC_GLYPHS_PER_ROW,
-            horizontalArrangement = Arrangement.spacedBy(NbSpace.s1),
-            verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
+        if (position.divider) NbHairline(start = NbControlDimens.rowPaddingHorizontal * 2 + NbDimens.icon)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .sizeIn(minHeight = NbControlDimens.rowMinHeight)
+                .then(if (selected) Modifier.background(controls.selectedRow) else Modifier)
+                .nbClickable(onClick = onClick, shape = RectangleShape, forced = forced, pressScale = position == GroupPosition.Single)
+                .semantics {
+                    contentDescription = description
+                    this.selected = selected
+                }.padding(horizontal = NbControlDimens.rowPaddingHorizontal, vertical = NbControlDimens.rowPaddingVertical),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(NbControlDimens.rowPaddingHorizontal),
         ) {
-            night.metrics.filter { it.state.compared || it.state.moved }.forEach { metric ->
-                MetricGlyphIcon(metric.state.glyph, colors.tone(metric.state.tone), size = 12.dp)
+            NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), background = colors.surface1)
+            Column(Modifier.weight(1f).clearAndSetSemantics {}, verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap)) {
+                Text(label, style = NbControlType.itemTitle, color = controls.title)
+                Text(status, style = NbControlType.summary, color = controls.summary)
+            }
+            FlowRow(
+                Modifier.widthIn(max = 72.dp).clearAndSetSemantics {},
+                maxItemsInEachRow = METRIC_GLYPHS_PER_ROW,
+                horizontalArrangement = Arrangement.spacedBy(NbSpace.s1),
+                verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
+            ) {
+                night.metrics.filter { it.state.compared || it.state.moved }.forEach { metric ->
+                    MetricGlyphIcon(metric.state.glyph, colors.tone(metric.state.tone), size = 12.dp)
+                }
             }
         }
     }
 }
 
 /**
- * A calendar day cell (`screens.md` 4): day number and the night status glyph (shape, not only colour), today
- * outlined, the selected day on `surface.3` with a bold number. A 48 dp target ("{full date}: {status}").
+ * A calendar day cell (`screens.md` 4, `coloros-conformance.md` L13): transparent on the calendar card, >= 48 dp; the
+ * day number 16/400 in a 32 dp circle, the night status glyph below it (shape, not only colour). Today: number in the
+ * accent at 500. Selected: an accent disc behind the number with a white 500 number. Days without a night are not
+ * targets. One node ("{full date}: {status}").
  */
 @Composable
 fun CalendarCell(
@@ -126,39 +188,61 @@ fun CalendarCell(
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
+    val controls = NbTheme.controls
     val status = night?.let { text.nightStatusLabel(it) } ?: text.string(R.string.history_status_nodata)
     val description = text.string(R.string.a11y_history_day, text.dateLong(date), status)
-    val background = if (selected) colors.surface3 else colors.surface1
+    val numberColor =
+        when {
+            selected -> controls.onFill
+            night == null -> colors.textTertiary
+            today -> controls.accentText
+            else -> controls.title
+        }
     Column(
         modifier
             .sizeIn(minWidth = NbDimens.targetMin, minHeight = NbDimens.targetMin)
-            .background(background, NbShapes.s)
-            .then(if (today) Modifier.border(1.5.dp, colors.outline, NbShapes.s) else Modifier)
-            .nbClickable(onClick = onClick, shape = NbShapes.s, enabled = night != null, forced = forced)
+            .nbClickable(onClick = onClick, shape = NbShapes.m, enabled = night != null, forced = forced, pressScale = false)
             .semantics {
                 contentDescription = description
                 this.selected = selected
-            }.padding(vertical = NbSpace.s2),
+            }.padding(vertical = NbSpace.s1),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
     ) {
-        Text(
-            text.int(date.dayOfMonth),
-            style = NbTheme.typography.numericAxis.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal),
-            color = if (night == null) colors.textTertiary else colors.textPrimary,
-            modifier = Modifier.clearAndSetSemantics {},
-        )
-        Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .sizeIn(minWidth = DAY_DISC, minHeight = DAY_DISC)
+                .then(if (selected) Modifier.background(controls.fillTop, NbShapes.circle) else Modifier),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text.int(date.dayOfMonth),
+                style =
+                    NbTheme.typography.numericAxis.copy(
+                        fontSize = NbTheme.typography.body.fontSize,
+                        lineHeight = DAY_LINE,
+                        fontWeight = if (selected || today) FontWeight.Medium else FontWeight.Normal,
+                    ),
+                color = numberColor,
+                modifier = Modifier.clearAndSetSemantics {},
+            )
+        }
+        Box(Modifier.size(DAY_GLYPH), contentAlignment = Alignment.Center) {
             if (night != null) {
-                NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), size = 16.dp, background = background)
+                NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), size = DAY_GLYPH, background = colors.surface1)
             }
         }
     }
 }
 
+private val DAY_DISC = 32.dp
+private val DAY_GLYPH = 14.dp
+private val DAY_LINE = 20.sp
+
 /**
- * The History month grid (`screens.md` 4): weekday header, 7 columns of [CalendarCell] (collection semantics with
- * row and column info), previous / next month buttons.
+ * A compact month grid (`screens.md` 4) for the component catalog: month title with round previous / next buttons,
+ * weekday letters and 7 columns of [CalendarCell] on one card (collection semantics with row and column info). The
+ * History screen uses `HistoryCalendar`, which adds keyboard, swipe and the narrow transposed form.
  */
 @Composable
 fun MonthCalendar(
@@ -172,22 +256,25 @@ fun MonthCalendar(
     onNext: () -> Unit = {},
 ) {
     val text = rememberUiText()
-    val colors = NbTheme.colors
+    val controls = NbTheme.controls
     val firstDay = WeekFields.of(text.locale).firstDayOfWeek
     val offset = (month.atDay(1).dayOfWeek.value - firstDay.value + DAYS) % DAYS
     val cells = List(offset) { null } + (1..month.lengthOfMonth()).map { month.atDay(it) }
     val rows = cells.chunked(DAYS)
-    Column(modifier.widthIn(max = NbDimens.textMax), verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
+    Column(
+        modifier.widthIn(max = NbDimens.textMax).solidCard(NbShapes.l).padding(NbSpace.s3),
+        verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            NbIconButton(NbIcons.Back, stringResource(R.string.a11y_prev_month), onPrevious, tint = colors.textPrimary)
+            NbRoundIconButton(NbIcons.Back, stringResource(R.string.a11y_prev_month), onPrevious)
             Text(
                 text.month(month.atDay(1)),
-                style = NbTheme.typography.titleSmall,
-                color = colors.textPrimary,
+                style = NbControlType.itemTitle,
+                color = controls.title,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
-            NbIconButton(NbIcons.Chevron, stringResource(R.string.a11y_next_month), onNext, tint = colors.textPrimary)
+            NbRoundIconButton(NbIcons.Chevron, stringResource(R.string.a11y_next_month), onNext)
         }
         Row(Modifier.fillMaxWidth().clearAndSetSemantics {}) {
             repeat(DAYS) { i ->
@@ -195,19 +282,16 @@ fun MonthCalendar(
                 Text(
                     // Any week works for the letters; the first cell of the month row starts at [firstDay].
                     text.weekdayLetter(month.atDay(1).with(TemporalAdjusters.nextOrSame(day))),
-                    style = NbTheme.typography.labelSmall,
-                    color = colors.textTertiary,
+                    style = NbTheme.typography.caption,
+                    color = controls.summary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f),
                 )
             }
         }
-        Column(
-            Modifier.semantics { collectionInfo = CollectionInfo(rows.size, DAYS) },
-            verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
-        ) {
+        Column(Modifier.semantics { collectionInfo = CollectionInfo(rows.size, DAYS) }) {
             rows.forEachIndexed { r, row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
+                Row {
                     repeat(DAYS) { c ->
                         val date = row.getOrNull(c)
                         Box(Modifier.weight(1f).aspectRatio(1f, matchHeightConstraintsFirst = false)) {
@@ -238,10 +322,11 @@ private const val DAYS = 7
 private const val METRIC_GLYPHS_PER_ROW = 3
 
 /**
- * The recent-nights strip of Home (`screens.md` 4): weekday letter and night glyph per night, titled "Last 7 nights"
- * with "See all". Nights are individual 48 dp targets only when they fit (7 x 48 dp); otherwise the whole strip is one
- * target that opens History (`a11y_history_strip`). [interactive] false renders the view-only glyph row (tabletop top
- * half).
+ * The recent-nights strip of Home (`screens.md` 4, `coloros-conformance.md` L12): the header ("Last 7 nights") sits
+ * outside the card as a section header with "See all" at its end (48 dp target); the card holds one column per night
+ * with the weekday letter (12/400 secondary) and the night glyph. Nights are individual 48 dp targets only when they
+ * fit (7 x 48 dp); otherwise the whole strip is one target that opens History (`a11y_history_strip`). [interactive]
+ * false renders the view-only glyph row (tabletop top half).
  */
 @Composable
 fun HistoryStrip(
@@ -254,10 +339,14 @@ fun HistoryStrip(
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
+    val controls = NbTheme.controls
     val stripDescription =
         text.string(R.string.a11y_history_strip, text.list(nights.map { "${text.dateShort(it.wakeDate)}: ${text.nightStatusLabel(it)}" }))
-    NbCard(modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().sizeIn(minHeight = NbDimens.targetMin),
+            verticalAlignment = Alignment.Bottom,
+        ) {
             Text(
                 when {
                     nights.size > DAYS -> stringResource(R.string.home_strip_title_14)
@@ -267,25 +356,33 @@ fun HistoryStrip(
                     // Learning: fewer nights are stored than the strip holds.
                     else -> text.plural(R.plurals.home_strip_title_n, nights.size, text.int(nights.size))
                 },
-                style = NbTheme.typography.titleSmall,
-                color = colors.textPrimary,
-                modifier = Modifier.weight(1f).semantics { heading() },
+                style = NbControlType.sectionHeader,
+                color = controls.sectionHeader,
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .padding(start = NbControlDimens.sectionHeaderStart, bottom = NbControlDimens.sectionHeaderBottom)
+                        .semantics { heading() },
             )
-            if (interactive) NbTextButton(stringResource(R.string.action_see_all), onClick = onSeeAll)
+            if (interactive) {
+                NbTextButton(stringResource(R.string.action_see_all), onClick = onSeeAll, modifier = Modifier.padding(end = NbSpace.s1))
+            }
         }
         val perNight = interactive && individualTargets
         Row(
             Modifier
                 .fillMaxWidth()
+                .solidCard(NbShapes.l)
+                .clip(NbShapes.l)
                 .then(
                     if (interactive && !individualTargets) {
                         Modifier
-                            .nbClickable(onClick = onSeeAll, shape = NbShapes.m)
+                            .nbClickable(onClick = onSeeAll, shape = NbShapes.l, pressScale = false)
                             .semantics { contentDescription = stripDescription }
                     } else {
                         Modifier
                     },
-                ),
+                ).padding(horizontal = NbSpace.s3, vertical = NbControlDimens.rowPaddingVertical),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             nights.forEach { night ->
@@ -296,9 +393,8 @@ fun HistoryStrip(
                         .sizeIn(minHeight = NbDimens.targetMin)
                         .then(
                             if (perNight) {
-                                Modifier.nbClickable(onClick = { onNight(night) }, shape = NbShapes.s).semantics {
-                                    contentDescription =
-                                        description
+                                Modifier.nbClickable(onClick = { onNight(night) }, shape = NbShapes.m, pressScale = false).semantics {
+                                    contentDescription = description
                                 }
                             } else {
                                 Modifier.clearAndSetSemantics {}
@@ -307,7 +403,7 @@ fun HistoryStrip(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
                 ) {
-                    Text(text.weekdayLetter(night.wakeDate), style = NbTheme.typography.labelSmall, color = colors.textTertiary)
+                    Text(text.weekdayLetter(night.wakeDate), style = NbTheme.typography.caption, color = controls.summary)
                     NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), size = 20.dp)
                 }
             }
@@ -315,7 +411,10 @@ fun HistoryStrip(
     }
 }
 
-/** A settings section header (`type.labelSmall`, `text.tertiary`), 16 dp above and 8 dp below. */
+/**
+ * A section header outside a grouped card (`coloros-conformance.md` T5, S2): 12/16/500 `text.tertiary`, 24 dp above
+ * (16 dp group gap + 8), 8 dp below, text 16 dp in from the card edge (32 dp from the screen edge).
+ */
 @Composable
 fun SectionHeader(
     title: String,
@@ -323,16 +422,62 @@ fun SectionHeader(
 ) {
     Text(
         title,
-        style = NbTheme.typography.labelSmall,
-        color = NbTheme.colors.textTertiary,
+        style = NbControlType.sectionHeader,
+        color = NbTheme.controls.sectionHeader,
         modifier =
             modifier
-                .padding(start = NbSpace.s5, top = NbSpace.s5, bottom = NbSpace.s3)
-                .semantics { heading() },
+                .padding(
+                    start = NbControlDimens.sectionHeaderStart,
+                    end = NbControlDimens.sectionHeaderStart,
+                    top = NbControlDimens.sectionHeaderTop,
+                    bottom = NbControlDimens.sectionHeaderBottom,
+                ).semantics { heading() },
     )
 }
 
-/** A group of settings rows: one solid card with 16 dp side inset and hairline separators inset to the text column. */
+/**
+ * A footer under a grouped card (COUI footer): 12 sp `text.tertiary`, 16 dp in from the card edge, 8 dp below the
+ * card. Read-only explanations that belong to the group above.
+ */
+@Composable
+fun SectionFooter(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text,
+        style = NbTheme.typography.caption,
+        color = NbTheme.controls.sectionHeader,
+        modifier =
+            modifier.padding(
+                start = NbControlDimens.sectionHeaderStart,
+                end = NbControlDimens.sectionHeaderStart,
+                top = NbSpace.s3,
+            ),
+    )
+}
+
+/**
+ * A grouped list card (`coloros-conformance.md` S3): one solid 20 dp card, no vertical padding (the rows carry it),
+ * clipped so a pressed first or last row follows the corners. Rows separate themselves with inset hairlines.
+ */
+@Composable
+fun GroupCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        Modifier
+            .widthIn(max = NbDimens.textMax)
+            .then(modifier)
+            .fillMaxWidth()
+            .solidCard(NbShapes.l)
+            .clip(NbShapes.l),
+        content = content,
+    )
+}
+
+/** A group of settings rows: the section header outside, then one [GroupCard] whose rows are split by inset hairlines. */
 @Composable
 fun SettingsGroup(
     title: String,
@@ -341,7 +486,7 @@ fun SettingsGroup(
 ) {
     Column(Modifier.widthIn(max = NbDimens.textMax).then(modifier).fillMaxWidth()) {
         SectionHeader(title)
-        Column(Modifier.fillMaxWidth().solidCard(NbShapes.l), content = content)
+        GroupCard(content = content)
     }
 }
 
@@ -350,7 +495,7 @@ sealed interface SettingsTrailing {
     /** A chevron: opens a sub-screen. */
     data object Chevron : SettingsTrailing
 
-    /** A value text (e.g. the source name). */
+    /** A value text followed by a chevron (e.g. the source name; the row opens a picker). */
     data class Value(
         /** The value. */
         val text: String,
@@ -362,7 +507,7 @@ sealed interface SettingsTrailing {
         val checked: Boolean,
     ) : SettingsTrailing
 
-    /** A radio button; the whole row selects it. */
+    /** A radio button (trailing, as in ColorOS single-choice lists); the whole row selects it. */
     data class Radio(
         /** Current state. */
         val selected: Boolean,
@@ -373,9 +518,11 @@ sealed interface SettingsTrailing {
 }
 
 /**
- * A settings row (`screens.md` 4): at least 56 dp, title + optional summary + trailing switch / radio / value /
- * chevron. The whole row is the touch target and one TalkBack node with the matching role and state; a disabled row
- * reads its reason (the summary).
+ * A settings row (`screens.md` 4, `coloros-conformance.md` S1, L1-L3): >= 48 dp, padding 16 / 10, title 16/500 +
+ * optional summary 14/400 (2 dp apart) + trailing switch / radio / value + chevron / chevron, 12 dp from the text.
+ * The whole row is the touch target and one TalkBack node with the matching role and state; it lights up on press but
+ * does not shrink (it sits in a grouped card). A disabled row reads its reason (the summary). [showDivider] draws the
+ * 1 px hairline inset 16 dp at both ends above the row. Flipping a switch row plays the toggle haptic.
  */
 @Suppress("CyclomaticComplexMethod") // Role, state and trailing element follow one exhaustive SettingsTrailing switch.
 @Composable
@@ -390,27 +537,30 @@ fun SettingsRow(
     forced: ForcedInteraction? = null,
 ) {
     val colors = NbTheme.colors
+    val controls = NbTheme.controls
+    val haptic = rememberToggleHaptic()
     val role =
         when (trailing) {
             is SettingsTrailing.Toggle -> Role.Switch
             is SettingsTrailing.Radio -> Role.RadioButton
             else -> Role.Button
         }
-    Column(modifier.fillMaxWidth()) {
-        if (showDivider) {
-            Box(
-                Modifier
-                    .padding(start = NbSpace.s5)
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(colors.separator),
-            )
+    val click: () -> Unit =
+        if (trailing is SettingsTrailing.Toggle) {
+            {
+                haptic(!trailing.checked)
+                onClick()
+            }
+        } else {
+            onClick
         }
+    Column(modifier.fillMaxWidth()) {
+        if (showDivider) NbHairline()
         Row(
             Modifier
                 .fillMaxWidth()
-                .sizeIn(minHeight = NbDimens.rowMinHeight)
-                .nbClickable(onClick = onClick, shape = NbShapes.l, role = role, enabled = enabled, forced = forced, pressScale = false)
+                .sizeIn(minHeight = NbControlDimens.rowMinHeight)
+                .nbClickable(onClick = click, shape = RectangleShape, role = role, enabled = enabled, forced = forced, pressScale = false)
                 .semantics(mergeDescendants = true) {
                     when (trailing) {
                         is SettingsTrailing.Toggle -> toggleableState = ToggleableState(trailing.checked)
@@ -418,55 +568,45 @@ fun SettingsRow(
                         is SettingsTrailing.Value -> stateDescription = trailing.text
                         else -> Unit
                     }
-                }.padding(horizontal = NbSpace.s5, vertical = NbDimens.rowPaddingVertical),
+                }.padding(horizontal = NbControlDimens.rowPaddingHorizontal, vertical = NbControlDimens.rowPaddingVertical),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
+            horizontalArrangement = Arrangement.spacedBy(NbControlDimens.rowTrailingGap),
         ) {
-            if (trailing is SettingsTrailing.Radio) {
-                RadioButton(selected = trailing.selected, onClick = null, enabled = enabled, modifier = Modifier.clearAndSetSemantics {})
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
-                Text(title, style = NbTheme.typography.titleSmall, color = if (enabled) colors.textPrimary else colors.textTertiary)
-                summary?.let { Text(it, style = NbTheme.typography.bodySmall, color = colors.textSecondary) }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap)) {
+                Text(title, style = NbControlType.itemTitle, color = if (enabled) controls.title else colors.textTertiary)
+                summary?.let { Text(it, style = NbControlType.summary, color = controls.summary) }
             }
             when (trailing) {
                 SettingsTrailing.Chevron -> {
-                    Icon(
-                        NbIcons.Chevron,
-                        contentDescription = null,
-                        tint = colors.textSecondary,
-                        modifier = Modifier.size(NbDimens.iconInline),
-                    )
+                    NbChevron()
                 }
 
                 is SettingsTrailing.Value -> {
-                    Text(
-                        trailing.text,
-                        style = NbTheme.typography.bodySmall,
-                        color = colors.textSecondary,
-                        modifier = Modifier.clearAndSetSemantics {},
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
+                        Text(
+                            trailing.text,
+                            style = NbTheme.typography.bodySmall,
+                            color = controls.summary,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.widthIn(max = VALUE_MAX).clearAndSetSemantics {},
+                        )
+                        NbChevron()
+                    }
                 }
 
                 is SettingsTrailing.Toggle -> {
-                    Switch(
-                        checked = trailing.checked,
-                        onCheckedChange = null,
-                        enabled = enabled,
-                        modifier = Modifier.clearAndSetSemantics {},
-                        colors =
-                            SwitchDefaults.colors(
-                                checkedTrackColor = colors.primary,
-                                checkedThumbColor = colors.onPrimary,
-                                uncheckedTrackColor = colors.surface3,
-                                uncheckedBorderColor = colors.outline,
-                                uncheckedThumbColor = colors.outline,
-                            ),
-                    )
+                    NbSwitch(checked = trailing.checked, enabled = enabled)
                 }
 
-                is SettingsTrailing.Radio, SettingsTrailing.None -> {}
+                is SettingsTrailing.Radio -> {
+                    NbRadio(selected = trailing.selected, enabled = enabled)
+                }
+
+                SettingsTrailing.None -> {}
             }
         }
     }
 }
+
+/** A trailing value never takes more than this; longer values wrap. */
+private val VALUE_MAX = 160.dp

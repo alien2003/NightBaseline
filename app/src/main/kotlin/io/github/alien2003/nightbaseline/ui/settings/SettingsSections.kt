@@ -1,9 +1,11 @@
 package io.github.alien2003.nightbaseline.ui.settings
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
@@ -11,10 +13,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
-import io.github.alien2003.nightbaseline.ui.components.NbCard
+import io.github.alien2003.nightbaseline.ui.components.GroupCard
+import io.github.alien2003.nightbaseline.ui.components.NbChoiceRow
+import io.github.alien2003.nightbaseline.ui.components.SectionFooter
 import io.github.alien2003.nightbaseline.ui.components.SettingsGroup
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
@@ -23,10 +35,13 @@ import io.github.alien2003.nightbaseline.ui.material.GlassPreference
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.UiText
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.theme.NbControlDimens
+import io.github.alien2003.nightbaseline.ui.theme.NbControlType
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.controls
 
 /** Data source group: source (opens the picker), Health Connect permissions, last read, set up again. */
 @Composable
@@ -121,8 +136,9 @@ internal fun SensitivityRowGroup(
 }
 
 /**
- * The sensitivity presets as large radio cards, then the preview line (hidden while learning, `ST-SENS-LEARNING`).
- * Used as the sub-screen (Compact), inline (Medium) and in the detail pane.
+ * The sensitivity presets as one grouped card of single-choice rows (`coloros-conformance.md` L8), then the preview
+ * line (hidden while learning, `ST-SENS-LEARNING`). Used as the sub-screen (Compact), inline (Medium) and in the
+ * detail pane.
  */
 @Composable
 internal fun SensitivityContent(
@@ -131,20 +147,23 @@ internal fun SensitivityContent(
     title: Boolean = false,
 ) {
     val text = rememberUiText()
-    val colors = NbTheme.colors
-    Column(
-        Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax),
-        verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
-    ) {
-        if (title) PaneHeading(stringResource(R.string.settings_group_sensitivity), Modifier.padding(top = NbSpace.s5))
-        Text(stringResource(R.string.setup_sens_intro), style = NbTheme.typography.body, color = colors.textSecondary)
-        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
-            SensitivityPreset.entries.forEach { preset ->
-                PresetCard(
+    val controls = NbTheme.controls
+    Column(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax)) {
+        if (title) PaneHeading(stringResource(R.string.settings_group_sensitivity), Modifier.padding(top = NbSpace.s5, bottom = NbSpace.s4))
+        Text(
+            stringResource(R.string.setup_sens_intro),
+            style = NbTheme.typography.body,
+            color = controls.summary,
+            modifier = Modifier.padding(horizontal = NbSpace.s5, vertical = NbSpace.s3),
+        )
+        GroupCard(Modifier.padding(top = NbSpace.s3).selectableGroup()) {
+            SensitivityPreset.entries.forEachIndexed { i, preset ->
+                PresetRow(
                     stringResource(preset.title),
                     stringResource(preset.description),
                     selected = preset == state.sensitivity,
                     onClick = { actions.onSensitivity(preset) },
+                    showDivider = i > 0,
                 )
             }
         }
@@ -152,35 +171,33 @@ internal fun SensitivityContent(
             state.previewNotes?.let {
                 text.plural(R.plurals.sens_preview, it, text.int(it), text.int(state.previewNights))
             } ?: stringResource(R.string.settings_sens_preview_learning)
-        Text(preview, style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+        SectionFooter(preview)
     }
 }
 
 /**
- * Appearance: theme (System / Light / Dark) and glass effects (Automatic / Off) as radio rows; Automatic names the
- * reason when the resolver turned glass off (`glass_off_*`). Then the read-only motion note.
+ * Appearance (`coloros-conformance.md` S3, L2): two grouped cards of single-choice rows under their own section
+ * headers, theme (System / Light / Dark) and glass effects (Automatic / Off; Automatic names the reason when the
+ * resolver turned glass off, `glass_off_*`), then the read-only motion note as a footer. [title] is accepted for
+ * symmetry with the other groups; the two headers are shown in every placement.
  */
+@Suppress("UnusedParameter")
 @Composable
 internal fun AppearanceGroup(
     state: SettingsState,
     actions: SettingsActions,
     title: Boolean = true,
 ) {
-    GroupOrCard(if (title) stringResource(R.string.settings_group_appearance) else null) {
-        GroupLabel(stringResource(R.string.settings_theme))
-        Column(Modifier.selectableGroup()) {
-            ThemeChoice.entries.forEachIndexed { i, choice ->
-                SettingsRow(
-                    stringResource(choice.label),
-                    onClick = { actions.onTheme(choice) },
-                    trailing = SettingsTrailing.Radio(choice == state.theme),
-                    showDivider = i > 0,
-                )
-            }
+    Column(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax)) {
+        SettingsGroup(stringResource(R.string.settings_theme)) {
+            NbChoiceRow(
+                labels = ThemeChoice.entries.map { stringResource(it.label) },
+                selected = ThemeChoice.entries.indexOf(state.theme),
+                onSelect = { actions.onTheme(ThemeChoice.entries[it]) },
+                art = { ThemePreview(ThemeChoice.entries[it]) },
+            )
         }
-        Divider()
-        GroupLabel(stringResource(R.string.settings_glass))
-        Column(Modifier.selectableGroup()) {
+        SettingsGroup(stringResource(R.string.settings_glass), Modifier.selectableGroup()) {
             SettingsRow(
                 stringResource(R.string.glass_auto),
                 onClick = { actions.onGlass(GlassPreference.Automatic) },
@@ -195,8 +212,7 @@ internal fun AppearanceGroup(
                 showDivider = true,
             )
         }
-        Divider()
-        NoteRow(stringResource(R.string.settings_motion_note))
+        SectionFooter(stringResource(R.string.settings_motion_note))
     }
 }
 
@@ -244,46 +260,31 @@ internal fun AboutGroup(
     }
 }
 
-/** A read-only row (title + optional summary) in the row rhythm (>= 56 dp), one TalkBack node, no action. */
+/** A read-only row (title + optional summary) in the row rhythm (>= 48 dp), one TalkBack node, no action. */
 @Composable
 internal fun InfoRow(
     title: String,
     summary: String?,
     divider: Boolean = false,
 ) {
-    val colors = NbTheme.colors
+    val controls = NbTheme.controls
     Column(Modifier.fillMaxWidth()) {
         if (divider) Divider()
         Column(
             Modifier
                 .fillMaxWidth()
-                .sizeIn(minHeight = NbDimens.rowMinHeight)
+                .sizeIn(minHeight = NbControlDimens.rowMinHeight)
                 .semantics(mergeDescendants = true) {}
-                .padding(horizontal = NbSpace.s5, vertical = NbDimens.rowPaddingVertical),
-            verticalArrangement = Arrangement.spacedBy(NbSpace.s1, Alignment.CenterVertically),
+                .padding(horizontal = NbControlDimens.rowPaddingHorizontal, vertical = NbControlDimens.rowPaddingVertical),
+            verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap, Alignment.CenterVertically),
         ) {
-            Text(title, style = NbTheme.typography.titleSmall, color = colors.textPrimary)
-            summary?.let { Text(it, style = NbTheme.typography.bodySmall, color = colors.textSecondary) }
+            Text(title, style = NbControlType.itemTitle, color = controls.title)
+            summary?.let { Text(it, style = NbControlType.summary, color = controls.summary) }
         }
     }
 }
 
-/** A read-only note in the row rhythm (secondary text only). */
-@Composable
-private fun NoteRow(text: String) {
-    Text(
-        text,
-        style = NbTheme.typography.bodySmall,
-        color = NbTheme.colors.textSecondary,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .sizeIn(minHeight = NbDimens.rowMinHeight)
-                .padding(horizontal = NbSpace.s5, vertical = NbSpace.s5),
-    )
-}
-
-/** A [SettingsGroup] with a header, or (in a detail pane, where the pane has its own heading) the bare solid card. */
+/** A [SettingsGroup] with a header, or (in a detail pane, where the pane has its own heading) the bare grouped card. */
 @Composable
 private fun GroupOrCard(
     title: String?,
@@ -292,6 +293,71 @@ private fun GroupOrCard(
     if (title != null) {
         SettingsGroup(title) { content() }
     } else {
-        Column(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax).solidCard(NbShapes.l)) { content() }
+        GroupCard { content() }
     }
 }
+
+/**
+ * Our own small phone drawing for a theme choice (decorative): a rounded outline with two cards, in light colours,
+ * dark colours, or split half and half for "System".
+ */
+@Composable
+private fun ThemePreview(choice: ThemeChoice) {
+    val ring = NbTheme.controls.radioRing
+    Canvas(Modifier.size(PREVIEW_WIDTH, PREVIEW_HEIGHT)) {
+        val radius = CornerRadius(PREVIEW_CORNER.toPx())
+        val mid = size.width / 2
+        when (choice) {
+            ThemeChoice.Light -> {
+                previewScreen(PREVIEW_LIGHT_BACK, Color.White, 0f, size.width, radius)
+            }
+
+            ThemeChoice.Dark -> {
+                previewScreen(Color.Black, PREVIEW_DARK_CARD, 0f, size.width, radius)
+            }
+
+            ThemeChoice.System -> {
+                previewScreen(PREVIEW_LIGHT_BACK, Color.White, 0f, mid, radius)
+                previewScreen(Color.Black, PREVIEW_DARK_CARD, mid, size.width, radius)
+            }
+        }
+        drawRoundRect(ring, cornerRadius = radius, style = Stroke(1.dp.toPx()))
+    }
+}
+
+private fun DrawScope.previewScreen(
+    back: Color,
+    card: Color,
+    left: Float,
+    right: Float,
+    radius: CornerRadius,
+) {
+    clipRect(left = left, right = right) {
+        drawRoundRect(back, cornerRadius = radius)
+        val pad = size.width * PREVIEW_PAD
+        val cardHeight = size.height * PREVIEW_CARD
+        for (n in 0..1) {
+            drawRoundRect(
+                card,
+                topLeft = Offset(pad, size.height * PREVIEW_FIRST_CARD + n * (cardHeight + pad)),
+                size = Size(size.width - 2 * pad, cardHeight),
+                cornerRadius = CornerRadius(pad / 2),
+            )
+        }
+    }
+}
+
+private val PREVIEW_WIDTH = 40.dp
+private val PREVIEW_HEIGHT = 68.dp
+private val PREVIEW_CORNER = 8.dp
+private const val PREVIEW_PAD = 0.14f
+private const val PREVIEW_CARD = 0.16f
+private const val PREVIEW_FIRST_CARD = 0.3f
+
+/** Window colour of the light preview (the measured ColorOS light background). */
+@Suppress("MagicNumber")
+private val PREVIEW_LIGHT_BACK = Color(0xFFF0F1F2)
+
+/** Card colour of the dark preview. */
+@Suppress("MagicNumber")
+private val PREVIEW_DARK_CARD = Color(0xFF2E2E2E)

@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.SettingsGroup
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
@@ -39,7 +40,7 @@ internal fun SourcePickerContent(
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
         Text(stringResource(R.string.onb_source_body), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
-        Column(Modifier.fillMaxWidth().solidCard(NbShapes.l).selectableGroup()) {
+        GroupCard(Modifier.selectableGroup()) {
             state.sources.forEachIndexed { i, source ->
                 SourceOptionRow(
                     source,
@@ -73,7 +74,7 @@ internal fun AboutContent(
             Text(stringResource(R.string.about_local), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
             Text(stringResource(R.string.about_any_source), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
         }
-        Column(Modifier.fillMaxWidth().solidCard(NbShapes.l)) {
+        GroupCard {
             SettingsRow(stringResource(R.string.about_licenses), onClick = { actions.onOpenPage(SettingsPage.Licenses) })
             SettingsRow(
                 stringResource(R.string.setup_privacy_policy),
@@ -93,7 +94,7 @@ internal fun LicensesContent(state: SettingsState) {
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
         Text(stringResource(R.string.setup_licenses_intro), style = NbTheme.typography.body, color = colors.textSecondary)
-        Column(Modifier.fillMaxWidth().solidCard(NbShapes.l)) {
+        GroupCard {
             state.licenses.forEachIndexed { i, entry -> InfoRow(entry.name, entry.license, divider = i > 0) }
         }
         Text(stringResource(R.string.setup_licenses_app), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
