@@ -28,8 +28,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
 import io.github.alien2003.nightbaseline.ui.material.SHELL_PRESS_SCALE_LARGE
 import io.github.alien2003.nightbaseline.ui.material.ShellMaterial
@@ -56,6 +58,8 @@ import io.github.alien2003.nightbaseline.ui.theme.ShellTokens
  * and weight, not colour. A press shrinks the whole pill (0.98) with the touch-following glow clipped to it. The
  * caller centres it 16 dp above the screen's bottom edge (gesture navigation).
  *
+ * @param sideMargin space the bar keeps free on each side while its labels fit without breaking a word (the layout
+ *   gutter); when the longest words need it the bar uses that space too, so a label never breaks inside a word.
  * @param forced catalog only: shows pressed / focus on one destination.
  */
 @Composable
@@ -63,6 +67,7 @@ fun FloatingNavBar(
     selected: TopLevel,
     onSelect: (TopLevel) -> Unit,
     modifier: Modifier = Modifier,
+    sideMargin: Dp = 0.dp,
     forced: Pair<TopLevel, ForcedInteraction>? = null,
 ) {
     val press = rememberShellPressState()
@@ -77,7 +82,7 @@ fun FloatingNavBar(
                 .padding(horizontal = ShellDimens.barPaddingHorizontal, vertical = ShellDimens.barPaddingVertical),
         contentAlignment = Alignment.Center,
     ) {
-        HuggingRow(Modifier.selectableGroup(), gap = ShellDimens.barItemGap) {
+        HuggingRow(Modifier.selectableGroup(), gap = ShellDimens.barItemGap, slack = sideMargin * 2) {
             TopLevel.entries.forEach { destination ->
                 NavItem(
                     destination = destination,
@@ -153,7 +158,8 @@ private fun NavItem(
     val motion = NbTheme.motion
     val label = stringResource(destination.label)
     val color = if (selected) shell.navSelected else shell.navUnselected
-    val style = ShellTokens.type.navLabel.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+    // Labels wrap only between words (no hyphenation): the bar gives every item at least its longest word.
+    val style = ShellTokens.type.navLabel.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, hyphens = Hyphens.None)
     val source = remember { MutableInteractionSource() }
     Column(
         modifier
@@ -199,35 +205,47 @@ private fun NavItem(
 private val NbSpaceHalf: Dp = ShellDimens.navLabelGap
 
 /**
- * A row that hugs its items ([gap] apart) while they fit and otherwise gives every item an equal share of the width
- * (each still at least 48 dp), so labels wrap instead of being cut (`layouts.md` 4.1). Every item gets the height of
- * the tallest one, so an item whose label wraps keeps its icon level with the others.
+ * A row that hugs its items ([gap] apart) while they fit and otherwise shares the width out (`layouts.md` 4.1): every
+ * item gets at least its minimum intrinsic width (its longest word, so a label wraps between words and never inside
+ * one) and the rest is shared equally. It first tries to stay [slack] narrower than the space it is given (the side
+ * margins); only when the longest words do not fit there does it use that space, then the gaps. Every item gets the
+ * height of the tallest one, so an item whose label wraps keeps its icon level with the others.
  */
 @Composable
 private fun HuggingRow(
     modifier: Modifier = Modifier,
     gap: Dp,
+    slack: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
     Layout(content, modifier) { measurables, constraints ->
-        val gapPx = gap.roundToPx()
-        val gaps = gapPx * (measurables.size - 1).coerceAtLeast(0)
+        val count = measurables.size.coerceAtLeast(1)
+        var gapPx = gap.roundToPx()
         val natural = measurables.map { it.maxIntrinsicWidth(Constraints.Infinity) }
-        val share =
-            if (constraints.hasBoundedWidth && natural.sum() + gaps > constraints.maxWidth) {
-                ((constraints.maxWidth - gaps) / measurables.size.coerceAtLeast(1)).coerceAtLeast(0)
+        val words = measurables.map { it.minIntrinsicWidth(Constraints.Infinity) }
+
+        fun gaps() = gapPx * (measurables.size - 1).coerceAtLeast(0)
+        val widths =
+            if (!constraints.hasBoundedWidth || natural.sum() + gaps() <= constraints.maxWidth - slack.roundToPx()) {
+                natural
             } else {
-                null
+                val preferred = constraints.maxWidth - slack.roundToPx()
+                val limit =
+                    when {
+                        words.sum() + gaps() <= preferred -> preferred
+                        words.sum() + gaps() <= constraints.maxWidth -> constraints.maxWidth
+                        else -> constraints.maxWidth.also { gapPx = 0 }
+                    }
+                share(words, (limit - gaps()).coerceAtLeast(0), count)
             }
-        val widths = measurables.mapIndexed { i, _ -> share ?: natural[i] }
         val tallest = measurables.mapIndexed { i, m -> m.minIntrinsicHeight(widths[i]) }.maxOrNull() ?: 0
         val height = tallest.coerceIn(constraints.minHeight, constraints.maxHeight)
         val placeables =
             measurables.mapIndexed { i, m ->
                 m.measure(Constraints(minWidth = widths[i], maxWidth = widths[i], minHeight = height, maxHeight = height))
             }
-        val width = placeables.sumOf { it.width } + gaps
-        layout(width, height) {
+        val width = placeables.sumOf { it.width } + gaps()
+        layout(width.coerceAtMost(constraints.maxWidth), height) {
             var x = 0
             placeables.forEach {
                 it.place(x, 0)
@@ -235,6 +253,35 @@ private fun HuggingRow(
             }
         }
     }
+}
+
+/**
+ * [total] shared out over [count] items, each at least its [minimum]: items whose minimum is above the equal share
+ * keep it, the others share what is left equally.
+ */
+internal fun share(
+    minimum: List<Int>,
+    total: Int,
+    count: Int,
+): List<Int> {
+    val fixed = BooleanArray(minimum.size)
+    var left = total
+    var open = count
+    var changed = true
+    while (changed && open > 0) {
+        changed = false
+        val equal = left / open
+        minimum.forEachIndexed { i, m ->
+            if (!fixed[i] && m > equal) {
+                fixed[i] = true
+                left -= m
+                open--
+                changed = true
+            }
+        }
+    }
+    val equal = if (open > 0) (left / open).coerceAtLeast(0) else 0
+    return minimum.mapIndexed { i, m -> if (fixed[i]) m else maxOf(equal, m) }
 }
 
 /**

@@ -159,16 +159,44 @@ class ShellLayoutTest {
 
     @Test
     @Config(qualifiers = "ru-rRU-w393dp-h851dp-port-xhdpi")
-    fun bottomBarAtRussianFont2KeepsIconsLevelAndStaysInsideTheGutters() {
-        val layout = resolveLayout(LayoutInputs(WIDTH, HEIGHT, fontScale = 2f))
+    fun bottomBarAtRussianFont2KeepsIconsLevelAndNeverBreaksAWord() = assertBarAtFont2(WIDTH)
+
+    @Test
+    @Config(qualifiers = "ru-rRU-w320dp-h700dp-port-xhdpi")
+    fun bottomBarOnANarrowPhoneAtRussianFont2UsesTheGuttersRatherThanBreakAWord() = assertBarAtFont2(NARROW_W)
+
+    @Test
+    fun bottomBarAtFont1StaysInsideTheGutters() {
+        val layout = resolveLayout(LayoutInputs(WIDTH, HEIGHT))
+        show { AppScaffold(layout, TopLevel.Home, onSelect = {}) { Box(Modifier.fillMaxSize()) } }
+        val items = compose.onAllNodes(tabs).fetchSemanticsNodes().map { it.boundsInRoot }
+        val span = items.maxOf { it.right } - items.minOf { it.left }
+        val inside = px(WIDTH.toInt()) - 2 * px(GUTTER_DP)
+        assertTrue("items span $span px, inside the gutters ($inside px)", span <= inside)
+    }
+
+    private fun assertBarAtFont2(width: Float) {
+        val layout = resolveLayout(LayoutInputs(width, HEIGHT, fontScale = 2f))
         show(fontScale = 2f) { AppScaffold(layout, TopLevel.Home, onSelect = {}) { Box(Modifier.fillMaxSize()) } }
         val items = compose.onAllNodes(tabs).fetchSemanticsNodes().map { it.boundsInRoot }
         assertEquals(TopLevel.entries.size, items.size)
         assertEquals("one top line for every item", 1, items.map { it.top }.distinct().size)
         assertEquals("one height for every item", 1, items.map { it.height }.distinct().size)
-        val span = items.maxOf { it.right } - items.minOf { it.left }
-        val inside = px(WIDTH.toInt()) - 2 * px(GUTTER_DP)
-        assertTrue("items span $span px, inside the gutters ($inside px)", span <= inside)
+        assertTrue("the bar stays on the screen", items.minOf { it.left } >= 0f && items.maxOf { it.right } <= px(width.toInt()))
+        TopLevel.entries.forEach { destination ->
+            val label = activity.getString(destination.label)
+            val node = compose.onNodeWithText(label, useUnmergedTree = true).fetchSemanticsNode()
+            val results = mutableListOf<TextLayoutResult>()
+            node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
+            val layoutResult = results.single()
+            for (line in 0 until layoutResult.lineCount - 1) {
+                val end = layoutResult.getLineEnd(line)
+                assertTrue(
+                    "'$label' breaks inside a word after line $line ('${label.substring(0, end)}')",
+                    label[end - 1].isWhitespace() || label.getOrNull(end)?.isWhitespace() == true,
+                )
+            }
+        }
     }
 
     @Test
@@ -271,6 +299,7 @@ class ShellLayoutTest {
     private companion object {
         const val WIDTH = 393f
         const val HEIGHT = 851f
+        const val NARROW_W = 320f
         const val WIDE_SHORT_W = 900f
         const val WIDE_SHORT_H = 400f
         const val THREE_BUTTON_DP = 48

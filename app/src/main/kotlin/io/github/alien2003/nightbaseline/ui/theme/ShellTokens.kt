@@ -178,6 +178,9 @@ object ShellDimens {
     /** Bar padding at the start and end. */
     val barPaddingHorizontal: Dp = 12.dp
 
+    /** Least space beside the bar when its labels need the layout gutter to keep every word whole (large font). */
+    val barMinSideMargin: Dp = 4.dp
+
     /** Bar padding at the top and bottom. */
     val barPaddingVertical: Dp = 4.dp
 

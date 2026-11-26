@@ -150,9 +150,12 @@ fun AppScaffold(
                     Modifier
                         .align(Alignment.BottomStart)
                         .then(if (paneWidth != null) Modifier.width(paneWidth) else Modifier.fillMaxSize())
-                        // A bar whose labels wrap at large font shares out at most the width inside the gutters.
-                        .padding(start = layout.gutter + safeStart, end = layout.gutter + padding.calculateEndPadding(direction))
-                        .padding(bottom = barBottom),
+                        // A bar whose labels wrap at large font keeps inside the gutters while its longest words fit
+                        // there and otherwise uses the gutters too (FloatingNavBar sideMargin): never a broken word.
+                        .padding(
+                            start = ShellDimens.barMinSideMargin + safeStart,
+                            end = ShellDimens.barMinSideMargin + padding.calculateEndPadding(direction),
+                        ).padding(bottom = barBottom),
                     contentAlignment = Alignment.BottomCenter,
                 ) {
                     AnimatedVisibility(
@@ -176,6 +179,7 @@ fun AppScaffold(
                             selected,
                             onSelect,
                             Modifier.focusGroup().onSizeChanged { barHeight = with(density) { it.height.toDp() } },
+                            sideMargin = (layout.gutter - ShellDimens.barMinSideMargin).coerceAtLeast(0.dp),
                         )
                     }
                 }
