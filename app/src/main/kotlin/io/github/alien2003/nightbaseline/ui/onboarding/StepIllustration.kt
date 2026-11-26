@@ -53,7 +53,7 @@ internal fun OnboardingState.illustration(): Illustration =
 
 /**
  * Our own abstract band-and-points drawing (no vendor art): nights as points left to right over a horizontal usual
- * range band with its middle line. Static, decorative (cleared semantics), drawn on a solid nested surface.
+ * range band. Static, decorative (cleared semantics), drawn on a solid nested surface.
  */
 @Composable
 internal fun StepIllustration(
@@ -67,7 +67,7 @@ internal fun StepIllustration(
             .fillMaxWidth()
             .widthIn(max = 480.dp)
             .height(height)
-            .solidCard(NbShapes.l)
+            .solidCard(NbShapes.xl)
             .clearAndSetSemantics {},
     ) {
         Canvas(Modifier.matchParentSize().padding(horizontal = NbSpace.s7, vertical = NbSpace.s6)) {
@@ -84,9 +84,8 @@ internal fun StepIllustration(
                     style = Stroke(edge, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))),
                 )
             } else {
+                // The usual range as one solid rounded segment, no edge lines (coloros-conformance.md F9).
                 drawRoundRect(colors.bandFill, Offset(0f, bandTop), Size(size.width, bandBottom - bandTop), radius)
-                val mid = (bandTop + bandBottom) / 2
-                drawLine(colors.bandEdge, Offset(0f, mid), Offset(size.width, mid), edge)
             }
             val offsets = listOf(0.1f, -0.25f, 0.3f, -0.05f, 0.2f, -0.3f, 0.05f)
             val count = if (kind == Illustration.Learning) 3 else offsets.size

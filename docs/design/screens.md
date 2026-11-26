@@ -126,21 +126,27 @@ Content (always solid):
 | `MetricRangeTile` | One metric: name, last-night value + unit (largest text), `RangeBand`, status chip (glyph + label). Variants: within, higher, lower, learning (n of 7), no value tonight (reason), not recorded by source. Whole tile is one 48 dp+ touch target opening Metric detail. |
 | `RangeBand` | Horizontal track: personal range as a solid tonal band, median tick, value marker whose **shape** encodes status. Values beyond the visible track are clamped to the edge with a chevron. No band while learning: dotted outline of where it will be. |
 | `StatusChip` / `StatusGlyph` | Glyph + text label; see section 6. |
-| `HistoryStrip` | Last 7 nights as 7 columns (14 in Medium when width >= 720 dp): weekday letter, night status glyph. Each night is a >= 48 dp target -> Night detail; when the strip is narrower than 7 x 48 dp (narrow list panes) or sits in a tabletop top half, the nights are not individually tappable and the whole strip is one target -> History. "See all" (`action_see_all`) -> History. |
+| `HistoryStrip` | Last 7 nights as 7 columns (14 in Medium when width >= 720 dp) in one card: weekday letter (12/400 secondary), night status glyph. The title ("Last 7 nights") is a section header outside the card with "See all" at its end. Each night is a >= 48 dp target -> Night detail; when the strip is narrower than 7 x 48 dp (narrow list panes) or sits in a tabletop top half, the nights are not individually tappable and the whole strip is one target -> History. "See all" (`action_see_all`) -> History. |
 | `TrendChart` | Per-night points (no connecting line across missing nights) for 7/30/90 nights, personal range drawn as a band that follows the baseline as it was on each night (stepped area), gaps for nights without value, hollow points for learning nights, status shapes for points outside. Finger-following selection with `ChartTooltip`. |
-| `PeriodSelector` | Segmented control 7 / 30 / 90 nights; selection capsule morphs. |
+| `PeriodSelector` | Segmented control 7 / 30 / 90 nights (`NbSegmentedControl`, `Controls.kt`): a solid 40 dp track (content layer, never glass) in a 48 dp target row, segments >= 52 dp; the selected segment sits on a solid convex thumb (vertical gradient + 1 dp rim, inset 4 dp, concentric) that slides on `spring.selection` (1.0 / 247), its leading edge on a stiffer spring so it stretches toward the target while moving; no tonal capsule. Snaps under reduced motion. |
 | `ChartSummary` | Visible text under every chart, also used as the chart's content description (section 8). |
 | `StatsRow` | 2–3 small figures: nights inside the range (k of N), usual range, median. |
 | `ExplainerCard` | Title + paragraphs + optional "Learn more" (opens `range-explainer`). |
 | `LearningProgress` | 7 segments filling in, "N of 7 nights" label, segment shape differs for counted / skipped (short night) / pending. |
 | `StateCard` | Shared pattern for every data problem: icon, title, body, primary action button, optional secondary text button. Used inline on Home/Night detail/Metric detail and full-screen when nothing else can be shown. |
 | `InlineBanner` | Solid banner (`shape.m`, wraps to more lines at large font) with icon, text and an action, for non-blocking problems shown above still-valid content (e.g. notifications off, last night not in yet). Announced once as a polite live region. |
-| `NightRow` | History feed row: night label, status glyph + label, small per-metric glyph row (2..6 glyphs, wraps). |
-| `MonthCalendar` | History calendar: 7-column month grid, each day cell shows the night status glyph (shape, not only color); today outlined. |
-| `SettingsGroup` / `SettingsRow` | Grouped solid cards with 16 dp side inset (measured reference pattern), rows >= 56 dp, title + optional summary + trailing switch/value/chevron; the whole row is the touch target and one TalkBack node (role switch/button, state "on/off"). |
-| `SourceRow` | Source app label + icon from the system package manager (not bundled), last sync time, radio selection. |
+| `NightRow` | History feed row, one row of a month's grouped 20 dp card: 24 dp night glyph, night label (16/500) and status summary (14/400), small per-metric glyph row at the end (2..6 glyphs, wraps); >= 48 dp, padding 16 / 10, hairline above inset 56 / 16 dp; the selected row on the neutral `state.selected` fill. Lights up on press, does not shrink. |
+| `MonthCalendar` | History calendar on one 20 dp card: month title (16/500) between 40 dp round previous / next buttons, weekday letters 12/400, 7 columns of transparent >= 48 dp day cells: number 16/400 in a 32 dp box and the night status glyph below it (shape, not only colour). Today: number in `primaryText` at 500. Selected: a `primaryFill` disc behind a white 500 number. |
+| `SettingsGroup` / `SettingsRow` | ColorOS grouped list (measured on `settings-display`, dark and light): the section header outside the card (12/16/500 `text.tertiary`, 24 dp above, 8 dp below, text 32 dp from the screen edge), then one 20 dp card per group whose rows are split by 1 px hairlines inset 16 dp at both ends. Rows >= 48 dp, padding 16 / 10, title 16/22/500 + optional summary 14/19/400 2 dp below, trailing element 12 dp from the text: `NbSwitch`, trailing `NbRadio`, value + chevron, or chevron (12 x 24 dp box, 1.3 dp stroke, `color.chevron`). The whole row is the touch target and one TalkBack node (role switch / radio / button, state); rows light up on press but do not shrink. Read-only notes that belong to a group are a footer under its card (12 sp `text.tertiary`). |
+| `NbSwitch` | 44 x 24 dp pill, 18 dp white knob 3 dp inside in every state, no outline; track `primary` when on, `control.switchOff` when off (2.16:1 dark, recorded exception: the knob position carries the state). Knob on `spring.switch` (0.7 / 247) with a stretch to x1.3 early in the travel; snaps under reduced motion. Disabled: alpha 0.3. Flipping plays `TOGGLE_ON` / `TOGGLE_OFF` (API 34+, else `CLOCK_TICK`). |
+| `NbRadio` | Always trailing. 24 dp box; unchecked a 20 dp ring, 1.3 dp, #767676 dark / #858585 light (3:1 on the card); checked a `primary` disc with a white centre dot, growing in over 300 ms with a 1.08 pulse (`easing.flow`). |
+| `NbTabRow` | ColorOS tab row: 48 dp, a centred group of text tabs (label + 12 dp each side), selected 500 `text.primary`, others 400 `text.tertiary`; a 2 dp square-ended underline as wide as the selected label in the label colour (not the accent), sliding on `spring.selection`. Placed under the top bar, never inside it. |
+| `NbChoiceRow` | Visual single choice (theme): equal columns, each a decorative drawing, a 14 sp label and an `NbRadio` below, split by 1 px vertical hairlines; selected label `primaryText` 500. Falls back to trailing-radio rows at font scale >= 1.5 or when a column would be narrower than 96 dp x font scale. |
+| `NbChipTab` | Filter chip: 36 dp pill in a 48 dp target, 16 dp padding, no outline, no check glyph; unselected neutral fill with a secondary label, selected brighter fill + 1 dp rim + 700 label. |
+| `SourceRow` | Source app icon (40 dp, read from the system package manager at runtime, never bundled; a neutral letter disc when unavailable), app label 16/500 in every state, last sync and written measurements, trailing `NbRadio`; hairline inset 72 dp. |
 | `DisclaimerFooter` | One line: "Not a medical device." + "About" link. |
-| `PrimaryButton` / `TextButton` | Pill buttons, never full width on wide windows (max 360 dp), min height 48 dp. |
+| `PrimaryButton` | Accent gradient capsule (`primaryFill`, darker toward the bottom so the white 16/22/500 label is >= 4.5:1 everywhere), a soft accent glow below (y 4, blur 12), a faint white top gloss band that ends above the label, and a white touch light that follows the finger (110 ms in, 480 ms out). >= 50 dp tall, padding 28 / 12, max 360 dp. Disabled: same fill and label at alpha 0.3, no glow. |
+| `SecondaryButton` / `TextButton` | Secondary: neutral capsule (white @ 10 % dark, black @ 6 % light), `text.primary` 16/500 label, 50 dp (replaces the tonal button). Text button: `primaryText` 16/22/500, padding 12 / 8, 48 dp target. |
 
 Icons: our own monochrome line icons drawn for the project, or Material Symbols (Apache-2.0). No vendor icons, fonts
 or images. Source app icons are read at runtime from the installed package, never bundled.
@@ -330,16 +336,17 @@ Actions: primary = period selection and chart scrubbing; secondary = range expla
 Purpose: find unusual nights.
 
 Compact:
-1. `ShellTopBar` large title "History"; trailing segmented toggle "List / Calendar" (`history_view_list` /
+1. `ShellTopBar` large title "History"; under it, centred, an `NbTabRow` "List / Calendar" (`history_view_list` /
    `history_view_calendar`, persisted).
-2. List mode: `NightRow` feed, newest first, grouped by month with sticky month headers (solid, not glass). Rows for
+2. List mode: `NightRow` feed, newest first, one grouped card per month under a sticky section header (solid window
+   background, not glass). Rows for
    learning, short and no-data nights use their own glyphs. Infinite scroll over the local database (all stored
    nights).
 3. Calendar mode: `MonthCalendar` with month swipe and previous/next buttons; below it a legend row (glyph + label for
    each night status, so the shapes are learnable); tapping a day opens Night detail.
-4. Filter chips (`history_filter_all`, `history_filter_moved`, `history_filter_gaps`): "All", "Moved", "Learning
-   and gaps" ("Moved" includes both levels, `S-SOME` and `S-DEV`). Each chip >= 48 dp tall, selection shown by a
-   check glyph and weight, not only color.
+4. Filter chips (`NbChipTab`; `history_filter_all`, `history_filter_moved`, `history_filter_gaps`): "All", "Moved",
+   "Learning and gaps" ("Moved" includes both levels, `S-SOME` and `S-DEV`). Each chip >= 48 dp tall, selection shown
+   by fill, rim and weight, not only color.
 
 Medium: single pane (the two-pane rule does not pass at 692 dp, `layouts.md` 3.3). List mode stays one column (max
 600 dp, centered; rows add a mini glyph per metric). Calendar mode shows the month grid with 48–64 dp cells and the
@@ -359,8 +366,11 @@ TalkBack: a row reads "{night label}: {night status label}. {k} moved: {metric n
 ### 7.5 First run (onboarding)
 
 Full screen, no nav, solid background with a quiet static gradient (no looping motion in any mode). Step indicator
-at the top: visible text `onb_step` "Step 2 of 6" plus decorative dots. `PrimaryButton` bottom end, "Back" text button bottom start; both always above the
-system navigation inset and outside the hinge.
+at the top: visible text `onb_step` "Step 2 of 6" plus decorative dots (6 dp, the current one a 16 x 6 dp `primary`
+pill, the others neutral), led by a 40 dp round "Back" button on steps that have one. At the bottom (ColorOS
+large-button pattern): a full-width `PrimaryButton` (max 360 dp, 50 dp) and, 8 dp below, the secondary action as a
+centred text button; always above the system navigation inset and outside the hinge. In Tabletop the top half stays
+view only, so "Back" is a text button under the other buttons there.
 
 | Step | Content | Primary action | Secondary |
 |---|---|---|---|
@@ -408,14 +418,17 @@ Compact (grouped solid cards, top bar large title "Settings"):
    then the row action opens system notification settings); switch "Problems reading data" (status channel, same
    name as the channel).
 3. **Sensitivity**: row "Sensitivity" (value = preset name) -> `settings/sensitivity`.
-4. **Appearance**: "Theme" (System / Light / Dark), "Glass effects" (Automatic / Off; Automatic turns them off on
+4. **Appearance**: two grouped cards under their own headers, "Theme" (System / Light / Dark as an `NbChoiceRow`:
+   three columns with our own small phone drawing, label and radio, split by vertical hairlines; trailing-radio rows
+   at large font) and "Glass effects" (Automatic / Off, trailing radios; Automatic turns them off on
    Android < 12, when animations are removed, battery saver, reduced transparency or higher contrast, weak, hot or
    janky devices: `tokens.md` 7.3; the summary names the reason, `glass_off_*`), "Motion" read-only note
-   `settings_motion_note`: follows the system "Remove animations" setting.
+   `settings_motion_note` as a footer under the glass card: follows the system "Remove animations" setting.
 5. **About**: "About NightBaseline" -> About; "Not a medical device" line.
 6. **Debug** (debug builds only): "Component catalog", "Show synthetic data".
 
-Sensitivity screen: three presets as large radio cards, each with one plain-language line:
+Sensitivity screen: three presets as rows of one grouped card, each with one plain-language summary line and a
+trailing `NbRadio` (no outline, no weight change):
 - "Fewer notes": a value must be further from your usual range (z 3.0); 2 measurements must move.
 - "Balanced" (default): defaults of `AlgoParams` (z 2.5, 2 measurements).
 - "More notes": smaller changes count (z 2.0); 2 measurements must move.

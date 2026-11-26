@@ -40,11 +40,12 @@ import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.controls
 
 private const val ILLUSTRATION_MAX_FONT = 1.5f
 private const val ILLUSTRATION_MIN_HEIGHT = 640f
 private const val START_COLUMN_SHARE = 0.4f
-private const val GRADIENT_ALPHA = 0.45f
+private const val GRADIENT_ALPHA = 0.10f
 private val TextColumnMax = 480.dp
 private val CardMax = 840.dp
 
@@ -72,7 +73,7 @@ fun OnboardingScreen(
         modifier
             .fillMaxSize()
             .background(colors.background)
-            .background(Brush.verticalGradient(listOf(colors.primaryContainer.copy(alpha = GRADIENT_ALPHA), colors.background)))
+            .background(Brush.verticalGradient(listOf(NbTheme.controls.accent.copy(alpha = GRADIENT_ALPHA), colors.background)))
             .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
         when (layout.mode) {
@@ -140,7 +141,7 @@ private fun ScrollingStep(
             .padding(horizontal = layout.gutter, vertical = NbSpace.s5),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s4),
     ) {
-        StepIndicator(state.step, dots = layout.mode != LayoutMode.Glance)
+        StepIndicator(state.step, dots = layout.mode != LayoutMode.Glance, onBack = backOf(state, actions))
         Title(state, NbTheme.typography.headline)
         StepBody(state, actions)
         StepActionRow(stepButtons(state, actions), actions.onBack)
@@ -166,7 +167,7 @@ private fun CompactStep(
                 .padding(top = NbSpace.s7, bottom = NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s5),
         ) {
-            StepIndicator(state.step)
+            StepIndicator(state.step, onBack = backOf(state, actions))
             if (illustration) StepIllustration(state.illustration())
             Title(state)
             StepBody(state, actions)
@@ -174,7 +175,7 @@ private fun CompactStep(
         StepActionRow(
             stepButtons(state, actions),
             actions.onBack,
-            Modifier.padding(horizontal = layout.gutter, vertical = NbSpace.s4),
+            Modifier.padding(horizontal = layout.gutter).padding(top = NbSpace.s3, bottom = NbSpace.s7),
         )
     }
 }
@@ -186,11 +187,12 @@ private fun CompactStep(
 @Composable
 private fun StartColumn(
     state: OnboardingState,
+    actions: OnboardingActions,
     illustration: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(NbSpace.s6)) {
-        StepIndicator(state.step)
+        StepIndicator(state.step, onBack = backOf(state, actions))
         if (illustration) StepIllustration(state.illustration(), height = IllustrationHeightWide) else Title(state)
     }
 }
@@ -231,7 +233,7 @@ private fun TwoColumnStep(
     illustration: Boolean,
 ) {
     BalancedColumns(scroll, Modifier.padding(horizontal = layout.gutter)) {
-        StartColumn(state, illustration, Modifier.weight(START_COLUMN_SHARE))
+        StartColumn(state, actions, illustration, Modifier.weight(START_COLUMN_SHARE))
         Spacer(Modifier.width(NbSpace.s8))
         Column(
             Modifier.weight(1f - START_COLUMN_SHARE).widthIn(max = TextColumnMax),
@@ -256,12 +258,12 @@ private fun CardStep(
             Modifier
                 .widthIn(max = CardMax)
                 .fillMaxWidth()
-                .solidCard(NbShapes.xl)
+                .solidCard(NbShapes.l)
                 .padding(NbSpace.s8),
             horizontalArrangement = Arrangement.spacedBy(NbSpace.s8),
             verticalAlignment = Alignment.Top,
         ) {
-            StartColumn(state, illustration, Modifier.weight(START_COLUMN_SHARE))
+            StartColumn(state, actions, illustration, Modifier.weight(START_COLUMN_SHARE))
             Column(
                 Modifier.weight(1f - START_COLUMN_SHARE).verticalScroll(scroll),
                 verticalArrangement = Arrangement.spacedBy(NbSpace.s5),
@@ -306,7 +308,8 @@ private fun TabletopStep(
             verticalArrangement = Arrangement.spacedBy(NbSpace.s4),
         ) {
             StepBody(state, actions)
-            StepActionRow(stepButtons(state, actions), actions.onBack)
+            // Nothing interactive in the top half: Back stays with the other buttons here.
+            StepActionRow(stepButtons(state, actions), actions.onBack, backHere = true)
         }
     }
 }
@@ -324,10 +327,17 @@ private fun BookStep(
     val startWidth =
         (fold?.positionDp ?: (layout.widthDp / 2)).dp - (fold?.occludedDp ?: 0f).dp / 2 - NbDimens.hingeClearance - layout.gutter
     BalancedColumns(scroll, Modifier.padding(horizontal = layout.gutter)) {
-        StartColumn(state, illustration, Modifier.width(startWidth))
+        StartColumn(state, actions, illustration, Modifier.width(startWidth))
         Spacer(Modifier.width(NbDimens.hingeClearance * 2 + (fold?.occludedDp ?: 0f).dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s5)) {
             TextAndActions(state, actions, showTitle = illustration)
         }
     }
 }
+
+/** The back action for the round button next to the step indicator, or null on steps without "Back". */
+@Composable
+private fun backOf(
+    state: OnboardingState,
+    actions: OnboardingActions,
+): (() -> Unit)? = actions.onBack.takeIf { stepButtons(state, actions).back }

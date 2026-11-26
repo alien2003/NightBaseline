@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
@@ -21,8 +22,10 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
-import io.github.alien2003.nightbaseline.ui.components.NightGlyphBadge
+import io.github.alien2003.nightbaseline.ui.components.NbHairline
+import io.github.alien2003.nightbaseline.ui.components.NightGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
 import io.github.alien2003.nightbaseline.ui.components.StateCard
@@ -31,10 +34,13 @@ import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.MetricUi
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.theme.NbControlDimens
+import io.github.alien2003.nightbaseline.ui.theme.NbControlType
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.controls
 
 /**
  * The default summary of the selected night (History detail pane, tabletop top half, calendar reflow): the summary or
@@ -63,24 +69,16 @@ fun HistoryNightPreview(
         } else {
             Text(
                 text.nightLabel(night),
-                style = NbTheme.typography.titleSmall,
-                color = colors.textSecondary,
-                modifier = Modifier.padding(horizontal = NbSpace.s2).semantics { heading() },
+                style = NbControlType.sectionHeader,
+                color = NbTheme.controls.sectionHeader,
+                modifier = Modifier.padding(horizontal = NbSpace.s5).semantics { heading() },
             )
             StateCard(night.state.glyph, night.state.tone, text.nightTitle(night, source), text.nightBody(night, source))
         }
         if (night.metrics.isNotEmpty()) {
-            Column(Modifier.fillMaxWidth().solidCard(NbShapes.l).padding(vertical = NbSpace.s2)) {
+            GroupCard {
                 night.metrics.forEachIndexed { i, metric ->
-                    if (i > 0) {
-                        Box(
-                            Modifier
-                                .padding(start = NbSpace.s5 + NbDimens.icon + NbSpace.s4)
-                                .fillMaxWidth()
-                                .height(SEPARATOR)
-                                .background(colors.separator),
-                        )
-                    }
+                    if (i > 0) NbHairline(start = NbControlDimens.rowPaddingHorizontal * 2 + NbDimens.icon)
                     MetricLine(metric, source)
                 }
             }
@@ -107,15 +105,15 @@ fun CompactNightSummary(
         modifier
             .fillMaxWidth()
             .widthIn(max = NbDimens.textMax)
-            .solidCard(NbShapes.xl)
+            .solidCard(NbShapes.l)
             .clearAndSetSemantics { contentDescription = "$label. $title" }
             .padding(NbSpace.s5),
         horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        NightGlyphBadge(night.state.glyph, night.state.tone, container = 48.dp, glyphSize = NbDimens.icon)
+        NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), size = SUMMARY_GLYPH)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
-            Text(label, style = NbTheme.typography.labelSmall, color = colors.textSecondary)
+            Text(label, style = NbControlType.summary, color = colors.textSecondary)
             Text(title, style = NbTheme.typography.title, color = colors.textPrimary)
         }
     }
@@ -132,19 +130,21 @@ private fun MetricLine(
     Row(
         Modifier
             .fillMaxWidth()
-            .sizeIn(minHeight = NbDimens.targetMin)
+            .sizeIn(minHeight = NbControlDimens.rowMinHeight)
             .clearAndSetSemantics { contentDescription = description }
-            .padding(horizontal = NbSpace.s5, vertical = NbSpace.s3),
+            .padding(horizontal = NbControlDimens.rowPaddingHorizontal, vertical = NbControlDimens.rowPaddingVertical),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
+        horizontalArrangement = Arrangement.spacedBy(NbControlDimens.rowPaddingHorizontal),
     ) {
-        MetricGlyphIcon(metric.state.glyph, colors.tone(metric.state.tone))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
-            Text(text.name(metric.metric), style = NbTheme.typography.titleSmall, color = colors.textPrimary)
-            Text(text.status(metric, source), style = NbTheme.typography.caption, color = colors.textSecondary)
+        Box(Modifier.size(NbDimens.icon), contentAlignment = Alignment.Center) {
+            MetricGlyphIcon(metric.state.glyph, colors.tone(metric.state.tone))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap)) {
+            Text(text.name(metric.metric), style = NbControlType.itemTitle, color = colors.textPrimary)
+            Text(text.status(metric, source), style = NbControlType.summary, color = colors.textSecondary)
         }
         Text(text.value(metric)?.text ?: "–", style = NbTheme.typography.numericSmall, color = colors.textPrimary)
     }
 }
 
-private val SEPARATOR = 1.dp
+private val SUMMARY_GLYPH = 28.dp

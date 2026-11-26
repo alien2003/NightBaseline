@@ -1,45 +1,56 @@
 package io.github.alien2003.nightbaseline.ui.settings
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Icon
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
-import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbChevron
+import io.github.alien2003.nightbaseline.ui.components.NbHairline
+import io.github.alien2003.nightbaseline.ui.components.NbRadio
+import io.github.alien2003.nightbaseline.ui.components.SettingsRow
+import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
 import io.github.alien2003.nightbaseline.ui.material.nbClickable
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
-import io.github.alien2003.nightbaseline.ui.theme.NbDimens
+import io.github.alien2003.nightbaseline.ui.theme.NbControlDimens
+import io.github.alien2003.nightbaseline.ui.theme.NbControlType
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.controls
 
 /**
- * A Health Connect source as a radio row (`screens.md` 4 `SourceRow`, `layouts.md` 5.5: >= 56 dp): a letter avatar
- * (source icons come from the package manager at runtime and are never bundled), the app label, the last sleep it
- * wrote and the measurements it writes. The whole row selects it; one TalkBack node with radio semantics.
+ * A Health Connect source as a single-choice row (`screens.md` 4 `SourceRow`, `coloros-conformance.md` L10): the app's
+ * own 40 dp icon read from the package manager at runtime (never bundled; a neutral letter disc when it is not
+ * available), the app label (16/500 in every state), the last sleep it wrote and the measurements it writes, and a
+ * trailing radio. The hairline above starts after the icon (72 dp). The whole row selects it; one TalkBack node with
+ * radio semantics.
  */
 @Composable
 fun SourceOptionRow(
@@ -50,116 +61,106 @@ fun SourceOptionRow(
     showDivider: Boolean = false,
 ) {
     val text = rememberUiText()
-    val colors = NbTheme.colors
+    val controls = NbTheme.controls
     Column(modifier.fillMaxWidth()) {
-        if (showDivider) Divider()
+        if (showDivider) NbHairline(start = NbControlDimens.rowPaddingHorizontal * 2 + NbControlDimens.avatar)
         Row(
             Modifier
                 .fillMaxWidth()
-                .sizeIn(minHeight = NbDimens.rowMinHeight)
-                .nbClickable(onClick = onClick, shape = NbShapes.l, role = Role.RadioButton, pressScale = false)
+                .sizeIn(minHeight = NbControlDimens.rowMinHeight)
+                .nbClickable(onClick = onClick, shape = RectangleShape, role = Role.RadioButton, pressScale = false)
                 .semantics(mergeDescendants = true) { this.selected = selected }
-                .padding(horizontal = NbSpace.s5, vertical = NbDimens.rowPaddingVertical),
+                .padding(horizontal = NbControlDimens.rowPaddingHorizontal, vertical = NbControlDimens.rowPaddingVertical),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
+            horizontalArrangement = Arrangement.spacedBy(NbControlDimens.rowPaddingHorizontal),
         ) {
-            SourceAvatar(source.label)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
-                Text(
-                    source.label,
-                    style = NbTheme.typography.titleSmall,
-                    color = colors.textPrimary,
-                    fontWeight = if (selected) FontWeight.SemiBold else null,
-                )
+            SourceIcon(source)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap)) {
+                Text(source.label, style = NbControlType.itemTitle, color = controls.title)
                 Text(
                     source.lastSleep?.let { text.string(R.string.source_last_sync, text.dateShort(it)) }
                         ?: text.string(R.string.setup_source_no_sleep),
-                    style = NbTheme.typography.bodySmall,
-                    color = colors.textSecondary,
+                    style = NbControlType.summary,
+                    color = controls.summary,
                 )
                 if (source.metrics.isNotEmpty()) {
                     Text(
                         text.string(R.string.setup_source_writes, text.list(source.metrics.map { text.shortName(it) })),
-                        style = NbTheme.typography.bodySmall,
-                        color = colors.textSecondary,
+                        style = NbControlType.summary,
+                        color = controls.summary,
                     )
                 }
             }
-            RadioButton(
-                selected = selected,
-                onClick = null,
-                modifier = Modifier.clearAndSetSemantics {},
-                colors = RadioButtonDefaults.colors(selectedColor = colors.primary, unselectedColor = colors.outline),
-            )
+            NbRadio(selected = selected)
         }
     }
 }
 
-/** The first letter of an app label in a tonal circle; decorative (the label is the text next to it). */
+/** The source app's launcher icon from the package manager, or its first letter on a neutral disc. Decorative. */
 @Composable
-private fun SourceAvatar(label: String) {
-    val colors = NbTheme.colors
+private fun SourceIcon(source: SourceOption) {
+    val context = LocalContext.current
+    val px = with(LocalDensity.current) { NbControlDimens.avatar.roundToPx() }
+    val icon: ImageBitmap? =
+        remember(source.packageName, px) {
+            runCatching {
+                val drawable = context.packageManager.getApplicationIcon(source.packageName)
+                val bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+                drawable.setBounds(0, 0, px, px)
+                drawable.draw(Canvas(bitmap))
+                bitmap.asImageBitmap()
+            }.getOrNull()
+        }
+    if (icon != null) {
+        Image(icon, contentDescription = null, modifier = Modifier.size(NbControlDimens.avatar).clearAndSetSemantics {})
+        return
+    }
+    val controls = NbTheme.controls
     Box(
         Modifier
-            .size(NbDimens.targetMin - NbSpace.s3)
-            .background(colors.primaryContainer, NbShapes.circle)
+            .size(NbControlDimens.avatar)
+            .background(controls.avatar, NbShapes.circle)
             .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            label.firstOrNull()?.uppercase().orEmpty(),
-            style = NbTheme.typography.titleSmall,
-            color = colors.onPrimaryContainer,
+            source.label
+                .firstOrNull()
+                ?.uppercase()
+                .orEmpty(),
+            style = NbControlType.itemTitle,
+            color = controls.title,
         )
     }
 }
 
 /**
- * A large radio card of the sensitivity screen (`screens.md` 7.7): radio, name and one plain-language line. The
- * selected card has a 2 dp outline, a filled radio and a bold name, so selection does not rely on colour.
+ * One sensitivity preset as a single-choice row of the presets card (`coloros-conformance.md` L8): name 16/500, one
+ * plain-language summary line and a trailing radio; selection is the filled radio plus `selected` semantics (no
+ * outline, no weight change).
  */
 @Composable
-fun PresetCard(
+fun PresetRow(
     title: String,
     description: String,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    showDivider: Boolean = false,
 ) {
-    val colors = NbTheme.colors
-    Row(
-        modifier
-            .fillMaxWidth()
-            .widthIn(max = NbDimens.textMax)
-            .solidCard(NbShapes.l)
-            .then(if (selected) Modifier.border(2.dp, colors.primary, NbShapes.l) else Modifier)
-            .nbClickable(onClick = onClick, shape = NbShapes.l, role = Role.RadioButton, pressScale = false)
-            .semantics(mergeDescendants = true) { this.selected = selected }
-            .padding(NbDimens.cardPadding),
-        horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(
-            selected = selected,
-            onClick = null,
-            modifier = Modifier.clearAndSetSemantics {},
-            colors = RadioButtonDefaults.colors(selectedColor = colors.primary, unselectedColor = colors.outline),
-        )
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-            Text(
-                title,
-                style = NbTheme.typography.title,
-                color = colors.textPrimary,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            )
-            Text(description, style = NbTheme.typography.bodySmall, color = colors.textSecondary)
-        }
-    }
+    SettingsRow(
+        title = title,
+        onClick = onClick,
+        modifier = modifier,
+        summary = description,
+        trailing = SettingsTrailing.Radio(selected),
+        showDivider = showDivider,
+    )
 }
 
 /**
- * A section row of the two-pane Settings list: title, summary and chevron; the selected row sits on a `surface.3`
- * capsule with a bold title and `selected` semantics (shape and weight, not only colour).
+ * A section row of the two-pane Settings list: title, summary and chevron; the selected row sits on the neutral
+ * `state.selected` fill with a bold title and `selected` semantics (fill and weight, not only colour).
  */
 @Composable
 internal fun SectionRow(
@@ -170,27 +171,30 @@ internal fun SectionRow(
     modifier: Modifier = Modifier,
 ) {
     val colors = NbTheme.colors
+    val controls = NbTheme.controls
     Row(
         modifier
             .fillMaxWidth()
-            .sizeIn(minHeight = NbDimens.rowMinHeight)
-            .background(if (selected) colors.surface3 else colors.surface1, NbShapes.l)
+            .sizeIn(minHeight = NbControlDimens.rowMinHeight)
+            .solidCard(NbShapes.l)
+            .clip(NbShapes.l)
+            .background(if (selected) controls.selectedRow else colors.surface1)
             .nbClickable(onClick = onClick, shape = NbShapes.l, pressScale = false)
             .semantics(mergeDescendants = true) { this.selected = selected }
-            .padding(horizontal = NbSpace.s5, vertical = NbDimens.rowPaddingVertical),
+            .padding(horizontal = NbControlDimens.rowPaddingHorizontal, vertical = NbControlDimens.rowPaddingVertical),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
+        horizontalArrangement = Arrangement.spacedBy(NbControlDimens.rowTrailingGap),
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap)) {
             Text(
                 title,
-                style = NbTheme.typography.titleSmall,
-                color = colors.textPrimary,
+                style = NbControlType.itemTitle,
+                color = controls.title,
                 fontWeight = if (selected) FontWeight.Bold else null,
             )
-            Text(summary, style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+            Text(summary, style = NbControlType.summary, color = controls.summary)
         }
-        Icon(NbIcons.Chevron, contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(NbDimens.iconInline))
+        NbChevron()
     }
 }
 
@@ -208,20 +212,6 @@ internal fun PaneHeading(
     )
 }
 
-/** A small label inside a settings group card (sub-heading of a set of radio rows). */
-@Composable
-internal fun GroupLabel(title: String) {
-    Text(
-        title,
-        style = NbTheme.typography.labelSmall,
-        color = NbTheme.colors.textSecondary,
-        modifier =
-            Modifier
-                .padding(start = NbSpace.s5, end = NbSpace.s5, top = NbSpace.s4, bottom = NbSpace.s1)
-                .semantics { heading() },
-    )
-}
-
 /** A titled paragraph block inside a card (privacy policy, about). */
 @Composable
 internal fun TextBlock(
@@ -231,22 +221,16 @@ internal fun TextBlock(
     Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
         Text(
             title,
-            style = NbTheme.typography.titleSmall,
-            color = NbTheme.colors.textPrimary,
+            style = NbControlType.itemTitle,
+            color = NbTheme.controls.title,
             modifier = Modifier.semantics { heading() },
         )
-        Text(body, style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
+        Text(body, style = NbTheme.typography.body, color = NbTheme.controls.summary)
     }
 }
 
-/** Hairline separator inset to the text column. */
+/** Hairline separator between rows of a grouped card, inset 16 dp at both ends. */
 @Composable
 internal fun Divider() {
-    Box(
-        Modifier
-            .padding(start = NbSpace.s5)
-            .fillMaxWidth()
-            .height(1.dp)
-            .background(NbTheme.colors.separator),
-    )
+    NbHairline()
 }

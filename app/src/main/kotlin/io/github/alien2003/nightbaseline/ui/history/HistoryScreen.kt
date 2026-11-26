@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.ui.components.GroupPosition
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NightRow
@@ -91,7 +93,7 @@ fun HistoryScreen(
     },
 ) {
     val density = LocalDensity.current
-    val arrangement = HistoryArrangement.of(layout, density.fontScale)
+    val arrangement = HistoryArrangement.of(layout)
     var barHeight by remember { mutableStateOf(0.dp) }
     AppScaffold(
         layout = layout,
@@ -141,7 +143,7 @@ fun HistoryScreen(
     }
 }
 
-/** Where things go for one layout (derived once from [LayoutSpec] and the font scale). */
+/** Where things go for one layout (derived once from [LayoutSpec]). */
 private data class HistoryArrangement(
     val mode: LayoutMode,
     val twoPanes: Boolean,
@@ -162,10 +164,7 @@ private data class HistoryArrangement(
     val listPaneOuter: Dp get() = listGutter + listWidth
 
     companion object {
-        fun of(
-            layout: LayoutSpec,
-            fontScale: Float,
-        ): HistoryArrangement {
+        fun of(layout: LayoutSpec): HistoryArrangement {
             val mode = layout.mode
             val twoPanes = layout.twoPanes || mode == LayoutMode.WideShort
             val rail = if (layout.navigation in RAILS) NbDimens.railArea.value else 0f
@@ -174,11 +173,11 @@ private data class HistoryArrangement(
             val bookPane = fold?.let { it.positionDp - it.occludedDp / 2 - rail - NbDimens.hingeClearance.value }
             val listGutter = if (bookPane != null && bookPane < CALENDAR_PANE) NbDimens.gutterCompact else layout.gutter
             val listWidth = listWidth(mode, bookPane, listGutter)
-            val barWidth = if (twoPanes) listWidth.value + listGutter.value else layout.widthDp - rail
             return HistoryArrangement(
                 mode = mode,
                 twoPanes = twoPanes,
-                toggleInBar = barWidth / fontScale >= TOGGLE_BAR_MIN,
+                // ColorOS puts the tab row under the top bar, never inside it (coloros-conformance.md L6).
+                toggleInBar = false,
                 topBar = mode != LayoutMode.Glance && mode != LayoutMode.Tabletop,
                 listGutter = listGutter,
                 listWidth = listWidth,
@@ -201,7 +200,6 @@ private data class HistoryArrangement(
         private val RAILS = setOf(NavigationKind.Rail, NavigationKind.RailIcons, NavigationKind.RailLabelled)
         private const val CALENDAR_PANE = 360f
         private const val LIST_PANE_MAX = 400f
-        private const val TOGGLE_BAR_MIN = 360f
         private const val MEDIUM_W = 600f
     }
 }
@@ -259,17 +257,19 @@ private class HistoryContent(
 
     fun LazyListScope.items() {
         state.access?.let { access ->
-            item(key = "banner") { HistoryAccessBanner(access, onAction = { actions.onFixAccess(access) }) }
+            item(key = "banner") { HistoryAccessBanner(access, onAction = { actions.onFixAccess(access) }, Modifier.padding(top = GAP)) }
         }
         val controls = !state.empty && !state.loading
         if (controls && (!arrangement.toggleInBar || !arrangement.topBar)) {
             item(key = "toggle") {
-                Box(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax)) { HistoryViewToggle(state.view, actions.onView) }
+                Box(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax), contentAlignment = Alignment.Center) {
+                    HistoryViewToggle(state.view, actions.onView)
+                }
             }
         }
         when {
-            state.loading -> item(key = "loading") { HistorySkeleton(rows = SKELETON_ROWS) }
-            state.empty -> item(key = "empty") { EmptyHistory() }
+            state.loading -> item(key = "loading") { HistorySkeleton(rows = SKELETON_ROWS, Modifier.padding(top = GAP)) }
+            state.empty -> item(key = "empty") { EmptyHistory(Modifier.padding(top = GAP)) }
             state.view == HistoryView.List -> listItems()
             else -> calendarItems()
         }
@@ -277,12 +277,17 @@ private class HistoryContent(
 
     private fun LazyListScope.listItems() {
         item(key = "filters") {
-            HistoryFilterChips(state.filter, actions.onFilter, Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax))
+            HistoryFilterChips(
+                state.filter,
+                actions.onFilter,
+                Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax).padding(top = NbSpace.s2),
+            )
         }
         val visible = state.visibleNights
         if (visible.isEmpty()) {
             item(key = "filter-empty") {
                 HistoryEmptyCard(
+                    modifier = Modifier.padding(top = GAP),
                     title = null,
                     body =
                         stringResource(
@@ -302,8 +307,13 @@ private class HistoryContent(
                     HistoryMonthHeader(text.month(month.atDay(1)), Modifier.widthIn(max = NbDimens.textMax))
                 }
             }
-            items(nights, key = { "night:${it.wakeDate.toEpochDay()}" }) { night ->
-                NightRow(night, onClick = { tap(night.wakeDate) }, selected = showSelection && night.wakeDate == selected)
+            itemsIndexed(nights, key = { _, night -> "night:${night.wakeDate.toEpochDay()}" }) { i, night ->
+                NightRow(
+                    night,
+                    onClick = { tap(night.wakeDate) },
+                    selected = showSelection && night.wakeDate == selected,
+                    position = GroupPosition.of(i, nights.size),
+                )
             }
         }
     }
@@ -318,19 +328,24 @@ private class HistoryContent(
                 onMonth = actions.onMonth,
                 selected = state.selectedNight?.wakeDate?.takeIf { showSelection || arrangement.previewBelowCalendar },
                 firstMonth = state.firstMonth,
+                modifier = Modifier.padding(top = GAP),
             )
         }
-        item(key = "legend") { HistoryLegend(threshold = state.nights.firstOrNull()?.threshold ?: 2) }
+        item(key = "legend") { HistoryLegend(threshold = state.nights.firstOrNull()?.threshold ?: 2, Modifier.padding(top = GAP)) }
         val night = state.selectedNight
         if (arrangement.previewBelowCalendar && night != null) {
-            item(key = "preview") { nightPreview(night, true) }
+            item(key = "preview") { Box(Modifier.padding(top = GAP)) { nightPreview(night, true) } }
         }
     }
 }
 
 @Composable
-private fun EmptyHistory() {
-    HistoryEmptyCard(title = stringResource(R.string.history_empty_title), body = stringResource(R.string.history_empty_body))
+private fun EmptyHistory(modifier: Modifier = Modifier) {
+    HistoryEmptyCard(
+        title = stringResource(R.string.history_empty_title),
+        body = stringResource(R.string.history_empty_body),
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -345,8 +360,8 @@ private fun HistoryList(
         state = listState,
         contentPadding = contentPadding,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
     ) {
+        // No list spacing: night rows join into one card per month; other items carry their own top gap.
         with(content) { items() }
     }
 }
@@ -491,3 +506,6 @@ private fun GlanceHistory(
 private const val SKELETON_ROWS = 6
 private const val GLANCE_SKELETON_ROWS = 3
 private val PANE_SPACER = 24.dp
+
+/** Gap above an item of the History list (rows of one month have none). */
+private val GAP = 12.dp

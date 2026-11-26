@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -33,10 +34,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.NbCard
+import io.github.alien2003.nightbaseline.ui.components.NbChipTab
+import io.github.alien2003.nightbaseline.ui.components.NbHairline
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbTabRow
 import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightGlyphIcon
+import io.github.alien2003.nightbaseline.ui.components.SectionHeader
 import io.github.alien2003.nightbaseline.ui.components.tone
 import io.github.alien2003.nightbaseline.ui.material.nbClickable
 import io.github.alien2003.nightbaseline.ui.material.solidCard
@@ -45,15 +51,17 @@ import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.StatusTone
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.theme.NbControlType
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.controls
 
 /**
- * The "List / Calendar" segmented control (`screens.md` 7.4): a `surface.3` pill track, the selected segment on a
- * `primaryContainer` capsule with a bold label (selection is shape and weight, not colour alone). Each segment is a
- * 48 dp tab.
+ * The "List / Calendar" switch (`screens.md` 7.4, `coloros-conformance.md` L6): a ColorOS tab row ([NbTabRow]) under
+ * the top bar, centred, with a short underline under the selected label (weight, colour and underline; no tonal
+ * capsule). Each tab is a 48 dp `Role.Tab` target.
  */
 @Composable
 fun HistoryViewToggle(
@@ -61,37 +69,25 @@ fun HistoryViewToggle(
     onSelect: (HistoryView) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = NbTheme.colors
-    Row(
-        modifier
-            .background(colors.surface3, NbShapes.pill)
-            .padding(NbSpace.s1)
-            .selectableGroup(),
-    ) {
-        HistoryView.entries.forEach { view ->
-            val isSelected = view == selected
-            Box(
-                Modifier
-                    .sizeIn(minWidth = NbDimens.targetMin, minHeight = NbDimens.targetMin)
-                    .then(if (isSelected) Modifier.background(colors.primaryContainer, NbShapes.pill) else Modifier)
-                    .nbClickable(onClick = { onSelect(view) }, shape = NbShapes.pill, role = Role.Tab)
-                    .semantics { this.selected = isSelected }
-                    .padding(horizontal = NbSpace.s5, vertical = NbSpace.s3),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    stringResource(if (view == HistoryView.List) R.string.history_view_list else R.string.history_view_calendar),
-                    style = NbTheme.typography.label.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold),
-                    color = if (isSelected) colors.onPrimaryContainer else colors.textSecondary,
-                )
-            }
+    val labels =
+        HistoryView.entries.map {
+            stringResource(
+                if (it ==
+                    HistoryView.List
+                ) {
+                    R.string.history_view_list
+                } else {
+                    R.string.history_view_calendar
+                },
+            )
         }
-    }
+    NbTabRow(labels, HistoryView.entries.indexOf(selected), onSelect = { onSelect(HistoryView.entries[it]) }, modifier = modifier)
 }
 
 /**
- * Filter chips "All / Moved / Learning and gaps" (`screens.md` 7.4): single choice, each chip >= 48 dp tall, the
- * selected chip carries a check glyph, a bold label and a tonal fill; the others an outline. Chips wrap at large font.
+ * Filter chips "All / Moved / Learning and gaps" (`screens.md` 7.4, `coloros-conformance.md` L7): single choice
+ * ColorOS chip tabs ([NbChipTab]): 36 dp pills in 48 dp targets, no outline and no check; the selected chip has a
+ * brighter fill, a rim and a bold label. Chips wrap at large font.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -100,14 +96,12 @@ fun HistoryFilterChips(
     onSelect: (HistoryFilter) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = NbTheme.colors
     FlowRow(
         modifier.selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(NbSpace.s3),
-        verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
+        horizontalArrangement = Arrangement.spacedBy(NbSpace.s2),
+        verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
     ) {
         HistoryFilter.entries.forEach { filter ->
-            val isSelected = filter == selected
             val label =
                 stringResource(
                     when (filter) {
@@ -116,42 +110,10 @@ fun HistoryFilterChips(
                         HistoryFilter.Gaps -> R.string.history_filter_gaps
                     },
                 )
-            // A 48 dp target around a 36 dp chip (the target is the outer box).
-            Box(
-                Modifier
-                    .sizeIn(minWidth = NbDimens.targetMin, minHeight = NbDimens.targetMin)
-                    .nbClickable(onClick = { onSelect(filter) }, shape = NbShapes.pill, role = Role.RadioButton)
-                    .semantics { this.selected = isSelected },
-                contentAlignment = Alignment.Center,
-            ) {
-                Row(
-                    Modifier
-                        .sizeIn(minHeight = CHIP_HEIGHT)
-                        .then(
-                            if (isSelected) {
-                                Modifier.background(colors.primaryContainer, NbShapes.pill)
-                            } else {
-                                Modifier.border(1.dp, colors.outline, NbShapes.pill)
-                            },
-                        ).padding(horizontal = NbSpace.s4, vertical = NbSpace.s2),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(NbSpace.s2),
-                ) {
-                    if (isSelected) {
-                        Icon(NbIcons.Check, contentDescription = null, tint = colors.onPrimaryContainer, modifier = Modifier.size(18.dp))
-                    }
-                    Text(
-                        label,
-                        style = NbTheme.typography.label.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium),
-                        color = if (isSelected) colors.onPrimaryContainer else colors.textSecondary,
-                    )
-                }
-            }
+            NbChipTab(label, selected = filter == selected, onClick = { onSelect(filter) })
         }
     }
 }
-
-private val CHIP_HEIGHT = 36.dp
 
 /**
  * The banner above still-listed rows when access is off or Health Connect needs an update (`states.md` 5:
@@ -171,36 +133,31 @@ fun HistoryAccessBanner(
         modifier
             .fillMaxWidth()
             .widthIn(max = NbDimens.textMax)
-            .solidCard(NbShapes.m)
-            .padding(start = NbSpace.s5, top = NbSpace.s3, bottom = NbSpace.s3, end = NbSpace.s3)
+            .solidCard(NbShapes.l)
+            .padding(start = NbSpace.s5, top = NbSpace.s4, bottom = NbSpace.s4, end = NbSpace.s3)
             .semantics { liveRegion = LiveRegionMode.Polite },
         horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
     ) {
-        Box(Modifier.padding(top = NbSpace.s4)) { NightGlyphIcon(glyph, colors.statusInfo) }
-        Column(Modifier.weight(1f).padding(top = NbSpace.s4), verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
+        NightGlyphIcon(glyph, NbTheme.controls.accentText)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
             Text(stringResource(message), style = NbTheme.typography.bodySmall, color = colors.textPrimary)
-            NbTextButton(stringResource(action), onClick = onAction)
+            NbTextButton(stringResource(action), onClick = onAction, modifier = Modifier.offset(x = -NbSpace.s4))
         }
     }
 }
 
-/** A sticky month header of the feed ("November 2026"): solid window background, heading semantics. */
+/**
+ * A sticky month header of the feed ("November 2026"), styled as a ColorOS section header outside the month's card
+ * (`coloros-conformance.md` T5, L11): 12/16/500 tertiary, solid window background behind it, heading semantics.
+ */
 @Composable
 fun HistoryMonthHeader(
     title: String,
     modifier: Modifier = Modifier,
 ) {
-    Text(
-        title,
-        style = NbTheme.typography.titleSmall,
-        color = NbTheme.colors.textSecondary,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(NbTheme.colors.background)
-                .padding(top = NbSpace.s5, bottom = NbSpace.s3, start = NbSpace.s2)
-                .semantics { heading() },
-    )
+    Box(modifier.fillMaxWidth().background(NbTheme.colors.background)) {
+        SectionHeader(title)
+    }
 }
 
 /**
@@ -229,7 +186,7 @@ fun HistoryLegend(
     NbCard(modifier.fillMaxWidth()) {
         Text(
             stringResource(R.string.history_legend_title),
-            style = NbTheme.typography.titleSmall,
+            style = NbControlType.itemTitle,
             color = colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )
@@ -249,7 +206,7 @@ fun HistoryLegend(
 
 private val LEGEND_GLYPH = 18.dp
 
-/** `H-LOADING`: static skeleton rows (no shimmer: idle screens never animate), one node with the loading text. */
+/** `H-LOADING`: static skeleton rows in one grouped card (no shimmer: idle screens never animate), one node. */
 @Composable
 fun HistorySkeleton(
     rows: Int,
@@ -257,20 +214,16 @@ fun HistorySkeleton(
 ) {
     val colors = NbTheme.colors
     val description = stringResource(R.string.state_loading_body)
-    Column(
-        modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = description },
-        verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
-    ) {
-        repeat(rows) {
+    GroupCard(modifier.clearAndSetSemantics { contentDescription = description }) {
+        repeat(rows) { i ->
+            if (i > 0) NbHairline(start = NbSpace.s5 * 2 + NbDimens.icon)
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .widthIn(max = NbDimens.textMax)
-                    .sizeIn(minHeight = NbDimens.rowMinHeight + NbSpace.s4)
-                    .background(colors.surface1, NbShapes.l)
+                    .sizeIn(minHeight = NbDimens.targetMin + NbSpace.s4)
                     .padding(horizontal = NbSpace.s5),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
+                horizontalArrangement = Arrangement.spacedBy(NbSpace.s5),
             ) {
                 Box(Modifier.size(NbDimens.icon).background(colors.surface3, NbShapes.circle))
                 Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
@@ -304,8 +257,8 @@ fun GlanceNightRow(
         modifier
             .fillMaxWidth()
             .sizeIn(minHeight = NbDimens.targetMin)
-            .background(colors.surface1, NbShapes.m)
-            .nbClickable(onClick = onClick, shape = NbShapes.m)
+            .background(colors.surface1, NbShapes.l)
+            .nbClickable(onClick = onClick, shape = NbShapes.l)
             .clearAndSetSemantics { contentDescription = "$label: $status." }
             .padding(horizontal = NbSpace.s4, vertical = NbSpace.s3),
         verticalAlignment = Alignment.CenterVertically,
@@ -313,7 +266,7 @@ fun GlanceNightRow(
     ) {
         NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), size = NbDimens.iconInline)
         Column(Modifier.weight(1f)) {
-            Text(text.dateShort(night.wakeDate), style = NbTheme.typography.titleSmall, color = colors.textPrimary)
+            Text(text.dateShort(night.wakeDate), style = NbControlType.itemTitle, color = colors.textPrimary)
             Text(status, style = NbTheme.typography.caption, color = colors.textSecondary)
         }
     }
@@ -332,12 +285,7 @@ fun HistoryEmptyCard(
     NbCard(modifier.fillMaxWidth()) {
         // The dotted ring (nights still to come) only on H-EMPTY; a filter with no match is not a learning state.
         title?.let {
-            Box(
-                Modifier.size(EMPTY_BADGE).background(colors.statusNeutralContainer, NbShapes.circle),
-                contentAlignment = Alignment.Center,
-            ) {
-                NightGlyphIcon(NightGlyph.DottedRing, colors.tone(StatusTone.Neutral), background = colors.statusNeutralContainer)
-            }
+            NightGlyphIcon(NightGlyph.DottedRing, colors.tone(StatusTone.Neutral), size = EMPTY_GLYPH)
             Text(it, style = NbTheme.typography.headline, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
         }
         Text(body, style = NbTheme.typography.body, color = colors.textSecondary)
@@ -347,4 +295,4 @@ fun HistoryEmptyCard(
     }
 }
 
-private val EMPTY_BADGE = 48.dp
+private val EMPTY_GLYPH = 28.dp

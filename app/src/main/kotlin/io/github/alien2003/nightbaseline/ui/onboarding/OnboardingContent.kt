@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,11 +40,11 @@ import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.LearningProgress
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbRoundIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbTextButton
-import io.github.alien2003.nightbaseline.ui.components.NestedBox
-import io.github.alien2003.nightbaseline.ui.components.NightGlyphBadge
+import io.github.alien2003.nightbaseline.ui.components.NightGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
-import io.github.alien2003.nightbaseline.ui.components.TonalButton
+import io.github.alien2003.nightbaseline.ui.components.tone
 import io.github.alien2003.nightbaseline.ui.components.triangle
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.NightGlyph
@@ -51,10 +52,12 @@ import io.github.alien2003.nightbaseline.ui.model.StatusTone
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
 import io.github.alien2003.nightbaseline.ui.settings.NotificationAccess
 import io.github.alien2003.nightbaseline.ui.settings.SourceOptionRow
+import io.github.alien2003.nightbaseline.ui.theme.NbControlType
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.controls
 
 /** The headline of a step in its current state. */
 @Composable
@@ -243,15 +246,16 @@ private fun WelcomeBody() {
         Point(NbIcons.History, stringResource(R.string.onb_point_own))
         Point(NbIcons.Check, stringResource(R.string.onb_point_local))
     }
-    NestedBox {
+    // The disclaimer is its own card (ColorOS has no tinted boxes nested inside cards).
+    NbCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
             Text(
                 stringResource(R.string.setup_about_disclaimer_title),
-                style = NbTheme.typography.titleSmall,
+                style = NbControlType.itemTitle,
                 color = NbTheme.colors.textPrimary,
                 modifier = Modifier.semantics { heading() },
             )
-            Text(stringResource(R.string.disclaimer_full), style = NbTheme.typography.bodySmall, color = NbTheme.colors.textSecondary)
+            Text(stringResource(R.string.disclaimer_full), style = NbControlType.summary, color = NbTheme.colors.textSecondary)
         }
     }
 }
@@ -264,7 +268,7 @@ private fun Point(
     style: TextStyle = NbTheme.typography.body,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(NbSpace.s4), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = NbTheme.colors.accent, modifier = Modifier.size(NbDimens.iconInline))
+        Icon(icon, contentDescription = null, tint = NbTheme.controls.accent, modifier = Modifier.size(NbDimens.iconInline))
         Text(text, style = style, color = NbTheme.colors.textPrimary, modifier = Modifier.weight(1f))
     }
 }
@@ -312,13 +316,23 @@ private fun SourceBody(
     }
 }
 
-/** The state's glyph in its tonal container, as on the matching state card. Decorative. */
+/** The state's glyph on its own (no tonal container), as on the matching state card. Decorative. */
 @Composable
 private fun BadgeLine(
     glyph: NightGlyph,
     tone: StatusTone,
 ) {
-    NightGlyphBadge(glyph, tone, container = NbDimens.targetMin, glyphSize = NbDimens.icon, modifier = Modifier.clearAndSetSemantics {})
+    NightGlyphIcon(
+        glyph,
+        NbTheme.colors.tone(
+            tone,
+        ),
+        size = BADGE_GLYPH,
+        background = NbTheme.colors.background,
+        modifier =
+            Modifier.clearAndSetSemantics {
+            },
+    )
 }
 
 /** A solid note: decorative glyph and text (partial access, notification outcome, Health Connect check). */
@@ -331,13 +345,13 @@ private fun Note(
     Row(
         Modifier
             .fillMaxWidth()
-            .solidCard(NbShapes.m)
+            .solidCard(NbShapes.l)
             .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
-            .padding(NbSpace.s5),
+            .padding(horizontal = NbSpace.s5, vertical = NbSpace.s4),
         horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        NightGlyphBadge(glyph, tone, container = 36.dp, glyphSize = NbDimens.iconInline, modifier = Modifier.clearAndSetSemantics {})
+        NightGlyphIcon(glyph, NbTheme.colors.tone(tone), modifier = Modifier.clearAndSetSemantics {})
         Text(text, style = NbTheme.typography.bodySmall, color = NbTheme.colors.textPrimary, modifier = Modifier.weight(1f))
     }
 }
@@ -381,7 +395,7 @@ private fun PermissionBody(state: OnboardingState) {
 
 @Composable
 private fun PermissionHeading(text: String) {
-    Text(text, style = NbTheme.typography.labelSmall, color = NbTheme.colors.textSecondary, modifier = Modifier.semantics { heading() })
+    Text(text, style = NbControlType.sectionHeader, color = NbTheme.colors.textSecondary, modifier = Modifier.semantics { heading() })
 }
 
 @Composable
@@ -412,63 +426,62 @@ private fun ReadyBody(state: OnboardingState) {
 }
 
 /**
- * Bottom actions: "Back" at the start, the secondary text action and the primary pill at the end; the end group wraps
- * at large font instead of clipping. Every button is >= 48 dp.
+ * Bottom actions (`coloros-conformance.md` L14, ColorOS large-button pattern): a full-width [PrimaryButton] (max
+ * 360 dp, 50 dp), and below it, 8 dp apart, the secondary action as a centred text button. "Back" is the round button
+ * next to the step indicator; only where nothing interactive may sit above the fold ([backHere], tabletop) is it a
+ * text button here. Every target is >= 48 dp.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun StepActionRow(
     buttons: StepButtons,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    backHere: Boolean = false,
 ) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        if (buttons.back) NbTextButton(stringResource(R.string.setup_action_back), onClick = onBack)
-        Spacer(Modifier.width(NbSpace.s3))
-        FlowRow(
-            Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(NbSpace.s3, Alignment.End),
-            verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
-            itemVerticalAlignment = Alignment.CenterVertically,
-        ) {
-            buttons.secondary?.let { TonalButton(it, buttons.onSecondary) }
-            buttons.primary?.let { PrimaryButton(it, buttons.onPrimary, enabled = buttons.primaryEnabled) }
-        }
+    Column(
+        modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
+    ) {
+        buttons.primary?.let { PrimaryButton(it, buttons.onPrimary, Modifier.fillMaxWidth(), enabled = buttons.primaryEnabled) }
+        buttons.secondary?.let { NbTextButton(it, buttons.onSecondary) }
+        if (backHere && buttons.back) NbTextButton(stringResource(R.string.setup_action_back), onClick = onBack)
     }
 }
 
-/** "Step n of 6" (visible text, announced politely on change) and six decorative dots; the current dot is a pill. */
+/**
+ * "Step n of 6" (visible text, announced politely on change) and six decorative dots: 6 dp, the current one a
+ * 16 x 6 dp accent pill, the others neutral. With [onBack] a 40 dp round back button leads the row.
+ */
 @Composable
 internal fun StepIndicator(
     step: OnboardingStep,
     modifier: Modifier = Modifier,
     dots: Boolean = true,
+    onBack: (() -> Unit)? = null,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
-        Text(
-            text.string(R.string.onb_step, text.int(step.number)),
-            style = NbTheme.typography.label,
-            color = colors.textSecondary,
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-        )
-        if (dots) {
-            Row(Modifier.clearAndSetSemantics {}, horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-                for (n in 1..OnboardingStep.COUNT) {
-                    val current = n == step.number
-                    Canvas(Modifier.width(if (current) 20.dp else 8.dp).height(8.dp)) {
-                        val radius = CornerRadius(size.height / 2)
-                        if (n <= step.number) {
-                            drawRoundRect(if (current) colors.accent else colors.textTertiary, cornerRadius = radius)
-                        } else {
-                            val stroke = 1.5.dp.toPx()
+    val controls = NbTheme.controls
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
+        if (onBack != null) {
+            NbRoundIconButton(NbIcons.Back, stringResource(R.string.setup_action_back), onBack, Modifier.offset(x = -NbSpace.s2))
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
+            Text(
+                text.string(R.string.onb_step, text.int(step.number)),
+                style = NbControlType.label,
+                color = colors.textSecondary,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            if (dots) {
+                Row(Modifier.clearAndSetSemantics {}, horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
+                    for (n in 1..OnboardingStep.COUNT) {
+                        val current = n == step.number
+                        Canvas(Modifier.width(if (current) DOT_CURRENT else DOT).height(DOT)) {
                             drawRoundRect(
-                                colors.outline,
-                                topLeft = Offset(stroke / 2, stroke / 2),
-                                size = Size(size.width - stroke, size.height - stroke),
-                                cornerRadius = radius,
-                                style = Stroke(stroke),
+                                if (current) controls.accent else controls.dotInactive,
+                                cornerRadius = CornerRadius(size.height / 2),
                             )
                         }
                     }
@@ -477,3 +490,7 @@ internal fun StepIndicator(
         }
     }
 }
+
+private val DOT = 6.dp
+private val DOT_CURRENT = 16.dp
+private val BADGE_GLYPH = 28.dp

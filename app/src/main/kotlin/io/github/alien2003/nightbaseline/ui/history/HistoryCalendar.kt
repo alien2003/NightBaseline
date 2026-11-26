@@ -47,13 +47,17 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.CalendarCell
-import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbRoundIconButton
+import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.theme.NbControlType
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
+import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.controls
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -108,7 +112,13 @@ fun HistoryCalendar(
             pendingFocus = target
         }
     }
-    BoxWithConstraints(modifier.fillMaxWidth().widthIn(max = CALENDAR_MAX)) {
+    BoxWithConstraints(
+        modifier
+            .fillMaxWidth()
+            .widthIn(max = CALENDAR_MAX + CARD_PADDING * 2)
+            .solidCard(NbShapes.l)
+            .padding(CARD_PADDING),
+    ) {
         val transposed = maxWidth < NbDimens.targetMin * DAYS + CELL_GAP * (DAYS - 1)
         // Narrower still (a book half next to the rail): the weeks scroll sideways, cells keep 48 dp.
         val fits = maxWidth >= WEEKDAY_COLUMN + (NbDimens.targetMin + CELL_GAP) * MAX_WEEKS
@@ -199,19 +209,19 @@ private fun MonthTitle(
     val colors = NbTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (onPrevious != null) {
-            NbIconButton(NbIcons.Back, stringResource(R.string.a11y_prev_month), onPrevious, tint = colors.textPrimary)
+            NbRoundIconButton(NbIcons.Back, stringResource(R.string.a11y_prev_month), onPrevious, tint = colors.textPrimary)
         } else {
             Spacer(Modifier.size(NbDimens.targetMin))
         }
         Text(
             title,
-            style = NbTheme.typography.titleSmall,
+            style = NbControlType.itemTitle,
             color = colors.textPrimary,
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f).semantics { heading() },
         )
         if (onNext != null) {
-            NbIconButton(NbIcons.Chevron, stringResource(R.string.a11y_next_month), onNext, tint = colors.textPrimary)
+            NbRoundIconButton(NbIcons.Chevron, stringResource(R.string.a11y_next_month), onNext, tint = colors.textPrimary)
         } else {
             Spacer(Modifier.size(NbDimens.targetMin))
         }
@@ -295,12 +305,14 @@ private fun FutureDay(
     modifier: Modifier,
 ) {
     Box(modifier.heightIn(min = NbDimens.targetMin).clearAndSetSemantics {}, contentAlignment = Alignment.TopCenter) {
-        Text(
-            day,
-            style = NbTheme.typography.numericAxis,
-            color = NbTheme.colors.textTertiary,
-            modifier = Modifier.padding(top = NbSpace.s2),
-        )
+        // Same 32 dp number box as a CalendarCell, so future days line up with past ones.
+        Box(Modifier.padding(top = NbSpace.s1).heightIn(min = FUTURE_DISC), contentAlignment = Alignment.Center) {
+            Text(
+                day,
+                style = NbTheme.typography.numericAxis.copy(fontSize = NbTheme.typography.body.fontSize),
+                color = NbTheme.colors.textTertiary,
+            )
+        }
     }
 }
 
@@ -310,7 +322,7 @@ private fun WeekdayLetter(
     modifier: Modifier,
 ) {
     Box(modifier, contentAlignment = Alignment.Center) {
-        Text(letter, style = NbTheme.typography.labelSmall, color = NbTheme.colors.textTertiary, textAlign = TextAlign.Center)
+        Text(letter, style = NbTheme.typography.caption, color = NbTheme.controls.summary, textAlign = TextAlign.Center)
     }
 }
 
@@ -392,6 +404,8 @@ private const val DAYS = 7
 private const val MAX_SEARCH_STEPS = 62
 private const val SWIPE_DP = 64
 private val CELL_GAP = 2.dp
+private val CARD_PADDING = 8.dp
+private val FUTURE_DISC = 32.dp
 
 /** Weeks a month can touch (columns of the transposed grid). */
 private const val MAX_WEEKS = 6
