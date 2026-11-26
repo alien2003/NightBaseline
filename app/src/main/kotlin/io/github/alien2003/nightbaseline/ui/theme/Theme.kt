@@ -1,6 +1,12 @@
 package io.github.alien2003.nightbaseline.ui.theme
 
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalRippleConfiguration
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -13,10 +19,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import io.github.alien2003.nightbaseline.ui.material.EffectsDecision
 import io.github.alien2003.nightbaseline.ui.material.LocalEffects
+import io.github.alien2003.nightbaseline.ui.material.NbPressIndication
 import io.github.alien2003.nightbaseline.ui.material.rememberPlatformEffectsInputs
 import io.github.alien2003.nightbaseline.ui.material.resolveEffectsMode
 import io.github.alien2003.nightbaseline.ui.motion.LocalNbMotion
 import io.github.alien2003.nightbaseline.ui.motion.NbMotionScheme
+import io.github.alien2003.nightbaseline.ui.motion.NbOverscrollFactory
 
 /** Colour tokens in effect. */
 val LocalNbColors = staticCompositionLocalOf { LightNbColors }
@@ -29,7 +37,10 @@ val LocalNbElevation = staticCompositionLocalOf { LightNbElevation }
 
 /**
  * NightBaseline's theme: the tokens of `docs/design/tokens.md` for light or dark, the effects decision (glass or the
- * solid fallback, `tokens.md` 7.3) and the motion scheme that follows from it (`tokens.md` 9.6).
+ * solid fallback, `tokens.md` 7.3) and the motion scheme that follows from it (`tokens.md` 9.6). It also replaces the
+ * Material defaults that do not belong to the ColorOS canon: no ripple anywhere (`LocalIndication` is
+ * [NbPressIndication], `LocalRippleConfiguration` is null), the bounce overscroll of [NbOverscrollFactory] instead of
+ * Android's stretch (none under reduced motion), and the content colour and text style come from our tokens.
  *
  * @param darkTheme dark tokens; follows the system by default (no dynamic colour).
  * @param effects a forced effects decision (component catalog, screenshot tests); null resolves it from the
@@ -38,6 +49,7 @@ val LocalNbElevation = staticCompositionLocalOf { LightNbElevation }
  * @param fontScale overrides the system font scale (catalog and tests); null keeps the system value. Text sizes are
  *   in sp and are never capped, so 2.0 renders at 200 %.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NightBaselineTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -56,6 +68,8 @@ fun NightBaselineTheme(
             if (fontScale == null) density else Density(density.density, fontScale)
         }
     val materialColors = remember(colors) { colors.toMaterialColorScheme() }
+    val indication = remember(colors) { NbPressIndication(colors.statePressed) }
+    val overscroll = remember(density, motion.overscroll) { if (motion.overscroll) NbOverscrollFactory(density) else null }
     CompositionLocalProvider(
         LocalNbColors provides colors,
         LocalNbTypography provides DefaultNbTypography,
@@ -64,7 +78,16 @@ fun NightBaselineTheme(
         LocalNbMotion provides motion,
         LocalDensity provides scaledDensity,
     ) {
-        MaterialTheme(colorScheme = materialColors, content = content)
+        MaterialTheme(colorScheme = materialColors) {
+            CompositionLocalProvider(
+                LocalIndication provides indication,
+                LocalRippleConfiguration provides null,
+                LocalOverscrollFactory provides overscroll,
+                LocalContentColor provides colors.textPrimary,
+                LocalTextStyle provides DefaultNbTypography.body,
+                content = content,
+            )
+        }
     }
 }
 
@@ -97,18 +120,21 @@ object NbTheme {
 }
 
 /**
- * Material 3 colour scheme built from our tokens, so Material components used for their semantics (switches, radio
- * buttons, text fields) are styled by the same values. Error roles map to the neutral info colour: the app has no
- * error colour (`tokens.md` 2.3).
+ * A minimal, neutral Material 3 colour scheme built from our tokens, for the few Material widgets still in use until
+ * the sweep removes them: one blue accent, neutral greys, no tonal containers (containers map to neutral surfaces).
+ * Error roles map to the neutral info colour: the app has no error colour (`tokens.md` 2.3).
  */
 private fun NbColors.toMaterialColorScheme() =
     if (isDark) {
         darkColorScheme(
             primary = primary,
             onPrimary = onPrimary,
-            primaryContainer = primaryContainer,
-            onPrimaryContainer = onPrimaryContainer,
-            secondary = accent,
+            primaryContainer = surface3,
+            onPrimaryContainer = textPrimary,
+            secondary = primary,
+            onSecondary = onPrimary,
+            secondaryContainer = surface3,
+            onSecondaryContainer = textPrimary,
             tertiary = statusWithin,
             background = background,
             onBackground = textPrimary,
@@ -118,21 +144,25 @@ private fun NbColors.toMaterialColorScheme() =
             onSurfaceVariant = textSecondary,
             surfaceContainer = surface2,
             surfaceContainerHigh = surface3,
+            surfaceContainerHighest = controlSwitchOff,
             outline = outline,
             outlineVariant = separator,
             error = statusInfo,
             onError = surface1,
-            errorContainer = statusInfoContainer,
-            onErrorContainer = statusInfoOnContainer,
+            errorContainer = surface1,
+            onErrorContainer = statusInfo,
             scrim = scrim,
         )
     } else {
         lightColorScheme(
             primary = primary,
             onPrimary = onPrimary,
-            primaryContainer = primaryContainer,
-            onPrimaryContainer = onPrimaryContainer,
-            secondary = accent,
+            primaryContainer = surface3,
+            onPrimaryContainer = textPrimary,
+            secondary = primary,
+            onSecondary = onPrimary,
+            secondaryContainer = surface3,
+            onSecondaryContainer = textPrimary,
             tertiary = statusWithin,
             background = background,
             onBackground = textPrimary,
@@ -142,12 +172,13 @@ private fun NbColors.toMaterialColorScheme() =
             onSurfaceVariant = textSecondary,
             surfaceContainer = surface2,
             surfaceContainerHigh = surface3,
+            surfaceContainerHighest = controlSwitchOff,
             outline = outline,
             outlineVariant = separator,
             error = statusInfo,
             onError = surface1,
-            errorContainer = statusInfoContainer,
-            onErrorContainer = statusInfoOnContainer,
+            errorContainer = surface1,
+            onErrorContainer = statusInfo,
             scrim = scrim,
         )
     }

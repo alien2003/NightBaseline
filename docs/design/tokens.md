@@ -1,8 +1,9 @@
 # Design tokens
 
-Status: design, stage 3 (before code). Date: 2026-11-25.
+Status: implemented (stage 4), ColorOS 17 conformance applied 2026-11-26 (`coloros-conformance.md` WP1). Date: 2026-11-26.
 Inputs: `principles.md`, `reference-analysis.md` (measurements of the owner's system apps, outer screen, dark theme),
-`docs/research/design-coloros17.md` (Iris numbers, Haze recommendation), ADR 0003, `screens.md`, `states.md`,
+`docs/research/design-coloros17.md` (Iris numbers, Haze recommendation), `docs/research/coloros17-glass.md`,
+`coloros-conformance.md` (the conformance plan this file implements), ADR 0003, ADR 0005, `screens.md`, `states.md`,
 `layouts.md`. This file is the single source of truth for values; the other design documents only name tokens.
 
 Our own token set in the spirit of ColorOS 17 (Living Flow Design, Luminous Effect). Nothing here is a vendor
@@ -13,7 +14,8 @@ research file), **[decision]** (ours, with the reason), **[hypothesis]** (to ver
 
 Automatic check: `python3 -I tools/design/contrast_check.py` parses the colour tables (header
 `| token | light | dark | ... |`) and the pairs table (header `| pair | fg | bg | theme | min |`) in this file
-and fails on any pair below its threshold. Keep both formats exact; see section 2.9. It runs locally today; wiring
+and fails on any pair below its threshold. Keep both formats exact; see section 2.10. `ContrastTest` and
+`ColorTokensTest` run the same checks against the Kotlin theme in `./gradlew test`. It runs locally today; wiring
 it into the pre-commit hook (when `tokens.md` is staged) and into CI is an open item for stage 4/5 (`review.md`).
 
 ---
@@ -39,163 +41,207 @@ it into the pre-commit hook (when `tokens.md` is staged) and into CI is an open 
 | `background`, `surface.*` | window and solid content surfaces | data always sits here |
 | `text.*` | text on `background` / `surface.*` | never on glass |
 | `onGlass.*` | text and icons on glass and on its solid fallback | the only text tokens allowed on glass |
-| `primary`, `accent` | actions, selection, progress | never carry a measurement status |
-| `status.*` | within / moved / neutral / info, plus aliases | always with a shape glyph and a label |
+| `primary`, `primaryText`, `primaryFill` | the one blue accent: controls and graphics, links and text buttons, filled buttons | never carry a measurement status |
+| `status.*` | within / moved / neutral / info, plus aliases | always with a shape glyph and a label; no tonal containers |
 | `band.*`, `marker.*`, `chart.*` | range band, value marker, chart | marks must reach 3:1 |
+| `control.*`, `chevron` | switch, slider track, convex round buttons, disclosure chevron | |
 | `glass.*`, `solid.*`, `scrim` | shell materials (glass only on bar, rail, top bar, sheet, dialog) | section 7 |
 | `focus.ring` | keyboard focus | 3:1 on every surface incl. glass worst case |
+| `state.*` | pressed and selected highlights | drawn under the content |
 
 ## 2. Colours
 
+All values follow the ColorOS 17 conformance plan (`coloros-conformance.md` section 4.1). Where the canon fails
+our accessibility rules, the rule wins and the deviation is recorded in `coloros-conformance.md` 1.2 and ADR 0005.
+
 ### 2.1 Neutrals and text
 
-Dark is calibrated to the measured system apps (true black window, #1A1A1A cards, #E9E9E9 / #969696 text
-[measured]), with a faint cool tint of our own and secondary text a step lighter so it also passes 4.5:1 on the
-selected surface. Light is our own (no light references were captured).
+Neutral, R = G = B, as measured: dark on the folded captures (true black window, #1A1A1A cards, #E9E9E9 /
+#969696 / #8A8A8A text, #484848 hairline), light on the inner-screen light captures (window #F0F1F2, white cards,
+#E0E0E0 hairline, #BDBDBD chevron, #D6D6D6 switch off, #6E6E6E section header) [measured]. Light secondary text is
+#666666 instead of the measured #757575 (4.07:1 on the window) [decision]. Secondary text never sits on a fill
+lighter (dark) or darker (light) than `surface.3`.
 
 | token | light | dark | use |
 |---|---|---|---|
-| `color.background` | `#F1F2F5` | `#000000` | window background, page behind cards |
-| `color.surface.1` | `#FFFFFF` | `#1A1B1E` | cards, tiles, chart card, settings groups (level 1) |
-| `color.surface.2` | `#F6F7F9` | `#232428` | nested areas inside a card: stats row, explainer box (level 2) |
-| `color.surface.3` | `#E9EBF0` | `#2D2E33` | selected row, segmented control track, pressed fill (level 3) |
-| `color.text.primary` | `#16171A` | `#ECEDF0` | titles, values, body |
-| `color.text.secondary` | `#50535B` | `#A3A6AE` | summaries, units, axis labels, row values |
-| `color.text.tertiary` | `#62656D` | `#8E919A` | section headers, captions, disabled labels; only on `background` and `surface.1` |
-| `color.separator` | `#DCDEE3` | `#34353A` | 1 px hairline inside cards, inset to the text column; decorative, never the only boundary |
-| `color.outline` | `#747883` | `#8A8E98` | essential boundaries: unchecked radio, switch-off track rim, text field, dotted learning band |
+| `color.background` | `#F0F1F2` | `#000000` | window background, page behind cards |
+| `color.surface.1` | `#FFFFFF` | `#1A1A1A` | cards, tiles, chart card, settings groups (level 1) |
+| `color.surface.2` | `#F5F5F5` | `#242424` | nested areas (retiring: hairline splits replace nested boxes) |
+| `color.surface.3` | `#EBEBEB` | `#2E2E2E` | selected row, segmented track, pressed fill; highest fill that may carry `text.secondary` |
+| `color.surface.elevated` | `#FFFFFF` | `#2B2B2B` | cards inside sheets, chart tooltip |
+| `color.text.primary` | `#1A1A1A` | `#E9E9E9` | titles, values, body |
+| `color.text.secondary` | `#666666` | `#969696` | summaries, units, axis labels, row values |
+| `color.text.tertiary` | `#6E6E6E` | `#8A8A8A` | section headers, captions, subtitles, disabled labels; only on `background` and `surface.1` |
+| `color.separator` | `#E0E0E0` | `#484848` | 1 px hairline inside cards, inset 16 dp at both ends; decorative, never the only boundary |
+| `color.outline` | `#767676` | `#767676` | essential boundaries: unchecked radio ring, text field, dotted learning band |
+| `color.chevron` | `#BDBDBD` | `#5F5F5F` | disclosure chevron (decorative: the row title carries the meaning) |
+| `color.control.track` | `#EBEBEB` | `#333333` | slider and range band track |
+| `color.control.switchOff` | `#D6D6D6` | `#505050` | switch track when off (2.16:1, recorded canon exception: the white knob position carries the state) |
+| `color.control.convexTop` | `#FFFFFF` | `#1F1F1F` | convex round shell button, gradient top |
+| `color.control.convexBottom` | `#F2F2F4` | `#2A2A2A` | convex round shell button, gradient bottom |
+| `color.control.convexRimTop` | `#FFFFFF @ 80%` | `#333333` | convex button rim, 0.5 dp top |
+| `color.control.convexRimBottom` | `#000000 @ 8%` | `#3E3E3E` | convex button rim, 1 dp bottom |
 
-### 2.2 Primary and accent
+### 2.2 Accent
 
-The measured system accent (#428AF7, white on it 3.4:1 [measured]) fails 4.5:1 for button labels. Ours is an own
-indigo-blue: darker in light (white label 5.9:1) and light in dark with a dark label [decision].
+One saturated blue, as in the system apps; the violet second accent is retired [owner decision 2026-11-26]. The
+canon accent fails 4.5:1 under a white label (#428AF7: 3.38) and as light text (#0080FF / measured #0078EF: 3.8 /
+4.26 on white), so the accent is split by role [decision]:
 
 | token | light | dark | use |
 |---|---|---|---|
-| `color.primary` | `#2C5BD6` | `#8FB0FF` | primary button fill, links, switch-on track, selected radio |
-| `color.onPrimary` | `#FFFFFF` | `#0B1C45` | label and icon on `primary` |
-| `color.primaryContainer` | `#DCE5FB` | `#25314F` | selected navigation capsule, selected period, tonal button |
-| `color.onPrimaryContainer` | `#12306F` | `#D7E2FF` | label and icon on `primaryContainer` |
-| `color.accent` | `#6650C8` | `#B6A8FF` | learning progress (counted segments), onboarding illustration strokes |
-| `color.accentGlow` | `#6650C8 @ 18%` | `#B6A8FF @ 22%` | finger-following light on glass items (decorative, never behind text) |
+| `color.primary` | `#0068E0` | `#428AF7` | controls and graphics: switch on, radio, slider, progress, selected label; links (5.18 / 5.15 on the card) |
+| `color.primaryText` | `#0062D6` | `#5C9DFF` | links, text buttons, info status; passes 4.5 on `surface.3` too |
+| `color.primaryFill` | `#0068E0` | `#2A6BE0` | filled buttons that carry a text label |
+| `color.onPrimary` | `#FFFFFF` | `#FFFFFF` | label and icon on `primaryFill` (5.18 / 4.91); glyphs on `primary` (3:1) |
+| `color.accentGlow` | `#0068E0 @ 25%` | `#428AF7 @ 35%` | coloured glow under the accent call-to-action only (decorative) |
+| `color.glow.neutral` | `#FFFFFF @ 30%` | `#FFFFFF @ 13.5%` | touch-following light on shell items and the primary button (decorative, never behind text that must be read) |
 
 ### 2.3 Status
 
 Calm by construction: there is no red and no error colour in the app (`principles.md` 1). Higher and lower share
 one hue, the direction is carried by the triangle (`principles.md` 2). Every status has a glyph and a label
-(`screens.md` section 6); the glyph is listed here so the token and its non-colour carrier are never separated.
+(`screens.md` section 6); there are no tonal status containers (none exist in the references). Hues follow the
+ColorOS functional green and yellow [owner decision 2026-11-26: amber moved colour, calm green within], darkened in
+light so they pass 4.5:1 on every surface up to `surface.3`.
 
 | token | light | dark | glyph that always accompanies it | use |
 |---|---|---|---|---|
-| `color.status.within` | `#1E7566` | `#74CDB9` | filled circle (metric), circle with check (night) | inside the usual range |
-| `color.status.moved` | `#95560F` | `#E8B56E` | triangle(s) in the direction of change; rounded square with 1 or 2 triangles (night) | moved outside the usual range (warm desaturated ochre) |
+| `color.status.within` | `#19762A` | `#24B232` | small filled dot (metric), circle with check (night) | inside the usual range; used sparingly, the label is grey "Usual" |
+| `color.status.moved` | `#8F5A00` | `#E5A100` | triangle(s) in the direction of change; rounded square with 1 or 2 triangles (night) | moved outside the usual range (ColorOS amber) |
 | `color.status.above` | `= color.status.moved` | `= color.status.moved` | upward triangle, marker right of the band | higher than usual |
 | `color.status.below` | `= color.status.moved` | `= color.status.moved` | downward triangle, marker left of the band | lower than usual |
-| `color.status.neutral` | `#5B606B` | `#A4A9B4` | dotted ring, dash, half circle, slashed circle | learning, missing, short night, not provided |
+| `color.status.neutral` | `#666666` | `#969696` | dotted ring, dash, half circle, slashed circle | learning, missing, short night, not provided |
 | `color.status.learning` | `= color.status.neutral` | `= color.status.neutral` | dotted ring, dotted band outline | learning period, per-metric learning |
 | `color.status.missing` | `= color.status.neutral` | `= color.status.neutral` | short dash (no value), slashed circle (not provided) | no value, too few readings, not recorded |
-| `color.status.info` | `#3E5C96` | `#A9BDE6` | outline icons: key, cloud with clock, download arrow | data-access problems (permission, sync, Health Connect update) |
-| `color.status.within.container` | `#E1F2ED` | `#143029` | | tonal chip / glyph container |
-| `color.status.within.onContainer` | `#0F4A3F` | `#B1E8DA` | | label on the within container |
-| `color.status.moved.container` | `#F8EAD6` | `#3A2A14` | | tonal chip, `S-SOME` tonal summary |
-| `color.status.moved.onContainer` | `#5C3306` | `#F5D3A2` | | label on the moved container |
-| `color.status.neutral.container` | `#ECEDF1` | `#2A2C31` | | learning / missing chip |
-| `color.status.neutral.onContainer` | `#3A3E47` | `#D2D5DC` | | label on the neutral container |
-| `color.status.info.container` | `#E3E9F6` | `#1F2A42` | | state card icon container |
-| `color.status.info.onContainer` | `#233C6B` | `#CFDBF5` | | label on the info container |
+| `color.status.info` | `= color.primaryText` | `= color.primaryText` | outline icons: key, cloud with clock, download arrow | data-access problems (permission, sync, Health Connect update) |
 
 Notification accent colour (`states.md` 6.1): the light value of `color.status.moved`.
 
 ### 2.4 Range band, value marker, chart
 
-The band fill is deliberately quiet (it is the "usual", not news); its boundary is carried by `band.edge` lines,
-which reach 3:1 against both the card and the fill. Markers get a 2 dp halo in `marker.halo` so they stay
-separable where they overlap the band edge.
+The usual range is a solid neutral segment on the track (like the measured slider): its boundary is the fill
+against the card (3.36 / 3.27). No edge lines, no median tick. Markers get a 2 dp halo in `marker.halo`.
 
 | token | light | dark | use |
 |---|---|---|---|
-| `color.band.fill` | `#DCE4F5` | `#2B3550` | personal range area (tile band, chart stepped area) |
-| `color.band.edge` | `#6F7FA6` | `#8794B8` | 1.5 dp low/high edge lines and the median tick |
+| `color.band.fill` | `#8C8C8C` | `#6B6B6B` | usual-range segment on the 16 dp `control.track` pill |
 | `color.band.learningOutline` | `= color.outline` | `= color.outline` | dotted outline where the band will be (learning) |
+| `color.marker.within` | `#FFFFFF` | `#FFFFFF` | value marker inside the range (slider-thumb idiom) |
+| `color.marker.withinRim` | `#CCCCCC` | `#FFFFFF` | 1 px rim of the white marker (light; dark has none) |
 | `color.marker.halo` | `= color.surface.1` | `= color.surface.1` | 2 dp ring around every value marker |
-| `color.chart.point` | `#4A4F5A` | `#B9BDC6` | chart points inside the range (filled circle); learning points are hollow in the same colour |
-| `color.chart.grid` | `#E6E8EC` | `#2C2D32` | grid lines (decorative; values are in labels and the text summary) |
+| `color.chart.point` | `#4A4A4A` | `#E9E9E9` | chart points inside the range; learning points are hollow `status.neutral` |
+| `color.chart.grid` | `#000000 @ 6%` | `#FFFFFF @ 8%` | 1 px horizontal grid lines (decorative; values are in labels and the text summary) |
+| `color.chart.bandArea` | `#000000 @ 8%` | `#FFFFFF @ 12%` | the chart's stepped usual-range area |
 | `color.chart.guide` | `= color.text.secondary` | `= color.text.secondary` | vertical selection guide under the finger / pointer |
 
-Marker colours: `status.within` (filled circle), `status.moved` (triangle), `status.neutral` (hollow, learning),
-`chart.point` (chart points inside the range).
+Marker colours: `marker.within` (inside), `status.moved` (triangle, 3:1 on the track and the card),
+`status.neutral` (learning, on the track), `chart.point` (chart points inside the range).
 
 ### 2.5 Glass tints, rim, text on glass
 
 Tints are composited over the blurred backdrop. Their alpha is chosen so that `onGlass.*` text passes 4.5:1 even
-if the backdrop were pure white or pure black (section 2.9 checks both). The rim is a 1 dp vertical gradient
-stroke drawn inside the shape, plus an outer hairline that keeps the edge visible on a same-coloured backdrop;
-calibrated to the measured shell controls (light top rim, slightly brighter bottom edge [measured]).
+if the backdrop were pure white or pure black (section 2.10 checks both). The rim is drawn inside the shape: a
+0.5 dp top highlight and a brighter, thicker bottom: a 1 dp stroke plus a faint 2 dp reflection band (bottom
+brighter than top, as measured on the bar: top #363636 1 px, bottom #3B3B3B-#3D3D3D 2-3 px [measured]). No outer
+hairline, no refraction, no specular motion (`docs/research/coloros17-glass.md` 4.1).
 
 | token | light | dark | use |
 |---|---|---|---|
-| `color.glass.bar` | `#F7F8FA @ 80%` | `#1C1D21 @ 78%` | floating bottom bar and navigation rail tint |
-| `color.glass.topBar` | `#F1F2F5 @ 82%` | `#0E0E10 @ 74%` | top bar tint (only while content is under it) |
-| `color.glass.sheet` | `#F7F8FA @ 90%` | `#1E1F23 @ 88%` | bottom sheet tint |
-| `color.glass.dialog` | `= color.glass.sheet` | `= color.glass.sheet` | dialog tint |
-| `color.glass.rimTop` | `#FFFFFF @ 90%` | `#FFFFFF @ 16%` | rim gradient, top stop |
-| `color.glass.rimMid` | `#FFFFFF @ 40%` | `#FFFFFF @ 5%` | rim gradient, 50 % stop |
-| `color.glass.rimBottom` | `#FFFFFF @ 60%` | `#FFFFFF @ 11%` | rim gradient, bottom stop |
-| `color.glass.rimOuter` | `#000000 @ 7%` | `#000000 @ 45%` | 0.5 dp outer hairline outside the rim |
-| `color.onGlass.primary` | `#111215` | `#F2F3F5` | titles, labels, selected icons on glass |
-| `color.onGlass.secondary` | `#3E4047` | `#CDD0D6` | unselected nav icons and labels, secondary text in sheets and dialogs |
+| `color.glass.bar` | `#FFFFFF @ 80%` | `#1B1B1B @ 80%` | floating bottom bar and navigation rail tint |
+| `color.glass.topBar` | `#F0F1F2 @ 82%` | `#000000 @ 72%` | top bar tint under the small title once it is visible (the row that carries text) |
+| `color.glass.topBarDim` | `#F0F1F2 @ 35%` | `#000000 @ 35%` | top stop of the progressive darkening (0.35 -> 0) where no text sits [measured x0.65-0.75] |
+| `color.glass.sheet` | `#F5F5F8 @ 92%` | `#171717 @ 92%` | bottom sheet tint |
+| `color.glass.dialog` | `#FFFFFF @ 94%` | `#232323 @ 94%` | dialog tint |
+| `color.glass.rimTop` | `#FFFFFF @ 80%` | `#FFFFFF @ 13%` | rim, 0.5 dp top highlight |
+| `color.glass.rimBottom` | `#000000 @ 8%` | `#FFFFFF @ 16%` | rim, 1 dp bottom stroke and 2 dp bottom reflection band (band at half this alpha) |
+| `color.onGlass.primary` | `#1A1A1A` | `#E9E9E9` | titles, labels, selected icons and labels on glass |
+| `color.onGlass.secondary` | `#474747` | `#C0C0C0` | unselected nav icons and labels (measured light #454545), secondary text in sheets and dialogs |
+
+The top bar title rule [decision, accessibility over canon]: the ColorOS top bar has no backing, only progressive
+blur and a 0.35 -> 0 darkening. We keep that look where no text sits (`glass.topBarDim`); once the small title has
+faded in, its row gets `glass.topBar`, which passes the worst case.
 
 The chart tooltip is **not** glass: it floats over data, so it is always `material.solid.tooltip` (section 7.2)
 and uses `text.*` [decision, review round 0: glass is reserved for the shell, ADR 0003].
 
-The touch light (`accentGlow`, section 9.5) is composited *under* the tint layer, as part of the backdrop, so the
+The touch light (`glow.neutral`, section 9.5) is composited *under* the labels, as part of the backdrop, so the
 worst-case contrast model (backdrop pure white or pure black) still bounds every label on a pressed glass item.
 
-Inside a glass sheet or dialog, content cards (for example a settings group or an explainer box) are solid
-`surface.1` and use `text.*` again; only text placed directly on the tint uses `onGlass.*`.
+Inside a glass sheet or dialog, content cards (for example a settings group) are solid `surface.elevated` /
+`surface.1` and use `text.*` again; only text placed directly on the tint uses `onGlass.*`. No glass on glass.
 
 ### 2.6 Solid fallback for glass, and scrim
 
-Used in `EffectsMode.Solid` (section 7.3), for the home-screen widget and, in both modes, for the chart tooltip. The bar keeps a quiet vertical gradient
-(the "lit" look of the measured shell controls: #1B1B1B -> #232323 [measured]) and the same rim tokens as glass, so
-the fallback looks finished rather than switched off.
+Used in `EffectsMode.Solid` (section 7.3), for the home-screen widget and, in both modes, for the chart tooltip and
+the convex round buttons. The bar keeps a quiet vertical gradient (the "lit" look of the measured shell controls:
+#1B1B1B -> #232323 [measured]) and the same rim tokens as glass, so the fallback looks finished rather than switched
+off. Under higher contrast the solid shell also gets a 1 dp border in `onGlass.primary` at 60 % (section 7.3).
 
 | token | light | dark | use |
 |---|---|---|---|
-| `color.solid.barTop` | `#FCFCFD` | `#1C1D21` | bar and rail fill, gradient top |
-| `color.solid.barBottom` | `#F2F3F6` | `#24252A` | bar and rail fill, gradient bottom |
-| `color.solid.topBar` | `= color.background` | `= color.background` | top bar fill (plus `separator` hairline once content scrolls under it) |
-| `color.solid.sheet` | `#FFFFFF` | `#1E1F23` | sheet fill |
-| `color.solid.dialog` | `= color.solid.sheet` | `= color.solid.sheet` | dialog fill |
-| `color.solid.tooltip` | `#FFFFFF` | `#2A2B30` | chart tooltip fill in both effect modes (with `elevation.raised`) |
-| `color.scrim` | `#0E1014 @ 32%` | `#000000 @ 60%` | dims content behind sheets and dialogs, both modes |
+| `color.solid.barTop` | `#FFFFFF` | `#1B1B1B` | bar and rail fill, gradient top |
+| `color.solid.barBottom` | `#F7F7F9` | `#232323` | bar and rail fill, gradient bottom |
+| `color.solid.topBar` | `= color.background` | `= color.background` | top bar fill: gradient `background` 0.85 -> 0, no hairline |
+| `color.solid.sheet` | `#F5F5F8` | `#171717` | sheet fill |
+| `color.solid.dialog` | `#FFFFFF` | `#232323` | dialog fill |
+| `color.solid.tooltip` | `= color.surface.elevated` | `= color.surface.elevated` | chart tooltip fill in both effect modes (with `elevation.raised`) |
+| `color.scrim` | `#000000 @ 40%` | `#000000 @ 60%` | dims content behind sheets and dialogs, both modes |
+| `color.sheetHandle` | `#000000 @ 26%` | `#FFFFFF @ 30%` | 36 x 4 dp sheet handle (decorative; the sheet has a close button) |
 
 ### 2.7 Focus
 
 | token | light | dark | use |
 |---|---|---|---|
-| `color.focus.ring` | `#1F4FD1` | `#A9C2FF` | 2 dp keyboard focus ring (section 10) |
+| `color.focus.ring` | `#0068E0` | `#5C9DFF` | 2 dp keyboard focus ring (section 10); ColorOS has none, ours is kept [decision] |
 
-### 2.8 State layers (not colours of their own)
+### 2.8 State layers
+
+ColorOS has no ripple. The pressed highlight is drawn **under** the content, clipped to the element's shape, so
+labels keep their colour; elements also shrink (section 9.5). Material's ripple is removed app-wide
+(`LocalIndication` = `NbPressIndication`, `LocalRippleConfiguration` = null; `tools/check-ripple.sh` rejects
+`ripple(`).
+
+| token | light | dark | use |
+|---|---|---|---|
+| `color.state.pressed` | `#000000 @ 6%` | `#FFFFFF @ 12.5%` | pressed highlight under the content (hover: two thirds of it) |
+| `color.state.selected` | `#000000 @ 6%` | `= color.surface.3` | selected rows and tiles (then `text.primary`, no secondary text on it) |
 
 | name | value | where |
 |---|---|---|
-| `state.hover` | `text.primary` at 8 % over the element | solid rows, tiles, chips, buttons |
-| `state.pressed` | `text.primary` at 12 % | solid elements (plus press scale, section 9.5) |
+| `state.glassHover` | rim alphas x 1.5 | glass items (no grey layer on glass) |
+| `state.glassPressed` | `glow.neutral` light under the finger (section 9.5) | glass items, round shell buttons, primary button |
 | `state.dragged` | `text.primary` at 16 % | chart scrub handle, sheet handle |
-| `state.glassHover` | rim alphas x 1.5 and tint alpha + 4 points | glass items (no grey layer on glass) |
-| `state.glassPressed` | `accentGlow` radial light under the finger (section 9.5) | glass items |
-| `state.disabled` | label in `text.tertiary`, glyph in `outline`, no state layers | disabled controls; a reason text is shown next to the control when one exists |
+| `state.disabled` | labels stay `text.tertiary` (>= 4.5:1); only control graphics (switch, radio) may use the canon #5F5F5F; filled buttons at alpha 0.3 with a reason text | disabled controls |
 
-State layers never reduce the contrast of text below the checked pairs: at 12 % the darkest layer in the light
-theme turns `surface.1` into roughly `surface.3`, which is checked.
+### 2.9 Retired tokens
 
-### 2.9 Contrast pairs (machine-checked)
+Retired by the conformance plan and kept only until the last caller is migrated (the sweep deletes them); each is
+an alias of its neutral replacement, so un-migrated components already look canonical. `color.glass.rimOuter` is
+gone already (transparent in code).
+
+| token | light | dark | replacement |
+|---|---|---|---|
+| `color.primaryContainer` | `= color.surface.3` | `= color.surface.3` | no tonal containers: neutral selection, icon fill and weight |
+| `color.onPrimaryContainer` | `= color.text.primary` | `= color.text.primary` | |
+| `color.accent` | `= color.primary` | `= color.primary` | single accent |
+| `color.status.within.container` | `= color.surface.1` | `= color.surface.1` | no status containers: glyph and label on the card |
+| `color.status.within.onContainer` | `= color.status.within` | `= color.status.within` | |
+| `color.status.moved.container` | `= color.surface.1` | `= color.surface.1` | |
+| `color.status.moved.onContainer` | `= color.status.moved` | `= color.status.moved` | |
+| `color.status.neutral.container` | `= color.surface.1` | `= color.surface.1` | |
+| `color.status.neutral.onContainer` | `= color.status.neutral` | `= color.status.neutral` | |
+| `color.status.info.container` | `= color.surface.1` | `= color.surface.1` | |
+| `color.status.info.onContainer` | `= color.status.info` | `= color.status.info` | |
+| `color.band.edge` | `= color.band.fill` | `= color.band.fill` | no band edges or median tick (drawn invisible until removed) |
+| `color.glass.rimMid` | `= color.glass.rimTop` | `= color.glass.rimTop` | two-part rim |
+
+### 2.10 Contrast pairs (machine-checked)
 
 Format (parsed by `tools/design/contrast_check.py`):
 
 - `pair`: name; the first part is the kind: `text` (normal text, >= 4.5), `large` (text >= 24 sp, or >= 19 sp at
-  weight 700; >= 3.0), `graphic` (icons, glyphs, band edges, markers, essential boundaries; >= 3.0), `focus`
+  weight 700; >= 3.0), `graphic` (icons, glyphs, markers, essential boundaries; >= 3.0), `focus`
   (focus indicator; >= 3.0). The script rejects a `min` below the kind's rule.
 - `fg`, `bg`: token names (or literal colours); `fg` must be opaque. A translucent `bg` is glass: it is
   composited over a pure white and a pure black backdrop and the worse ratio counts.
@@ -208,15 +254,21 @@ Format (parsed by `tools/design/contrast_check.py`):
 | text.primary.surface1 | color.text.primary | color.surface.1 | both | 4.5 |
 | text.primary.surface2 | color.text.primary | color.surface.2 | both | 4.5 |
 | text.primary.surface3 | color.text.primary | color.surface.3 | both | 4.5 |
+| text.primary.elevated | color.text.primary | color.surface.elevated | both | 4.5 |
 | text.secondary.background | color.text.secondary | color.background | both | 4.5 |
 | text.secondary.surface1 | color.text.secondary | color.surface.1 | both | 4.5 |
 | text.secondary.surface2 | color.text.secondary | color.surface.2 | both | 4.5 |
 | text.secondary.surface3 | color.text.secondary | color.surface.3 | both | 4.5 |
+| text.secondary.elevated | color.text.secondary | color.surface.elevated | both | 4.5 |
 | text.tertiary.background | color.text.tertiary | color.background | both | 4.5 |
 | text.tertiary.surface1 | color.text.tertiary | color.surface.1 | both | 4.5 |
 | text.link.surface1 | color.primary | color.surface.1 | both | 4.5 |
 | text.link.background | color.primary | color.background | both | 4.5 |
-| text.onPrimary | color.onPrimary | color.primary | both | 4.5 |
+| text.primaryText.background | color.primaryText | color.background | both | 4.5 |
+| text.primaryText.surface1 | color.primaryText | color.surface.1 | both | 4.5 |
+| text.primaryText.surface3 | color.primaryText | color.surface.3 | both | 4.5 |
+| text.primaryText.elevated | color.primaryText | color.surface.elevated | both | 4.5 |
+| text.onPrimary | color.onPrimary | color.primaryFill | both | 4.5 |
 | text.onPrimaryContainer | color.onPrimaryContainer | color.primaryContainer | both | 4.5 |
 | text.status.within.surface1 | color.status.within | color.surface.1 | both | 4.5 |
 | text.status.within.surface2 | color.status.within | color.surface.2 | both | 4.5 |
@@ -230,6 +282,8 @@ Format (parsed by `tools/design/contrast_check.py`):
 | text.status.moved.surface3 | color.status.moved | color.surface.3 | both | 4.5 |
 | text.status.neutral.surface3 | color.status.neutral | color.surface.3 | both | 4.5 |
 | text.status.info.surface3 | color.status.info | color.surface.3 | both | 4.5 |
+| text.status.within.background | color.status.within | color.background | both | 4.5 |
+| text.status.moved.background | color.status.moved | color.background | both | 4.5 |
 | text.status.within.onContainer | color.status.within.onContainer | color.status.within.container | both | 4.5 |
 | text.status.moved.onContainer | color.status.moved.onContainer | color.status.moved.container | both | 4.5 |
 | text.status.neutral.onContainer | color.status.neutral.onContainer | color.status.neutral.container | both | 4.5 |
@@ -250,6 +304,8 @@ Format (parsed by `tools/design/contrast_check.py`):
 | text.onGlass.secondary.solidTopBar | color.onGlass.secondary | color.solid.topBar | both | 4.5 |
 | text.onGlass.primary.solidSheet | color.onGlass.primary | color.solid.sheet | both | 4.5 |
 | text.onGlass.secondary.solidSheet | color.onGlass.secondary | color.solid.sheet | both | 4.5 |
+| text.onGlass.primary.solidDialog | color.onGlass.primary | color.solid.dialog | both | 4.5 |
+| text.onGlass.secondary.solidDialog | color.onGlass.secondary | color.solid.dialog | both | 4.5 |
 | text.primary.tooltip | color.text.primary | color.solid.tooltip | both | 4.5 |
 | text.secondary.tooltip | color.text.secondary | color.solid.tooltip | both | 4.5 |
 | text.status.within.tooltip | color.status.within | color.solid.tooltip | both | 4.5 |
@@ -261,33 +317,38 @@ Format (parsed by `tools/design/contrast_check.py`):
 | graphic.status.moved.container | color.status.moved | color.status.moved.container | both | 3.0 |
 | graphic.status.neutral.container | color.status.neutral | color.status.neutral.container | both | 3.0 |
 | graphic.status.info.container | color.status.info | color.status.info.container | both | 3.0 |
-| graphic.band.edge.surface1 | color.band.edge | color.surface.1 | both | 3.0 |
-| graphic.band.edge.fill | color.band.edge | color.band.fill | both | 3.0 |
-| graphic.marker.within.fill | color.status.within | color.band.fill | both | 3.0 |
+| graphic.band.fill.surface1 | color.band.fill | color.surface.1 | both | 3.0 |
+| graphic.marker.within.fill | color.marker.within | color.band.fill | both | 3.0 |
 | graphic.marker.within.surface1 | color.status.within | color.surface.1 | both | 3.0 |
-| graphic.marker.moved.fill | color.status.moved | color.band.fill | both | 3.0 |
+| graphic.marker.moved.track | color.status.moved | color.control.track | both | 3.0 |
 | graphic.marker.moved.surface1 | color.status.moved | color.surface.1 | both | 3.0 |
-| graphic.marker.neutral.fill | color.status.neutral | color.band.fill | both | 3.0 |
+| graphic.marker.neutral.track | color.status.neutral | color.control.track | both | 3.0 |
 | graphic.chart.point.surface1 | color.chart.point | color.surface.1 | both | 3.0 |
-| graphic.chart.point.fill | color.chart.point | color.band.fill | both | 3.0 |
 | graphic.learningOutline.surface1 | color.band.learningOutline | color.surface.1 | both | 3.0 |
 | graphic.outline.surface1 | color.outline | color.surface.1 | both | 3.0 |
 | graphic.outline.surface2 | color.outline | color.surface.2 | both | 3.0 |
 | graphic.outline.background | color.outline | color.background | both | 3.0 |
 | graphic.accent.surface1 | color.accent | color.surface.1 | both | 3.0 |
 | graphic.primary.surface1 | color.primary | color.surface.1 | both | 3.0 |
+| graphic.primary.background | color.primary | color.background | both | 3.0 |
 | graphic.navIcon.bar | color.onGlass.secondary | color.glass.bar | both | 3.0 |
+| graphic.roundButton.glyph | color.onGlass.primary | color.control.convexBottom | both | 3.0 |
+| graphic.onPrimary.primary | color.onPrimary | color.primary | both | 3.0 |
 | focus.ring.background | color.focus.ring | color.background | both | 3.0 |
 | focus.ring.surface1 | color.focus.ring | color.surface.1 | both | 3.0 |
 | focus.ring.surface3 | color.focus.ring | color.surface.3 | both | 3.0 |
 | focus.ring.glassBar | color.focus.ring | color.glass.bar | both | 3.0 |
 | focus.ring.glassSheet | color.focus.ring | color.glass.sheet | both | 3.0 |
+| focus.ring.glassDialog | color.focus.ring | color.glass.dialog | both | 3.0 |
 | focus.ring.solidBarBottom | color.focus.ring | color.solid.barBottom | both | 3.0 |
 | focus.ring.primaryContainer | color.focus.ring | color.primaryContainer | both | 3.0 |
 
-Not in the table on purpose: `separator`, `chart.grid`, `band.fill` against the card, `glass.rim*`, `accentGlow` and
-`scrim` are decorative or are backed by a checked boundary (band edges, labels, text summary). The large value pair
-is held to 4.5 although large text would allow 3.0 [decision: values are the most important text].
+Not in the table on purpose: `separator`, `chevron`, `chart.grid`, `chart.bandArea`, `glass.rim*`,
+`control.switchOff` (canon exception, section 2.1), `control.convex*`, `accentGlow`, `glow.neutral`, `state.*`,
+`sheetHandle` and `scrim` are decorative or are backed by a checked boundary (band fill vs card, labels, text
+summary). `glass.topBarDim` carries no text. The large value pair is held to 4.5 although large text would allow
+3.0 [decision: values are the most important text]. `graphic.onPrimary.primary` covers white glyphs and the
+switch knob on the canon accent (3.38 dark); white *text* only sits on `primaryFill`.
 
 The model's limits: the worst case composites the tint over pure white and pure black in sRGB, which is stricter
 than any real blurred backdrop; Haze may add extra blend layers that the script does not model. The component
@@ -301,9 +362,10 @@ be designed with the screenshot tests].
 
 System font only (`FontFamily.Default`: Roboto or the device's system sans, which also covers Cyrillic); no
 bundled or vendor fonts. Hierarchy comes from size, weight and grey level, as in the references [measured].
+**Weights 400 / 500 / 700 only** (600 renders near-bold on the system sans and is the Material signature).
 Sizes and line heights are in sp, so both scale; Android 14+ non-linear font scaling compresses the largest sizes.
 Letter spacing 0 everywhere; no all-caps (Russian labels get long). `includeFontPadding = false`,
-`LineHeightStyle(alignment = Center, trim = None)`. Minimum size 12 sp.
+`LineHeightStyle(alignment = Center, trim = None)`. Minimum size 12 sp, with one recorded exception (`navLabel`).
 
 Numeric styles use `fontFeatureSettings = "tnum, lnum"` (tabular, lining figures) so values, axis labels and
 stats do not jitter when digits change; numbers are formatted per locale (`NumberFormat`), units come from string
@@ -311,14 +373,23 @@ resources and use the matching non-numeric style at a smaller size.
 
 | name | size sp | line height sp | weight | figures | use | reference |
 |---|---|---|---|---|---|---|
-| `type.largeTitle` | 28 | 34 | 700 | | top-level screen title at rest (collapses to `type.title`) | Clock large title ≈ 24 sp+ [measured] |
-| `type.headline` | 22 | 28 | 600 | | night summary headline, state card title | |
-| `type.title` | 20 | 26 | 600 | | collapsed top bar title, pane titles, sheet and dialog titles | top bar ≈ 14 sp in references; larger here for the half-awake glance [decision] |
-| `type.titleSmall` | 16 | 22 | 600 | | card titles, metric name in a tile, row titles | row title ≈ 16 sp medium [measured] |
+| `type.largeTitle` | 32 | 40 | 700 | | top-level screen title, first item of the scrolling content (no size animation) | Clock large title 32.7 dp bold [measured] |
+| `type.headline` | 22 | 28 | 500 | | night summary headline | |
+| `type.title` | 20 | 26 | 500 | | pane and state-card titles | |
+| `type.topBarTitle` | 18 | 24 | 700 | | collapsed top-bar title, 1 line, ellipsis | top bar em 18.7 dp [measured] |
+| `type.dialogTitle` | 18 | 24 | 700 | | sheet and dialog titles, centred | |
+| `type.titleSmall` (= `type.itemTitle`) | 16 | 22 | 500 | | row titles, card titles, metric name | row title 16 sp medium [measured] |
 | `type.body` | 16 | 24 | 400 | | explanations, state card body, onboarding text | |
-| `type.bodySmall` | 14 | 20 | 400 | | summaries under row titles, chart summary, banner text | row summary ≈ 13-14 sp [measured] |
-| `type.label` | 14 | 20 | 600 | | buttons, status chips, period selector | |
-| `type.labelSmall` | 12 | 16 | 600 | | navigation labels, section headers, weekday letters | section header ≈ 12 sp [measured]; nav label ≈ 10-11 sp, raised to 12 for legibility [decision] |
+| `type.bodySmall` | 14 | 20 | 400 | | chart summary, banner text | |
+| `type.summary` | 14 | 19 | 400 | | summaries under row titles (canon 13 sp; 14 for legibility [decision]) | row summary 13-14 sp [measured] |
+| `type.value` | 14 | 20 | 400 | | trailing row values (`text.secondary`) | |
+| `type.button` | 16 | 22 | 500 | | button labels, text buttons | |
+| `type.label` | 14 | 20 | 500 | | chips, segments, tabs | |
+| `type.statusLabel` | 13 / 14 | 18 / 20 | 400 / 500 | | status label: within, learning, missing 13/400 grey; moved 14/500 in `status.moved` | |
+| `type.sectionHeader` | 12 | 16 | 500 | | grey section header outside the cards (`text.tertiary`) | 12 sp, #8A8A8A dark / #6E6E6E light [measured] |
+| `type.subtitleSmall` | 14 | 19 | 400 | | subtitle under the large title (`text.tertiary`) | Clock subtitle #8A8A8A [measured] |
+| `type.labelSmall` | 12 | 16 | 500 | | weekday letters | |
+| `type.navLabel` | 11 | 14 | 500 / 700 | | navigation labels: 500 unselected, 700 selected | 10 sp canon; 11 sp, below our 12 sp minimum, recorded exception (the icon and the content description double it); never capped, wraps to 2 lines |
 | `type.caption` | 12 | 16 | 400 | | footnotes, disclaimer, "updated" times | |
 | `type.numeric.display` | 48 | 56 | 500 | tnum | Metric detail header value | |
 | `type.numeric.value` | 32 | 38 | 500 | tnum | last-night value on a tile and in the glance layout (28/34 in `Glance`) | |
@@ -327,7 +398,7 @@ resources and use the matching non-numeric style at a smaller size.
 | `type.unit` | 16 | 22 | 400 | | unit next to `numeric.value` (13/18 next to `numeric.small`) | |
 
 WCAG "large text" (>= 24 sp regular or >= 19 sp at 700): only `largeTitle`, `numeric.display` and `numeric.value`
-qualify; everything else is checked at 4.5:1 (and the values too, section 2.9).
+qualify; everything else is checked at 4.5:1 (and the values too, section 2.10).
 
 At 200 % font scale (`principles.md` 8): rows and tiles grow, labels wrap (max 2 lines for nav labels, the bar
 grows), values never ellipsize; in tiles narrower than value + unit, the unit wraps below the value.
@@ -350,95 +421,107 @@ Semantic spacing (window-level gutters and pane widths are owned by `layouts.md`
 | name | value | reference |
 |---|---|---|
 | `gutter.compact` / `.medium` / `.large` / `.glance` | 16 / 24 / 32 / 12 dp | 16 dp side margin [measured] |
-| `card.padding` | 16 dp horizontal, 16 dp vertical | 16.5 dp inner padding [measured] |
-| `row.paddingVertical` | 12 dp (row min height 56 dp, grows with text) | 10.2 dp at font 1.35, 48 dp rows [measured]; 56 dp for touch comfort [decision] |
-| `card.gap` | 12 dp between tiles and list cards | 11.9 dp (Clock) [measured] |
-| `group.gap` | 16 dp between groups; section header row 8 dp above / 8 dp below its text, 16 dp above the row | [measured] |
-| `content.bottomClearance` | bar height + bar offset + 16 dp | `layouts.md` 4.1 |
-| `icon.size` | 24 dp (standard), 20 dp (inline with text), 16 dp (status glyph in chips), 40 dp (summary card glyph in a 56 dp container) | 24 dp nav icon [measured] |
+| `card.padding` | 16 dp horizontal, 16 dp vertical for content cards; 0 vertical for list cards (the rows carry it) | 16.5 dp inner padding [measured] |
+| `row.paddingVertical` / min height | 10 dp / 48 dp (grows with text; 48 dp = `target.min`) | 10.2 dp, 48.3 dp rows [measured] |
+| `row.paddingHorizontal` | 16 dp; title -> summary 2 dp | [measured] |
+| `card.gap` | 12 dp between homogeneous items (tiles, history months) | 11.9 dp (Clock) [measured] |
+| `group.gap` | 16 dp between distinct cards and groups | 16.1 dp [measured] |
+| section header row | 24 dp above its text (incl. the 16 dp group gap), 8 dp below; text starts 32 dp from the screen edge (16 dp inside the gutter); card-to-card across a header 54 dp | 54.2 dp, text x 32.6 dp [measured] |
+| divider | `max(1 px, 0.33 dp)`, inset 16 dp at start and end (start 16 + icon + 16 with a leading icon) | 1 px #484848 inset 16.5 dp [measured] |
+| `content.bottomClearance` | 88 dp (+ the navigation inset when it exceeds 16 dp) | `layouts.md` 4.1 |
+| round shell button | 40 dp visual, 48 dp target, 16 dp from the window edge, 20 dp glyph with a 1.5 dp stroke | 40.2 dp, left 15.7 dp [measured] |
+| glass rim | 0.5 dp top, 1 dp bottom stroke + 2 dp bottom reflection band | [measured] |
+| `icon.size` | 24 dp (standard), 20 dp (inline with text), status dot 8 / triangle 10 / ring 12 dp, summary glyph 28 dp without a container | 24 dp nav icon [measured] |
 | `hinge.clearance` | 12 dp on each side of a separating fold | `layouts.md` |
+
+Shell geometry (bar 56 dp, items 70 x 48 dp, offset 16 dp, rail 56 dp, toolbar 52 dp, title start 66 / 16 dp,
+sheet header 56 dp, dialog 392 dp / 24 dp padding) is specified in `coloros-conformance.md` 4.3 and applied with
+the shell components (`ShellTokens.kt`).
 
 ## 5. Shapes
 
-Radii are calibrated to the references: cards ≈ 20 dp, bars and controls full pill [measured].
+Radii are calibrated to the references: one content radius ≈ 20 dp for every card, bars and controls capsules
+[measured]. **Concentric rule**: an inner shape's radius = outer radius - inset between the edges, never below
+12 dp for controls (`NbShapes.concentric`), e.g. 44 dp buttons 16 dp inside a 30 dp dialog get a full pill since
+their own height wins; a 20 dp card inside a 32 dp sheet at 12 dp inset keeps 20 dp.
 
 | name | radius | smoothing | use |
 |---|---|---|---|
-| `shape.xs` | 4 dp | none | chart tooltip pointer, median tick ends, smallest nested boxes |
-| `shape.s` | 8 dp | none | calendar day cell, small icon containers |
-| `shape.m` | 12 dp | none | inline banner, explainer box nested in a card, tooltip |
-| `shape.l` | 20 dp | 0.6 | cards, tiles, chart card, settings groups, state cards |
-| `shape.xl` | 28 dp | 0.6 | night summary hero card, onboarding illustration card |
-| `shape.sheet` | 32 dp (top corners only) | 0.6 | bottom sheets (`screens.md`) |
-| `shape.dialog` | 32 dp | 0.6 | dialogs (`screens.md`) |
-| `shape.pill` | 50 % of the short side | n/a | bottom bar, rail, buttons, chips, switch, period selector, selection capsule, range band track |
-| `shape.circle` | 50 % | n/a | value markers, glyph containers, icon buttons, radio |
+| `shape.xs` | 4 dp | none | chart tooltip pointer, smallest details |
+| `shape.s` | 8 dp | none | small icon containers |
+| `shape.m` | 12 dp | none | small elements only |
+| `shape.popup` | 16 dp | 0.6 | chart tooltip, popups |
+| `shape.l` | 20 dp | 0.55 | cards, tiles, chart card, settings groups, banners, state cards, night summary |
+| `shape.xl` | 28 dp | 0.6 | onboarding illustration only |
+| `shape.sheet` | 32 dp (top corners only) | 0.6 | bottom sheets |
+| `shape.dialog` | 30 dp | 0.6 | dialogs [owner decision 2026-11-26] |
+| `shape.smoothPill` | h / 2 / 1.08 | 0.08 | bottom bar, rail, buttons ("fuller than a circle" near the straight edge [measured]) |
+| `shape.pill` | 50 % of the short side | n/a | chips, switch, segmented track and thumb, range band track |
+| `shape.circle` | 50 % | n/a | value markers, round shell buttons, radio |
 
-**Squircle decision** [decision]: radii >= 16 dp use continuous ("smoothed") corners with smoothing 0.6, drawn by
-our own `SmoothCornerShape` (cubic curves per corner, path cached per size, convex so platform shadows still work
-on API 28-29). Reason: the reference bottom bar's corner profile is slightly fuller than a circle near the
-straight edge, consistent with smoothing (not resolvable reliably [measured]), and Iris uses ≈ 0.5-0.6 [Iris];
-smoothing below 16 dp is invisible at phone densities, so small radii stay circular (cheaper). Pills are exact
-semicircles. If profiling shows path cost in scrolling lists, tiles fall back to `RoundedCornerShape(20.dp)`
-without changing size (visual difference under 1 px) [hypothesis: cost not measured yet].
+**Squircle decision** [decision]: radii >= 16 dp use continuous ("smoothed") corners, drawn by our own
+`SmoothCornerShape` (cubic curves per corner, path cached per size, convex so platform shadows still work on API
+28-29). Smoothing below 16 dp is invisible at phone densities, so small radii stay circular (cheaper). If profiling
+shows path cost in scrolling lists, tiles fall back to `RoundedCornerShape(20.dp)` without changing size (visual
+difference under 1 px) [hypothesis: cost not measured yet].
 
-Nested radius rule: inner radius = outer radius - inset, never below 4 dp (a 12 dp box inside a 20 dp card with
-16 dp padding uses `shape.s`). Content inside cards is padded, not clipped, so smoothed shapes are drawn as
-backgrounds and borders; only the chart canvas clips, with a plain rounded rectangle.
+Content inside cards is padded, not clipped, so smoothed shapes are drawn as backgrounds and borders; only the
+chart canvas clips, with a plain rounded rectangle.
 
 ## 6. Elevation and shadows
 
-The references use no shadows on cards over black and soft shadows under shell controls [measured]. Shadows are
-drawn with Compose `Modifier.dropShadow` (offset y, blur radius, colour), identical in glass and solid modes.
+The references use no shadows on cards (dark on black, light white on #F0F1F2) and soft shadows under shell
+controls and the round buttons [measured]. Shadows are drawn with Compose `Modifier.dropShadow` (offset y, blur
+radius, colour), identical in glass and solid modes.
 
 | name | light | dark | use |
 |---|---|---|---|
-| `elevation.flat` | none | none | cards and tiles in dark; everything inside cards |
-| `elevation.card` | y 1 dp, blur 3 dp, black 6 % | none | cards and tiles in light (separation from `#F1F2F5`) |
-| `elevation.shell` | y 6 dp, blur 20 dp, black 10 % | y 4 dp, blur 16 dp, black 50 % | floating bar, rail |
-| `elevation.raised` | y 4 dp, blur 12 dp, black 12 % | y 4 dp, blur 12 dp, black 50 % | tooltip, dragged handle |
-| `elevation.overlay` | y 12 dp, blur 32 dp, black 14 % | y 12 dp, blur 32 dp, black 60 % | sheets, dialogs (above `scrim`) |
+| `elevation.flat` | none | none | everything inside cards |
+| `elevation.card` | none | none | cards and tiles: separated by the background step |
+| `elevation.shell` | y 4 dp, blur 12 dp, black 10 % | y 4 dp, blur 10 dp, black 35 % | floating bar, rail |
+| `elevation.control` | y 3 dp, blur 8 dp, black 10 % | y 3 dp, blur 8 dp, black 20 % | convex round shell buttons |
+| `elevation.raised` | y 4 dp, blur 16 dp, black 12 % | y 4 dp, blur 16 dp, black 50 % | tooltip, dragged handle |
+| `elevation.overlay` | y 0, blur 24 dp, black 12 % | y 0, blur 24 dp, black 30 % | sheets, dialogs (above `scrim`) |
+| `elevation.accentGlow` | `#0068E0` 25 %, y 4 dp, blur 12 dp | `#428AF7` 35 %, y 4 dp, blur 12 dp | glow under the accent call-to-action (measured FAB) |
 
 Dark relies on the rim, not the shadow, to separate the shell (shadows barely show on black).
 
 ## 7. Materials
 
+In the spirit of ColorOS 17's Luminous Effect (`docs/research/coloros17-glass.md`): blur + static per-theme tint +
+noise + rim + soft shadow on the shell only. No refraction, no reflection, no motion specular, no backdrop
+luminance sampling, no `haze-glass` in 0.1.0; cards, charts, tooltip and the period selector stay solid.
+
 ### 7.1 Glass (EffectsMode.Glass)
 
 Implemented with Haze (`dev.chrisbanes.haze:haze` + `haze-blur` 2.1.0, ADR 0003): the content root is a
 `hazeSource`; each shell component is a `hazeEffect` with a `HazeStyle(tint, blurRadius, noiseFactor)` built from
-these tokens, plus our own rim and shadow. No refraction or dispersion (`haze-glass` only after on-device
-verification). Text never sits on the blur without the tint (section 2.5).
+these tokens, plus our own rim and shadow. Text never sits on the blur without the tint (section 2.5).
 
 | name | component | blur radius dp | tint | noise | rim | shadow | reference |
 |---|---|---|---|---|---|---|---|
-| `material.glass.bar` | floating bottom bar | 24 | `glass.bar` | 3 % | 1 dp gradient `rimTop` -> `rimMid` -> `rimBottom` + 0.5 dp `rimOuter` | `elevation.shell` | Iris bar sigma 25 px @ 480 dpi ≈ 8.3 dp [Iris] |
+| `material.glass.bar` | floating bottom bar | 24 | `glass.bar` | 3 % | 0.5 dp `rimTop`, 1 dp `rimBottom` + 2 dp bottom band | `elevation.shell` | Iris bar sigma 25 px @ 480 dpi ≈ 8.3 dp [Iris] |
 | `material.glass.rail` | floating navigation rail | 24 | `glass.bar` | 3 % | as bar | `elevation.shell` | same as bar |
-| `material.glass.topBar` | top bar, only once content scrolls under it | progressive: 0 at the bar's bottom edge -> 20 under the status bar | `glass.topBar`, alpha driven by scroll offset: full once content has moved 8 dp under the bar's bottom edge, i.e. before it reaches the title text; the title row then sits on an opaque `solid.topBar` backing (same scroll-driven alpha, no fade lag) so text never sits directly on blur, and a pane that scrolls on its own (two-pane detail, book start pane) drives it too | 0 | none (bottom edge is a 0.5 dp `separator` line when scrolled) | none | progressive blur and darkening to ≈ x0.7 under the status bar, sigma ≈ 0.8 -> 4.5 dp [measured]; Iris top bar ≈ 6.7 dp [Iris] |
-| `material.glass.sheet` | bottom sheet | 40 | `glass.sheet` | 3 % | 1 dp gradient on the top edge and corners | `elevation.overlay` | Iris sheet ≈ 22 dp sigma [Iris] |
-| `material.glass.dialog` | dialog | 32 | `glass.dialog` | 3 % | 1 dp gradient all round | `elevation.overlay` | Iris dialog ≈ 11 dp sigma [Iris] |
+| `material.glass.topBar` | top bar, only once content scrolls under it | progressive: 0 at the toolbar's bottom edge -> 12 under the status bar | darkening `glass.topBarDim` 0.35 -> 0; `glass.topBar` under the small title once it is visible (section 2.5); tint distance 10 dp | 0 | none, no divider | none | progressive blur and darkening to ≈ x0.7 under the status bar, sigma ≈ 0.8 -> 4.5 dp [measured] |
+| `material.glass.sheet` | bottom sheet | 40 | `glass.sheet` | 3 % | 0.5 dp `rimTop` on the top edge only | `elevation.overlay` | Iris sheet ≈ 22 dp sigma [Iris] |
+| `material.glass.dialog` | dialog | 32 | `glass.dialog` | 3 % | none | `elevation.overlay` | Iris dialog ≈ 11 dp sigma [Iris] |
 
 Blur radius unit [hypothesis]: the values are Haze `blurRadius` in dp. Android's blur radius maps to a Gaussian
-sigma of about `0.58 x radius` (Skia's radius-to-sigma conversion), so 24 dp ≈ 14 dp sigma; this is deliberately a
-little stronger than Iris's bar so small labels under the bar never read through. Calibrate once on the owner's
-phone against the system bar look and adjust these numbers only (no other token changes). Noise is generated by
-Haze at runtime (no texture file); it matches the fine grain seen on the system's translucent surfaces [measured]
-and hides gradient banding.
-
-Over the backdrop: the glass shell sits over solid content, so in practice the blurred backdrop is cards and the
-window background; the worst-case contrast model (section 2.9) does not rely on that.
+sigma of about `0.58 x radius` (Skia's radius-to-sigma conversion), so 24 dp ≈ 14 dp sigma. Calibrate once on the
+owner's phone against the system bar look and adjust these numbers only. Noise is generated by Haze at runtime (no
+texture file); it matches the fine grain seen on the system's translucent surfaces [measured].
 
 ### 7.2 Solid (always for data; fallback for the shell)
 
 | name | fill | rim | shadow | used for |
 |---|---|---|---|---|
 | `material.solid.card` | `surface.1` | none | `elevation.card` | cards, tiles, chart card, settings groups, state cards |
-| `material.solid.nested` | `surface.2` | none | none | areas inside cards |
 | `material.solid.bar` | vertical gradient `solid.barTop` -> `solid.barBottom` | same rim tokens as glass | `elevation.shell` | bar and rail in fallback |
-| `material.solid.topBar` | `solid.topBar` (+ `separator` hairline when scrolled) | none | none | top bar in fallback |
+| `material.solid.convex` | vertical gradient `control.convexTop` -> `control.convexBottom` | `control.convexRimTop` 0.5 dp / `control.convexRimBottom` 1 dp | `elevation.control` | round back / action buttons in both modes (never blurred) |
+| `material.solid.topBar` | `solid.topBar` gradient 0.85 -> 0 over status bar + toolbar + 16 dp, no hairline | none | none | top bar in fallback |
 | `material.solid.sheet` | `solid.sheet` | same rim as glass sheet | `elevation.overlay` | sheet in fallback |
-| `material.solid.dialog` | `solid.dialog` | same rim as glass dialog | `elevation.overlay` | dialog in fallback |
-| `material.solid.tooltip` | `solid.tooltip` | 1 dp `separator` outline | `elevation.raised` | chart tooltip, both modes (it sits over data, so never glass) |
+| `material.solid.dialog` | `solid.dialog` | none | `elevation.overlay` | dialog in fallback |
+| `material.solid.tooltip` | `solid.tooltip` | none | `elevation.raised` | chart tooltip, both modes (it sits over data, so never glass) |
 | `material.solid.widget` | `surface.1` with `shape.l` | none | system widget | home-screen widget (RemoteViews cannot blur) |
 
 ### 7.3 When the solid fallback activates
@@ -452,7 +535,7 @@ reason. The first matching rule wins; the reason becomes the Settings summary (`
 | 2 | `Build.VERSION.SDK_INT < 31` | `RenderEffect` needs 31 | Solid | normal | `glass_off_unsupported` |
 | 3 | Animations removed: `ANIMATOR_DURATION_SCALE == 0` | `Settings.Global` (observed with a `ContentObserver`) | Solid | reduced (section 9.6) | `glass_off_animations` |
 | 4 | Battery saver on | `PowerManager.isPowerSaveMode` + `ACTION_POWER_SAVE_MODE_CHANGED` | Solid | reduced | `glass_off_battery` |
-| 5 | Reduced transparency or higher contrast requested | `UiModeManager.getContrast() > 0` (API 34+); a platform "reduce transparency" setting where one is exposed through public API [hypothesis: none found yet; the in-app switch covers it] | Solid | normal | `glass_off_transparency` |
+| 5 | Reduced transparency or higher contrast requested | `UiModeManager.getContrast() > 0` (API 34+); a platform "reduce transparency" setting where one is exposed through public API [hypothesis: none found yet; the in-app switch covers it] | Solid + 1 dp shell border in `onGlass.primary` at 60 % | normal | `glass_off_transparency` |
 | 6 | Weak device | `ActivityManager.isLowRamDevice()`, or `MemoryInfo.totalMem < 3 GiB` | Solid | normal | `glass_off_device` |
 | 7 | Measured jank | JankStats: > 5 % janky frames over the first 300 frames with glass visible, in two separate sessions; stored, cleared on app update | Solid | normal | `glass_off_device` |
 | 8 | Device hot | `PowerManager.getCurrentThermalStatus() >= THERMAL_STATUS_SEVERE` (temporary, reverts when it cools) | Solid | normal | `glass_off_device` |
@@ -487,25 +570,25 @@ Own monochrome line icons (1.75 dp stroke on a 24 dp grid, round caps) or Materi
 icons. Status glyphs are geometric shapes drawn in code, sized by `icon.size`, so they stay crisp and identical in
 both themes: filled circle, circle with check, triangle up/down (equilateral, 10 dp in the band at 16 dp tile
 height), rounded square with one or two triangles, dotted ring (8 dashes), dash (8 x 2 dp), half-filled circle,
-slashed circle. Selected navigation items switch outline -> filled icon in addition to the capsule and the label
-weight 600 -> 700.
+slashed circle. Selected navigation items switch outline -> filled icon and the label weight 500 -> 700 (no
+capsule). Back is an arrow, not a chevron; the disclosure chevron is a small 5 x 10 dp glyph in a 12 x 24 dp box.
 
 ## 9. Motion
 
-Springs follow the reverse-engineered range of ColorOS 17 (dampingRatio 0.55-1.0, stiffness 160-1366 [Iris]) and
-the measured back transition (exit ≈ 200 ms, entry from ≈ -1/3 width, settle ≈ 470 ms, no overshoot [measured]).
-Gesture-driven motion always uses springs and inherits the finger's velocity; data (values, bands, markers) never
-overshoots.
+Springs follow the reverse-engineered range of ColorOS 17 (dampingRatio 0.55-1.0, stiffness 160-1755 [Iris, COUI])
+and the measured back transition (exit ≈ 200 ms, entry from ≈ -1/3 width with a ≈ 0.33 -> 0 dim, settle ≈ 470 ms,
+no overshoot [measured]). The canon is critically damped almost everywhere; nothing grows above its size.
+Gesture-driven motion always uses springs and inherits the finger's velocity; data never overshoots.
 
 ### 9.1 Durations (for tweens and fades)
 
 | name | ms | use |
 |---|---|---|
 | `motion.duration.instant` | 0 | reduced-motion replacement |
-| `motion.duration.micro` | 100 | state layer in, icon outline -> filled |
-| `motion.duration.short` | 150 | crossfades, top bar tint in, effects-mode switch |
+| `motion.duration.micro` | 100 | navigation icon outline -> filled and label weight crossfade |
+| `motion.duration.short` | 150 | crossfades, top-level switch, top bar tint in, effects-mode switch, dialog exit |
 | `motion.duration.medium` | 250 | dialog enter, banner in |
-| `motion.duration.reduced` | 120 | screen crossfade that replaces morphs and pushes under reduced motion |
+| `motion.duration.reduced` | 120 | screen, sheet and dialog crossfade that replaces motion under reduced motion |
 | `motion.duration.long` | 350 | onboarding page change |
 | `motion.duration.glowIn` | 110 | touch light appears under the finger [Iris] |
 | `motion.duration.glowOut` | 480 | touch light fades after release [Iris] |
@@ -517,7 +600,9 @@ overshoots.
 | `motion.easing.standard` | (0.2, 0, 0, 1) | general property changes |
 | `motion.easing.flow` | (0.3, 0, 0.1, 1) | entering elements (dialog, banner, tooltip) [decision: a generic strong-decelerate curve; the same numbers appear in a third-party kit (research file), no code or resource is taken from it] |
 | `motion.easing.exit` | (0.3, 0, 1, 1) | leaving elements |
-| `motion.easing.linear` | linear | scroll-driven values (large title collapse, top bar tint by scroll offset) |
+| `motion.easing.title` | (0.33, 0, 0.67, 1) | small top-bar title fading in over scroll 40 -> 72 dp |
+| `motion.easing.overscrollReturn` | (0.2, 0.62, 0.17, 1.05) | overscroll back to rest |
+| `motion.easing.linear` | linear | scroll-driven values (top bar tint by scroll offset) |
 
 ### 9.3 Springs
 
@@ -525,37 +610,56 @@ overshoots.
 |---|---|---|---|
 | `motion.spring.page` | 1.0 | 220 | screen push / pop, predictive back release (settles ≈ 470 ms, matches [measured]) |
 | `motion.spring.morph` | 0.9 | 380 | shared-bounds morph tile -> Metric detail header, row -> Night detail, list -> pane |
-| `motion.spring.selection` | 0.72 | 600 | nav capsule and period capsule moving between items (≤ 4 % overshoot: the "elastic" feel) |
-| `motion.spring.press` | 0.6 | 1200 | press scale 1 -> 0.97 and release |
-| `motion.spring.follow` | 1.0 | 1500 | anything tracking the finger: chart scrub, capsule drag, sheet drag |
-| `motion.spring.sheet` | 0.92 | 420 | sheet settle after drag or open |
+| `motion.spring.selection` | 1.0 | 247 | period selector thumb, tab underline (no overshoot) |
+| `motion.spring.pressIn` | 1.0 | 632 (compact) / 439 (wide) | press shrink |
+| `motion.spring.pressOut` | 0.8 | 380 | release; carries the press velocity, scale clamped at 1.0 [decision: the COUI 0.4 / 158 release would grow the element above its size, which ColorOS never does] |
+| `motion.spring.highlightIn` / `Out` | 1.0 | 1755 / 187 | pressed highlight of buttons and tiles |
+| `motion.spring.rowHighlightIn` / `Out` | 1.0 | 439 / 895 | pressed highlight of rows in a grouped card |
+| `motion.spring.follow` | 1.0 | 1500 | anything tracking the finger: chart scrub, thumb drag, sheet drag |
+| `motion.spring.sheet` | 1.0 | 250 | sheet show |
+| `motion.spring.sheetHide` | 1.0 | 440 | programmatic sheet hide |
+| `motion.spring.sheetReturn` | 1.0 | 247 | dragged sheet returning to rest |
+| `motion.spring.switch` | 0.7 | 247 | switch knob, stretch to x1.3 at 34.7 % of travel |
+| `motion.spring.squash` | 0.5 | 110 | segmented control height squash 0.94 -> 1 (optional) |
 | `motion.spring.pane` | 1.0 | 300 | pane resize / list-detail changes on resize, fold and unfold |
 | `motion.spring.data` | 1.0 | 400 | band, marker and value changes when the selected night changes (never overshoot) |
 
-### 9.4 Transitions (morphing between screens)
+### 9.4 Transitions
 
 | transition | spec |
 |---|---|
+| Push (non-shared) | incoming slides in from the end edge (+100 % width), the covered page moves to -1/3 width with a black dim 0 -> 0.3; `spring.page`; no scale, no fade. Mirrored in RTL [measured: `reference-analysis.md` 8.1] |
+| Pop | mirrored: incoming from -1/3 with the dim 0.3 -> 0, outgoing to +100 %; `spring.page` |
+| In-page sub-navigation | the same push / pop via `AnimatedContent`, direction from page depth (Settings sub-pages, onboarding steps) |
 | Home tile -> Metric detail | `SharedTransitionLayout`: tile container `sharedBounds` -> header card, radius `shape.l` kept, value text `sharedElement`; other content fades in after 60 % progress; `spring.morph` |
 | History row -> Night detail | same pattern, row -> header |
-| Push (non-shared) | incoming slides in from the end edge, outgoing moves to -1/3 width (parallax); `spring.page`; no scale, no dimming (as measured). Mirrored in RTL |
-| Predictive back | during the gesture the page scales to 0.92 and its corners grow to `shape.xl`; release completes with `spring.page`, cancel returns with `spring.follow` |
-| Top-level section switch | crossfade `duration.short`; nav capsule moves with `spring.selection` |
-| Sheet | enters with `spring.sheet` from below; exit tween 200 ms `easing.exit`; scrim fades with it |
-| Dialog | scale 0.94 -> 1 plus fade, `duration.medium` `easing.flow`; exit fade 150 ms |
+| Predictive back | drives the pop from the back progress; release `spring.page`, cancel `spring.follow`; commit threshold 45 dp; preview scale 0.92 kept until a slow-gesture capture exists |
+| Top-level section switch | crossfade `duration.short` |
+| Navigation selection | icon outline -> filled and label 500 -> 700, crossfade `duration.micro` `easing.standard`; no indicator |
+| Bottom bar on sub-pages | slides out (translate 88 dp + alpha 0, 200 ms `easing.exit`), back with `spring.page` |
+| Sheet | shows with `spring.sheet` from below; hides with `spring.sheetHide`; drag follows the finger (upward rubber band to 72 dp); release dismisses past 50 % or on a downward fling, else `spring.sheetReturn`; scrim alpha follows the offset |
+| Dialog | Compact, bottom-docked: slide from +100 % of its height + fade, `duration.medium` `easing.flow`; centred: scale 0.8 -> 1 + fade, same timing; exit fade (+ 24 dp slide when docked) `duration.short` `easing.exit` |
 | Tooltip | appears at the finger with fade + scale 0.9 -> 1, `duration.short`; position follows with `spring.follow` |
 | Learning -> range ready (`B-RANGE-READY`) | dotted band outline morphs into the filled band: dashes close, fill fades in, `spring.data` |
 | Fold / unfold / resize | panes animate with `spring.pane`; content keeps its scroll anchor; no reload, no fade of data |
 
 ### 9.5 Finger-following feedback
 
-- Press: scale 0.97 with `spring.press` on tiles, rows, buttons and shell items (not on chart points).
-- Glass items: a radial `accentGlow` light (radius 48 dp) appears under the finger in `duration.glowIn`, follows
-  the finger, fades in `duration.glowOut` after release. Solid elements use `state.pressed` instead.
-- Navigation capsule and period capsule follow a horizontal drag across the bar with `spring.follow` and snap to
-  the nearest item with `spring.selection`.
-- Haptics: public `HapticFeedbackConstants` only (`CLOCK_TICK` on chart point change, `CONFIRM` on snap); no
-  vendor constants (ADR 0003).
+- **Press shrink**: tiles, buttons, chips, round shell buttons and the bar shrink to 0.96 (side <= 40 dp) ... 0.98
+  (side >= 150 dp or aspect >= 4: bar, full-width buttons, sheet handle), linear in between, on
+  `spring.pressIn`; release on `spring.pressOut` with the press velocity, never above 1.0. Rows inside a grouped
+  card do not shrink, they only light up. Not on chart points.
+- **Pressed highlight**: `state.pressed` under the content, clipped to the element's shape (hover: two thirds).
+- **Touch glow** on shell items, round shell buttons, the period selector thumb and primary buttons: a radial
+  `glow.neutral` light (radius up to 140 dp, capped by the element and clipped to it) appears in `duration.glowIn`,
+  follows the finger, fades in `duration.glowOut` after release. Decorative, never on cards; at most one animating.
+- **Functional light**: one place only, a short highlight sweep across the period selector thumb in the direction of
+  the change.
+- No bar minimising on scroll.
+- **Haptics**: public `HapticFeedbackConstants` only (no vendor codes, ADR 0003): switch `TOGGLE_ON` / `TOGGLE_OFF`
+  (API 34+, else `CLOCK_TICK`); segment drag crossing `SEGMENT_TICK` (else `CLOCK_TICK`); chart scrub point
+  `CLOCK_TICK` (`SEGMENT_FREQUENT_TICK` on 34+); long press `LONG_PRESS`; nothing for taps, tabs, rows, navigation
+  or the overscroll edge; through the View so the system setting applies.
 
 ### 9.6 Reduced motion
 
@@ -565,13 +669,30 @@ spring settle times are simply scaled by Compose; with 0, these variants replace
 
 | normal | reduced variant |
 |---|---|
-| shared-bounds morph, push with parallax | crossfade `motion.duration.reduced` (forced to 120 ms by our own clock even at scale 0, so the change of screen stays visible) |
-| predictive back scale and corner growth | none; back completes without preview |
-| springs with overshoot (`selection`, `press`) | snap to the end state (capsule moves without travel) |
-| touch glow, press scale | static `state.pressed` layer only |
+| shared-bounds morph, push / pop with parallax and dim | crossfade `motion.duration.reduced` (forced to 120 ms by our own clock even at scale 0, so the change of screen stays visible) |
+| predictive back preview | none; back completes without preview |
+| sheet and dialog motion | fade `motion.duration.reduced` |
+| springs with overshoot (switch, squash) | snap to the end state |
+| press shrink, glow spread | none; the static pressed highlight (and a static glow while pressed on glass) only |
+| overscroll bounce | none: content stops at the edge |
 | progressive top bar tint by scroll | appears at a fixed scroll threshold, no fade |
 | `B-RANGE-READY` morph | static filled band |
 | fold/unfold pane animation | instant relayout |
+
+### 9.7 Overscroll
+
+ColorOS translates the content past the edge without distortion instead of Android's stretch [measured:
+`reference-analysis.md` 8.2]. Implemented by our own `NbOverscrollEffect`, provided app-wide through
+`LocalOverscrollFactory` (none under reduced motion):
+
+| name | value |
+|---|---|
+| `motion.overscroll.follow` | the content follows 24 % (slow pull) to 34 % (fast pull, >= 24 dp per event) of the finger travel past the edge, with growing resistance up to 240 dp; holds while the finger rests |
+| `motion.overscroll.return` | 700 ms, `easing.overscrollReturn`, never across the edge |
+| `motion.overscroll.throw` | a fling that hits the edge: leftover velocity x 0.047 s, at most 107 dp, rise 60 ms FastOutSlowIn, then the return |
+| `motion.overscroll.catch` | a finger landing during the return stops it where it is |
+
+Fling itself stays the Compose spline decay (revisit after a side-by-side recording [hypothesis]).
 
 ## 10. Interaction: targets, focus, hover
 
@@ -588,11 +709,20 @@ spring settle times are simply scaled by Compose; with 0, these variants replace
 
 | Token | Reference | Ours | Why |
 |---|---|---|---|
-| Window / card (dark) | #000000 / #1A1A1A [measured] | #000000 / #1A1B1E | same structure, faint cool tint of our own |
-| Secondary text (dark) | #969696 [measured] | #A3A6AE | 4.5:1 on `surface.3` too |
-| Accent | #428AF7, white label 3.4:1 [measured] | #2C5BD6 / #8FB0FF | own hue; button labels pass 4.5:1 |
-| Card radius | ≈ 20 dp [measured] | 20 dp, smoothing 0.6 | match, continuous corners |
-| Bottom bar | 56 dp pill, 16 dp above bottom [measured] | 64 dp pill, nav inset + 12 dp (`layouts.md` 4.1) | 12 sp labels at font 1.0 with room to grow |
-| Selection in bar | filled icon + bold label, no capsule [measured] | capsule + filled icon + weight | selection not by colour alone, and a morphing target for Living Flow motion |
-| Disabled grey | #5F5F5F, 2.7:1 [measured] | `text.tertiary`, >= 4.5:1 | disabled labels still readable |
-| Back transition | ≈ 470 ms settle, no overshoot [measured] | `spring.page` 1.0 / 220 | match |
+| Window / card (dark) | #000000 / #1A1A1A [measured] | #000000 / #1A1A1A | match |
+| Window / card (light) | #F0F1F2 / #FFFFFF, no card shadow [measured] | #F0F1F2 / #FFFFFF, no shadow | match |
+| Secondary text (dark) | #969696 [measured] | #969696 | match; never on fills lighter than `surface.3` (4.59) |
+| Secondary text (light) | #757575 [measured] | #666666 | #757575 is 4.07:1 on the window |
+| Section header | #8A8A8A dark / #6E6E6E light [measured] | `text.tertiary` #8A8A8A / #6E6E6E | match |
+| Hairline, chevron | #484848 / #5F5F5F dark, #E0E0E0 / #BDBDBD light [measured] | same | match |
+| Accent | #428AF7 dark, #0078EF light, white label 3.4:1 [measured] | #428AF7 controls, #2A6BE0 label fills, #5C9DFF text (dark); #0068E0 / #0062D6 (light) | button labels and links pass 4.5:1 |
+| Card radius | ≈ 20 dp [measured] | 20 dp, smoothing 0.55 | match, continuous corners |
+| Bottom bar | 56 dp pill, 16 dp above the edge [measured] | 56 dp pill, 16 dp above the edge on gesture navigation | match |
+| Selection in bar | filled icon + bold label, no capsule [measured] | filled icon + 700 label, no capsule | not colour alone: shape and weight carry it |
+| Nav label | 10 sp, scaling capped [Iris] | 11 sp, never capped | legibility and 200 % font |
+| Switch off track | #505050 dark, #D6D6D6 light, 2.16:1 [measured] | same | canon exception: the knob position carries the state |
+| Unchecked radio | #5F5F5F (2.73:1) [measured] | `outline` #767676 (3.83:1) | control boundary reaches 3:1 |
+| Disabled | whole item #5F5F5F, 2.7:1 [measured] | labels `text.tertiary` (>= 4.5:1), only control graphics in #5F5F5F | disabled labels still readable |
+| Press | shrink + highlight under content, no ripple [Iris, COUI] | 0.96-0.98 shrink, `state.pressed` under content, no ripple | match |
+| Overscroll | translate, ≈ 0.7 s return [measured] | `NbOverscrollEffect` | match |
+| Back transition | ≈ 470 ms settle, no overshoot, covered page dimmed ≈ 0.33 -> 0 [measured] | `spring.page` 1.0 / 220, dim 0.3 | match |

@@ -267,7 +267,8 @@ change (variable frame rate, ≈ 16.7 ms spacing while animating).
 | Incoming page | slides in **from the left** with parallax, not from 0: first visible at ≈ −1/3 of the width | [estimate] |
 | Incoming offset over time | ≈ −124 px at ~100 ms, −63 px at ~150 ms, −24 px at ~215 ms, −8 px at ~285 ms, −3 px at ~350 ms, 0 at **≈ 470 ms** | [measured on device recording] |
 | Curve | strong deceleration with a long exponential tail (per-frame offset ratio ≈ 0.8, time constant ≈ 75 ms); looks like a critically damped spring, no overshoot | [estimate] |
-| Other properties | no scale, no visible fade or dimming of either page (both on black), top bar moves with its page | [measured on device recording] |
+| Covered page dim | the incoming (covered) page is darkened at the start of the pop and brightens as it settles: card #181818 at rest (recording scale) reads #101010 at ~80 ms, #121212 at ~115 ms, #141414 at ~150 ms, #171717 at ~180 ms and #181818 from ~300 ms, i.e. a black dim of ≈ 0.33 -> 0 that follows the slide (`frames-back/f000060`-`f000075`, card mode sampled at the same spot); corrected 2026-11-26, the first reading "no dimming" was taken by eye | [measured on device recording] |
+| Other properties | no scale, no fade, top bar moves with its page | [measured on device recording] |
 
 ### 8.2 Scroll and overscroll (Settings, Display page)
 
@@ -306,8 +307,12 @@ consistent with a spring of dampingRatio ≈ 1.0 and medium-low stiffness [estim
 
 ## 10. Gaps
 
-- Only the folded (outer screen) posture and only the dark theme were captured: no light-theme colours, no
-  inner-screen layouts (navigation rail, two-pane), no tabletop posture [measured on device screenshot].
+- Only the folded (outer screen) posture was captured in dark. Light-theme captures of the inner screen exist since
+  2026-11-26 (`unfolded-light/settings-display`, `alarmclock`, `calculator`): window #F0F1F2, cards #FFFFFF, text
+  #191919, summary #757575, section header and unselected tab #6E6E6E, hairline #E0E0E0, chevron #BDBDBD, switch
+  off #D6D6D6, switch on #0078EF, FAB gradient #008DFF -> #109BFB, bar fill #F8F8F8 -> #FBFBFB with a white bottom
+  rim, unselected nav label #454545, white round back button with a soft shadow, dark tab underline
+  [measured on device screenshot]. Still missing: navigation rail, two-pane, tabletop posture.
 - Translucency of the floating bar and of dialogs/bottom sheets could not be judged (black backgrounds; no sheet or
   dialog was opened). A light-theme capture over colourful content would settle it.
 - Light theme, unfolded captures and a dialog/bottom-sheet capture are candidates for the next reference session

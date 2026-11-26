@@ -1,18 +1,22 @@
 package io.github.alien2003.nightbaseline
 
 import android.content.Intent
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
 import android.view.KeyboardShortcutInfo
 import android.view.Menu
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -45,8 +49,9 @@ import io.github.alien2003.nightbaseline.work.notify.NightIntents
 /**
  * The single activity: edge-to-edge, no orientation lock, resizable; fold / unfold, rotation and resize are handled
  * without recreation (manifest `configChanges`), and the layout follows the live window metrics and folding features.
- * It hosts the navigation graph, turns notification taps into deep links (the `nightbaseline://` data URI or the
- * night date extra, both validated) and lists the keyboard shortcuts for the system helper (Meta+/).
+ * The system bar icons follow the app's own theme, not the system's (a forced light or dark theme keeps them
+ * readable), over transparent bars. It hosts the navigation graph, turns notification taps into deep links (the
+ * `nightbaseline://` data URI or the night date extra, both validated) and lists the keyboard shortcuts for the system helper (Meta+/).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -89,6 +94,7 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.DARK -> true
                 else -> isSystemInDarkTheme()
             }
+        LaunchedEffect(dark) { applySystemBars(dark) }
         NightBaselineTheme(darkTheme = dark, effects = resolveEffectsMode(rememberPlatformEffectsInputs(glass))) {
             var showCatalog by rememberSaveable { mutableStateOf(false) }
             val catalog = DebugTools.catalog
@@ -122,6 +128,19 @@ class MainActivity : ComponentActivity() {
                     },
             )
         }
+    }
+
+    /** Transparent status and navigation bars with icons for the in-app theme (`coloros-conformance.md` D1). */
+    private fun applySystemBars(dark: Boolean) {
+        val style =
+            if (dark) {
+                SystemBarStyle.dark(Color.TRANSPARENT)
+            } else {
+                SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+            }
+        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+        // No system scrim behind a 3-button bar: the shell draws its own bottom gradient.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
     }
 
     override fun onProvideKeyboardShortcuts(

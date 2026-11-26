@@ -18,32 +18,42 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
 
-/** Shape tokens of `tokens.md` section 5. Radii >= 16 dp use continuous corners ([SmoothCornerShape], smoothing 0.6). */
+/**
+ * Shape tokens of `tokens.md` section 5. Radii >= 16 dp use continuous corners ([SmoothCornerShape]). One content
+ * radius (20 dp) for every card; shell surfaces are capsules; inner shapes are concentric with their container
+ * ([concentric]).
+ */
 @Immutable
 object NbShapes {
     /** `shape.xs` 4 dp. */
     val xs: Shape = RoundedCornerShape(4.dp)
 
-    /** `shape.s` 8 dp: calendar day cell, small icon containers. */
+    /** `shape.s` 8 dp: small icon containers. */
     val s: Shape = RoundedCornerShape(8.dp)
 
-    /** `shape.m` 12 dp: inline banner, nested explainer box, tooltip. */
+    /** `shape.m` 12 dp: small elements only. */
     val m: Shape = RoundedCornerShape(12.dp)
 
-    /** `shape.l` 20 dp, smoothing 0.6: cards, tiles, chart card, settings groups, state cards. */
-    val l: Shape = SmoothCornerShape(20.dp)
+    /** `shape.popup` 16 dp, smoothing 0.6: chart tooltip, popups. */
+    val popup: Shape = SmoothCornerShape(16.dp)
 
-    /** `shape.xl` 28 dp, smoothing 0.6: night summary hero card. */
+    /** `shape.l` 20 dp, smoothing 0.55: cards, tiles, chart card, settings groups, banners, state cards. */
+    val l: Shape = SmoothCornerShape(20.dp, smoothing = CARD_SMOOTHING)
+
+    /** `shape.xl` 28 dp, smoothing 0.6: onboarding illustration only. */
     val xl: Shape = SmoothCornerShape(28.dp)
 
     /** `shape.sheet` 32 dp, top corners only. */
     val sheet: Shape = SmoothCornerShape(topStart = 32.dp, topEnd = 32.dp, bottomEnd = 0.dp, bottomStart = 0.dp)
 
-    /** `shape.dialog` 32 dp. */
-    val dialog: Shape = SmoothCornerShape(32.dp)
+    /** `shape.dialog` 30 dp, smoothing 0.6. */
+    val dialog: Shape = SmoothCornerShape(30.dp)
 
-    /** `shape.pill`: exact semicircle ends. */
+    /** `shape.pill`: exact semicircle ends (chips, switch, track, small controls). */
     val pill: Shape = RoundedCornerShape(percent = 50)
+
+    /** `shape.smoothPill`: capsule with slightly smoothed ends, fuller than a circle (bar, rail, buttons). */
+    val smoothPill: Shape = SmoothPillShape
 
     /** `shape.circle`. */
     val circle: Shape = CircleShape
@@ -56,6 +66,43 @@ object NbShapes {
 
     /** Radius of [s]. */
     val sRadius: Dp = 8.dp
+
+    /** Radius of [dialog]. */
+    val dialogRadius: Dp = 30.dp
+
+    /** Radius of [sheet]. */
+    val sheetRadius: Dp = 32.dp
+
+    /**
+     * Concentric inner radius: [outer] minus the [inset] between the two edges, never below 12 dp
+     * (`tokens.md` 5, nested radius rule), e.g. a button 16 dp inside a 30 dp dialog gets 14 dp.
+     */
+    fun concentric(
+        outer: Dp,
+        inset: Dp,
+    ): Dp = maxOf(outer - inset, NbDimens.concentricMinRadius)
+
+    private const val CARD_SMOOTHING = 0.55f
+}
+
+/**
+ * A capsule whose ends are slightly smoothed (radius = h / 2 / 1.08, smoothing 0.08), which reads fuller near the
+ * straight edge than an exact semicircle, as the measured ColorOS bar does.
+ */
+@Immutable
+object SmoothPillShape : Shape {
+    private const val RADIUS_DIVISOR = 1.08f
+    private const val SMOOTHING = 0.08f
+
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val radiusPx = min(size.width, size.height) / 2f / RADIUS_DIVISOR
+        val radius = with(density) { radiusPx.toDp() }
+        return SmoothCornerShape(radius, SMOOTHING).createOutline(size, layoutDirection, density)
+    }
 }
 
 /**

@@ -12,27 +12,28 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
 /**
- * Type scale of `tokens.md` section 3: system font only, sizes and line heights in sp (they scale with the system
- * font scale up to 200 %, never capped), letter spacing 0, no all-caps, `includeFontPadding = false`, centred line
- * height without trimming. Numeric styles use tabular lining figures (`tnum, lnum`) so digits do not jitter.
+ * Type scale of `tokens.md` section 3, after the ColorOS 17 system apps: system font only, weights 400 / 500 / 700
+ * only (600 renders near-bold on the system sans), sizes and line heights in sp (they scale with the system font
+ * scale up to 200 %, never capped), letter spacing 0, no all-caps, `includeFontPadding = false`, centred line height
+ * without trimming. Numeric styles use tabular lining figures (`tnum, lnum`) so digits do not jitter.
  */
 @Immutable
 data class NbTypography(
-    /** `type.largeTitle` 28/34 700: top-level screen title at rest. */
+    /** `type.largeTitle` 32/40 700: top-level screen title, first item of the scrolling content. */
     val largeTitle: TextStyle,
-    /** `type.headline` 22/28 600: night summary headline, state card title. */
+    /** `type.headline` 22/28 500: night summary headline. */
     val headline: TextStyle,
-    /** `type.title` 20/26 600: collapsed top bar, pane, sheet and dialog titles. */
+    /** `type.title` 20/26 500: pane and state-card titles. */
     val title: TextStyle,
-    /** `type.titleSmall` 16/22 600: card titles, metric name, row titles. */
+    /** `type.titleSmall` = `type.itemTitle` 16/22 500: card titles, metric name, row titles. */
     val titleSmall: TextStyle,
     /** `type.body` 16/24 400. */
     val body: TextStyle,
-    /** `type.bodySmall` 14/20 400: summaries, chart summary, banner text. */
+    /** `type.bodySmall` 14/20 400: chart summary, banner text. */
     val bodySmall: TextStyle,
-    /** `type.label` 14/20 600: buttons, chips, period selector. */
+    /** `type.label` 14/20 500: chips, segments, status. */
     val label: TextStyle,
-    /** `type.labelSmall` 12/16 600: navigation labels, section headers, weekday letters. */
+    /** `type.labelSmall` 12/16 500: weekday letters. */
     val labelSmall: TextStyle,
     /** `type.caption` 12/16 400: footnotes, disclaimer. */
     val caption: TextStyle,
@@ -50,7 +51,32 @@ data class NbTypography(
     val unit: TextStyle,
     /** `type.unit` next to [numericSmall]: 13/18. */
     val unitSmall: TextStyle,
-)
+    /** `type.topBarTitle` 18/24 700: collapsed top-bar title, one line with ellipsis. */
+    val topBarTitle: TextStyle,
+    /** `type.dialogTitle` 18/24 700: sheet and dialog titles, centred. */
+    val dialogTitle: TextStyle,
+    /** `type.summary` 14/19 400: summaries under row titles (canon 13 sp, 14 for legibility). */
+    val summary: TextStyle,
+    /** `type.value` 14/20 400: trailing row values. */
+    val value: TextStyle,
+    /** `type.button` 16/22 500: button labels, text buttons. */
+    val button: TextStyle,
+    /** `type.sectionHeader` 12/16 500: grey section header outside the cards (`text.tertiary`). */
+    val sectionHeader: TextStyle,
+    /** `type.navLabel` 11/14 500: unselected navigation label (recorded exception to the 12 sp minimum). */
+    val navLabel: TextStyle,
+    /** `type.navLabel` 11/14 700: selected navigation label. */
+    val navLabelSelected: TextStyle,
+    /** `type.subtitleSmall` 14/19 400: subtitle under the large title (`text.tertiary`). */
+    val subtitleSmall: TextStyle,
+    /** `type.statusLabel` 13/18 400: "Usual", learning and missing labels. */
+    val statusLabel: TextStyle,
+    /** `type.statusLabel` for moved values: 14/20 500. */
+    val statusLabelMoved: TextStyle,
+) {
+    /** `type.itemTitle` = [titleSmall]. */
+    val itemTitle: TextStyle get() = titleSmall
+}
 
 private const val TABULAR_FIGURES = "tnum, lnum"
 
@@ -77,14 +103,14 @@ private fun style(
 /** The one type scale (colour is applied by the components, not baked into the styles). */
 val DefaultNbTypography: NbTypography =
     NbTypography(
-        largeTitle = style(28.sp, 34.sp, 700),
-        headline = style(22.sp, 28.sp, 600),
-        title = style(20.sp, 26.sp, 600),
-        titleSmall = style(16.sp, 22.sp, 600),
+        largeTitle = style(32.sp, 40.sp, 700),
+        headline = style(22.sp, 28.sp, 500),
+        title = style(20.sp, 26.sp, 500),
+        titleSmall = style(16.sp, 22.sp, 500),
         body = style(16.sp, 24.sp, 400),
         bodySmall = style(14.sp, 20.sp, 400),
-        label = style(14.sp, 20.sp, 600),
-        labelSmall = style(12.sp, 16.sp, 600),
+        label = style(14.sp, 20.sp, 500),
+        labelSmall = style(12.sp, 16.sp, 500),
         caption = style(12.sp, 16.sp, 400),
         numericDisplay = style(48.sp, 56.sp, 500, numeric = true),
         numericValue = style(32.sp, 38.sp, 500, numeric = true),
@@ -93,4 +119,15 @@ val DefaultNbTypography: NbTypography =
         numericAxis = style(12.sp, 16.sp, 400, numeric = true),
         unit = style(16.sp, 22.sp, 400),
         unitSmall = style(13.sp, 18.sp, 400),
+        topBarTitle = style(18.sp, 24.sp, 700),
+        dialogTitle = style(18.sp, 24.sp, 700),
+        summary = style(14.sp, 19.sp, 400),
+        value = style(14.sp, 20.sp, 400),
+        button = style(16.sp, 22.sp, 500),
+        sectionHeader = style(12.sp, 16.sp, 500),
+        navLabel = style(11.sp, 14.sp, 500),
+        navLabelSelected = style(11.sp, 14.sp, 700),
+        subtitleSmall = style(14.sp, 19.sp, 400),
+        statusLabel = style(13.sp, 18.sp, 400),
+        statusLabelMoved = style(14.sp, 20.sp, 500),
     )

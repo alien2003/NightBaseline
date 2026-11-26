@@ -5,7 +5,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
-/** Kind of a contrast pair and its lowest allowed ratio (WCAG 2.x, `tokens.md` 2.9). */
+/** Kind of a contrast pair and its lowest allowed ratio (WCAG 2.x, `tokens.md` 2.10). */
 enum class ContrastKind(
     /** Lowest allowed minimum for this kind. */
     val floor: Double,
@@ -35,7 +35,7 @@ enum class ContrastTheme {
     Both,
 }
 
-/** One row of the pairs table of `tokens.md` 2.9: foreground and background token names and the required ratio. */
+/** One row of the pairs table of `tokens.md` 2.10: foreground and background token names and the required ratio. */
 data class ContrastPair(
     /** Pair name; its first dot-separated part is the [kind]. */
     val name: String,
@@ -127,22 +127,28 @@ private fun both(
     min: Double,
 ) = ContrastPair(name, fg, bg, ContrastTheme.Both, min)
 
-/** The pairs table of `tokens.md` 2.9 (kept identical to the Markdown by `ContrastTest`). */
+/** The pairs table of `tokens.md` 2.10 (kept identical to the Markdown by `ContrastTest`). */
 val NbContrastPairs: List<ContrastPair> =
     listOf(
         both("text.primary.background", "color.text.primary", "color.background", 4.5),
         both("text.primary.surface1", "color.text.primary", "color.surface.1", 4.5),
         both("text.primary.surface2", "color.text.primary", "color.surface.2", 4.5),
         both("text.primary.surface3", "color.text.primary", "color.surface.3", 4.5),
+        both("text.primary.elevated", "color.text.primary", "color.surface.elevated", 4.5),
         both("text.secondary.background", "color.text.secondary", "color.background", 4.5),
         both("text.secondary.surface1", "color.text.secondary", "color.surface.1", 4.5),
         both("text.secondary.surface2", "color.text.secondary", "color.surface.2", 4.5),
         both("text.secondary.surface3", "color.text.secondary", "color.surface.3", 4.5),
+        both("text.secondary.elevated", "color.text.secondary", "color.surface.elevated", 4.5),
         both("text.tertiary.background", "color.text.tertiary", "color.background", 4.5),
         both("text.tertiary.surface1", "color.text.tertiary", "color.surface.1", 4.5),
         both("text.link.surface1", "color.primary", "color.surface.1", 4.5),
         both("text.link.background", "color.primary", "color.background", 4.5),
-        both("text.onPrimary", "color.onPrimary", "color.primary", 4.5),
+        both("text.primaryText.background", "color.primaryText", "color.background", 4.5),
+        both("text.primaryText.surface1", "color.primaryText", "color.surface.1", 4.5),
+        both("text.primaryText.surface3", "color.primaryText", "color.surface.3", 4.5),
+        both("text.primaryText.elevated", "color.primaryText", "color.surface.elevated", 4.5),
+        both("text.onPrimary", "color.onPrimary", "color.primaryFill", 4.5),
         both("text.onPrimaryContainer", "color.onPrimaryContainer", "color.primaryContainer", 4.5),
         both("text.status.within.surface1", "color.status.within", "color.surface.1", 4.5),
         both("text.status.within.surface2", "color.status.within", "color.surface.2", 4.5),
@@ -156,6 +162,8 @@ val NbContrastPairs: List<ContrastPair> =
         both("text.status.moved.surface3", "color.status.moved", "color.surface.3", 4.5),
         both("text.status.neutral.surface3", "color.status.neutral", "color.surface.3", 4.5),
         both("text.status.info.surface3", "color.status.info", "color.surface.3", 4.5),
+        both("text.status.within.background", "color.status.within", "color.background", 4.5),
+        both("text.status.moved.background", "color.status.moved", "color.background", 4.5),
         both("text.status.within.onContainer", "color.status.within.onContainer", "color.status.within.container", 4.5),
         both("text.status.moved.onContainer", "color.status.moved.onContainer", "color.status.moved.container", 4.5),
         both("text.status.neutral.onContainer", "color.status.neutral.onContainer", "color.status.neutral.container", 4.5),
@@ -176,6 +184,8 @@ val NbContrastPairs: List<ContrastPair> =
         both("text.onGlass.secondary.solidTopBar", "color.onGlass.secondary", "color.solid.topBar", 4.5),
         both("text.onGlass.primary.solidSheet", "color.onGlass.primary", "color.solid.sheet", 4.5),
         both("text.onGlass.secondary.solidSheet", "color.onGlass.secondary", "color.solid.sheet", 4.5),
+        both("text.onGlass.primary.solidDialog", "color.onGlass.primary", "color.solid.dialog", 4.5),
+        both("text.onGlass.secondary.solidDialog", "color.onGlass.secondary", "color.solid.dialog", 4.5),
         both("text.primary.tooltip", "color.text.primary", "color.solid.tooltip", 4.5),
         both("text.secondary.tooltip", "color.text.secondary", "color.solid.tooltip", 4.5),
         both("text.status.within.tooltip", "color.status.within", "color.solid.tooltip", 4.5),
@@ -187,27 +197,29 @@ val NbContrastPairs: List<ContrastPair> =
         both("graphic.status.moved.container", "color.status.moved", "color.status.moved.container", 3.0),
         both("graphic.status.neutral.container", "color.status.neutral", "color.status.neutral.container", 3.0),
         both("graphic.status.info.container", "color.status.info", "color.status.info.container", 3.0),
-        both("graphic.band.edge.surface1", "color.band.edge", "color.surface.1", 3.0),
-        both("graphic.band.edge.fill", "color.band.edge", "color.band.fill", 3.0),
-        both("graphic.marker.within.fill", "color.status.within", "color.band.fill", 3.0),
+        both("graphic.band.fill.surface1", "color.band.fill", "color.surface.1", 3.0),
+        both("graphic.marker.within.fill", "color.marker.within", "color.band.fill", 3.0),
         both("graphic.marker.within.surface1", "color.status.within", "color.surface.1", 3.0),
-        both("graphic.marker.moved.fill", "color.status.moved", "color.band.fill", 3.0),
+        both("graphic.marker.moved.track", "color.status.moved", "color.control.track", 3.0),
         both("graphic.marker.moved.surface1", "color.status.moved", "color.surface.1", 3.0),
-        both("graphic.marker.neutral.fill", "color.status.neutral", "color.band.fill", 3.0),
+        both("graphic.marker.neutral.track", "color.status.neutral", "color.control.track", 3.0),
         both("graphic.chart.point.surface1", "color.chart.point", "color.surface.1", 3.0),
-        both("graphic.chart.point.fill", "color.chart.point", "color.band.fill", 3.0),
         both("graphic.learningOutline.surface1", "color.band.learningOutline", "color.surface.1", 3.0),
         both("graphic.outline.surface1", "color.outline", "color.surface.1", 3.0),
         both("graphic.outline.surface2", "color.outline", "color.surface.2", 3.0),
         both("graphic.outline.background", "color.outline", "color.background", 3.0),
         both("graphic.accent.surface1", "color.accent", "color.surface.1", 3.0),
         both("graphic.primary.surface1", "color.primary", "color.surface.1", 3.0),
+        both("graphic.primary.background", "color.primary", "color.background", 3.0),
         both("graphic.navIcon.bar", "color.onGlass.secondary", "color.glass.bar", 3.0),
+        both("graphic.roundButton.glyph", "color.onGlass.primary", "color.control.convexBottom", 3.0),
+        both("graphic.onPrimary.primary", "color.onPrimary", "color.primary", 3.0),
         both("focus.ring.background", "color.focus.ring", "color.background", 3.0),
         both("focus.ring.surface1", "color.focus.ring", "color.surface.1", 3.0),
         both("focus.ring.surface3", "color.focus.ring", "color.surface.3", 3.0),
         both("focus.ring.glassBar", "color.focus.ring", "color.glass.bar", 3.0),
         both("focus.ring.glassSheet", "color.focus.ring", "color.glass.sheet", 3.0),
+        both("focus.ring.glassDialog", "color.focus.ring", "color.glass.dialog", 3.0),
         both("focus.ring.solidBarBottom", "color.focus.ring", "color.solid.barBottom", 3.0),
         both("focus.ring.primaryContainer", "color.focus.ring", "color.primaryContainer", 3.0),
     )

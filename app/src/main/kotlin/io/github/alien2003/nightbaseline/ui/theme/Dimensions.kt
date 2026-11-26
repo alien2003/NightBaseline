@@ -59,16 +59,37 @@ object NbDimens {
     /** `card.padding` (horizontal and vertical). */
     val cardPadding: Dp = 16.dp
 
-    /** `row.paddingVertical`. */
-    val rowPaddingVertical: Dp = 12.dp
+    /** `row.paddingVertical` (ColorOS 10 dp, measured 10.2 dp). */
+    val rowPaddingVertical: Dp = 10.dp
 
-    /** Row minimum height (grows with text). */
-    val rowMinHeight: Dp = 56.dp
+    /** Row minimum height (grows with text): 48 dp as measured, equal to `target.min`. */
+    val rowMinHeight: Dp = 48.dp
 
-    /** `card.gap` between tiles and list cards. */
+    /** `row.paddingHorizontal`. */
+    val rowPaddingHorizontal: Dp = 16.dp
+
+    /** Gap between a row title and its summary. */
+    val rowTitleSummaryGap: Dp = 2.dp
+
+    /** Section header: space above its text (includes the 16 dp group gap). */
+    val sectionHeaderTop: Dp = 24.dp
+
+    /** Section header: space between its text and the card below. */
+    val sectionHeaderBottom: Dp = 8.dp
+
+    /** Section header text start, measured from the card's edge (32 dp from the screen edge with a 16 dp gutter). */
+    val sectionHeaderStart: Dp = 16.dp
+
+    /** Hairline divider thickness: `max(1 px, 0.33 dp)`; draw with `max(1f, toPx())`. */
+    val divider: Dp = 0.33.dp
+
+    /** Divider inset from the card edge, at the start and at the end. */
+    val dividerInset: Dp = 16.dp
+
+    /** `card.gap` between homogeneous items (tiles, history months). */
     val cardGap: Dp = 12.dp
 
-    /** `group.gap` between groups. */
+    /** `group.gap` between distinct cards and groups. */
     val groupGap: Dp = 16.dp
 
     /** `icon.size` standard. */
@@ -125,14 +146,14 @@ object NbDimens {
     /** Space the rail takes from the content (`railArea`). */
     val railArea: Dp = 96.dp
 
-    /** Compact large title top bar height at rest (collapses to [topBarCollapsed]). */
+    /** Retired: the large title scrolls with the content now (`coloros-conformance.md` C4); removed in the sweep. */
     val topBarLarge: Dp = 112.dp
 
-    /** Compact collapsed top bar height. */
-    val topBarCollapsed: Dp = 56.dp
+    /** Compact collapsed top bar height (measured 52.1 dp). */
+    val topBarCollapsed: Dp = 52.dp
 
-    /** Medium and up top bar height. */
-    val topBarMedium: Dp = 64.dp
+    /** Medium and up top bar height (same as collapsed in the canon). */
+    val topBarMedium: Dp = 52.dp
 
     /** Short windows top bar height. */
     val topBarShort: Dp = 48.dp
@@ -147,7 +168,7 @@ object NbDimens {
     val chartMax: Dp = 840.dp
 
     /** Dialog max width for confirmations. */
-    val dialogMaxWidth: Dp = 480.dp
+    val dialogMaxWidth: Dp = 392.dp
 
     /** Dialog max width when it hosts sheet content. */
     val dialogMaxWidthWide: Dp = 560.dp
@@ -170,15 +191,39 @@ object NbDimens {
     /** Status triangle side in the band. */
     val markerTriangle: Dp = 10.dp
 
-    /** Radius of the touch light under the finger on glass (`tokens.md` 9.5). */
-    val glowRadius: Dp = 48.dp
+    /** Radius of the touch light under the finger (`tokens.md` 9.5); capped by the element's own size. */
+    val glowRadius: Dp = 140.dp
 
     /** Chart height in Compact (`layouts.md` 5.2). */
     val chartHeightCompact: Dp = 220.dp
 
     /** Drag handle visual size of a sheet. */
-    val sheetHandleWidth: Dp = 32.dp
+    val sheetHandleWidth: Dp = 36.dp
 
     /** Drag handle visual height. */
     val sheetHandleHeight: Dp = 4.dp
+
+    /** Convex round shell button: visual diameter (48 dp target). */
+    val roundButton: Dp = 40.dp
+
+    /** Margin of a round shell button from the window edge. */
+    val roundButtonMargin: Dp = 16.dp
+
+    /** Glyph inside a round shell button. */
+    val roundButtonGlyph: Dp = 20.dp
+
+    /** Glass rim: top highlight stroke. */
+    val rimTop: Dp = 0.5.dp
+
+    /** Glass rim: bottom stroke. */
+    val rimBottom: Dp = 1.dp
+
+    /** Glass rim: faint bottom reflection band inside the shape. */
+    val rimBottomBand: Dp = 2.dp
+
+    /** Higher-contrast border on solid shell surfaces (`onGlass.primary` at 60 %). */
+    val contrastBorder: Dp = 1.dp
+
+    /** Smallest radius of a concentric inner shape (`tokens.md` 5). */
+    val concentricMinRadius: Dp = 12.dp
 }
