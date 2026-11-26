@@ -32,6 +32,10 @@ no internet. Current state and plan: `docs/STATUS.md` (read it first in a new se
   medical device" disclaimer in the app and the README.
 - Vendor neutral: any Health Connect source; OHealth (com.heytap.health.international) is the default and the first
   verified source. The ColorOS look is styling only: no vendor SDKs or resources.
+- Design canon: the WHOLE UI (components, glass, colours, typography, motion, launcher icon) follows ColorOS 17 as
+  seen in OPPO's system apps on the owner's phone (`.data/design-refs/`, `docs/design/reference-analysis.md`). Not
+  Material You / flat Material, not Apple Liquid Glass (Apple material is only a technical comparison where OPPO
+  documents nothing). Own implementation and art only.
 
 ## Hard rules
 1. Work in WSL Ubuntu, only inside the NightBaseline folder. Install or change nothing outside it. If unavoidable,
