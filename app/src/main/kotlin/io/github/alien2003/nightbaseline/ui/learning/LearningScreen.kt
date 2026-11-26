@@ -108,13 +108,18 @@ private fun SinglePaneLearning(
             .padding(padding)
             .padding(horizontal = layout.gutter),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
-        LearningCard(state.night, state.source, onHowItWorks = actions.onHowItWorks, lastNightShort = state.lastNightShort)
-        AlreadyVisible(state, columns, actions)
-        WhatToExpect(Modifier.widthIn(max = NbDimens.textMax))
-        Strip(state, actions)
-        DisclaimerFooter(onAbout = actions.onAbout)
+        // One container for every block (review round 4): same width cap and start edge, centred as a whole.
+        Column(
+            Modifier.widthIn(max = if (columns > 1) NbDimens.chartMax else NbDimens.textMax).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
+        ) {
+            LearningCard(state.night, state.source, onHowItWorks = actions.onHowItWorks, lastNightShort = state.lastNightShort)
+            AlreadyVisible(state, columns, actions)
+            WhatToExpect()
+            Strip(state, actions, capped = false)
+            DisclaimerFooter(onAbout = actions.onAbout)
+        }
     }
 }
 
@@ -123,13 +128,14 @@ private fun Strip(
     state: LearningState,
     actions: LearningActions,
     individualTargets: Boolean = true,
+    capped: Boolean = true,
 ) {
     HistoryStrip(
         state.recent,
         onNight = actions.onNight,
         onSeeAll = actions.onSeeAll,
         individualTargets = individualTargets,
-        modifier = Modifier.widthIn(max = NbDimens.textMax),
+        modifier = if (capped) Modifier.widthIn(max = NbDimens.textMax) else Modifier,
     )
 }
 

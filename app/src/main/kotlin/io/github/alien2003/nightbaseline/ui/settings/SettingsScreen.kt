@@ -192,6 +192,18 @@ private fun SinglePaneColumn(
             .padding(padding)
             .padding(horizontal = layout.gutter),
         horizontalAlignment = alignment,
+    ) { SettingsContainer { content() } }
+}
+
+/**
+ * The one container rule of Settings (review round 4): every card, section header and footer of a page sits in this
+ * column, max [NbDimens.textMax] wide, so they share one width and one start edge in every layout; the caller centres
+ * the container (single pane) or starts it at the pane edge (detail pane, fold).
+ */
+@Composable
+private fun SettingsContainer(content: @Composable () -> Unit) {
+    Column(
+        Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) { content() }
 }
@@ -231,9 +243,8 @@ private fun TwoPaneSettings(
                     top = padding.calculateTopPadding(),
                     bottom = padding.calculateBottomPadding(),
                 ),
-            verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
-            DetailContent(state, actions)
+            SettingsContainer { DetailContent(state, actions) }
         }
     }
 }
@@ -316,7 +327,7 @@ private fun BackRow(
     title: String,
     onBack: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         ShellRoundButton(NbIcons.ArrowBack, stringResource(R.string.a11y_back), onClick = onBack)
         PaneHeading(title, Modifier.weight(1f).padding(start = NbSpace.s2))
     }
@@ -376,10 +387,11 @@ private fun TabletopSettings(
                 .then(horizontal)
                 .padding(bottom = padding.calculateBottomPadding()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
-            if (state.page != SettingsPage.Main) BackRow(stringResource(pageTitle(state.page)), actions.onBack)
-            PageContent(state, actions, state.page, inlineSensitivity(layout))
+            SettingsContainer {
+                if (state.page != SettingsPage.Main) BackRow(stringResource(pageTitle(state.page)), actions.onBack)
+                PageContent(state, actions, state.page, inlineSensitivity(layout))
+            }
         }
     }
 }

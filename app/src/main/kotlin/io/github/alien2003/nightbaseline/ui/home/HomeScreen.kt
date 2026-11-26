@@ -248,8 +248,17 @@ private fun ColumnScope.HomeBlocks(
     blocks: Blocks = Blocks(),
     selected: MetricId? = null,
     stripTargets: Boolean = true,
-    stripBesideSummary: Boolean = false,
+    stripBelowSummary: Int? = null,
 ) {
+    val strip: @Composable (Int) -> Unit = { count ->
+        HistoryStrip(
+            state.recent.takeLast(count),
+            onNight = { actions.onNight(it.wakeDate) },
+            onSeeAll = actions.onSeeAll,
+            individualTargets = stripTargets,
+            modifier = Modifier.widthIn(max = maxWidth),
+        )
+    }
     if (blocks.night) {
         state.banner?.let {
             InlineBanner(
@@ -262,32 +271,13 @@ private fun ColumnScope.HomeBlocks(
                 maxWidth = maxWidth,
             )
         }
-        if (stripBesideSummary && state.recent.isNotEmpty()) {
-            Row(Modifier.widthIn(max = maxWidth).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
-                NightBlockOf(state, actions, Modifier.weight(1f))
-                HistoryStrip(
-                    state.recent.takeLast(STRIP_WIDE),
-                    onNight = { actions.onNight(it.wakeDate) },
-                    onSeeAll = actions.onSeeAll,
-                    individualTargets = stripTargets,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        } else {
-            NightBlockOf(state, actions, Modifier.widthIn(max = maxWidth), maxWidth)
-        }
+        NightBlockOf(state, actions, Modifier.widthIn(max = maxWidth), maxWidth)
+        // Multi-column Home: the strip is a full-width card right below the summary (review round 4).
+        if (stripBelowSummary != null && state.recent.isNotEmpty()) strip(stripBelowSummary)
         LastResultBlock(state, maxWidth)
     }
     if (blocks.tiles) TileBlocks(state, actions, columns, maxWidth, selected)
-    if (blocks.strip && !stripBesideSummary && state.recent.isNotEmpty()) {
-        HistoryStrip(
-            state.recent.takeLast(STRIP_NIGHTS),
-            onNight = { actions.onNight(it.wakeDate) },
-            onSeeAll = actions.onSeeAll,
-            individualTargets = stripTargets,
-            modifier = Modifier.widthIn(max = maxWidth),
-        )
-    }
+    if (blocks.strip && stripBelowSummary == null && state.recent.isNotEmpty()) strip(STRIP_NIGHTS)
     if (blocks.footer) DisclaimerFooter(onAbout = actions.onAbout)
 }
 
@@ -361,6 +351,10 @@ private fun SinglePaneHome(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val width = contentWidth(maxWidth, padding, layout.gutter)
         val columns = tileColumns(width)
+        val cap = if (columns > 1) NbDimens.chartMax else NbDimens.textMax
+        // Multi-column: the strip follows the summary across the full width, 14 nights when 14 targets fit.
+        val stripNights = if (minOf(width, cap) >= STRIP_WIDE_MIN) STRIP_WIDE else STRIP_NIGHTS
+        val below = stripNights.takeIf { columns > 1 && state.night.state != NightState.Loading }
         Column(
             Modifier
                 .fillMaxSize()
@@ -369,12 +363,14 @@ private fun SinglePaneHome(
                 .padding(horizontal = layout.gutter)
                 .padding(top = topInset(barHeight), bottom = NbSpace.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
-            val maxWidth = if (columns > 1) NbDimens.chartMax else NbDimens.textMax
-            // 14 nights beside the summary when the content is at least 720 dp wide (screens.md 7.1, Medium).
-            val beside = columns > 1 && width >= STRIP_BESIDE_MIN && state.night.state != NightState.Loading
-            HomeBlocks(state, actions, columns, maxWidth, stripBesideSummary = beside)
+            // One container for every block (review round 4): same width cap, same start edge, centred as a whole.
+            Column(
+                Modifier.widthIn(max = cap).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
+            ) {
+                HomeBlocks(state, actions, columns, cap, stripBelowSummary = below)
+            }
         }
     }
 }
@@ -558,6 +554,9 @@ private fun TabletopHome(
 ) {
     val night = state.night
     val text = rememberUiText()
+    // Both halves share one container: the width of the tile grid below the fold (review round 4).
+    val columns = tileColumns(contentWidth(layout.widthDp.dp, padding, layout.gutter))
+    val maxWidth = if (columns > 1) NbDimens.chartMax else NbDimens.textMax
     Box(Modifier.fillMaxSize().padding(horizontal = layout.gutter)) {
         // Top half: view only and never scrolls (layouts.md 6.4); at large font it keeps the compact summary only.
         val large = LocalDensity.current.fontScale >= TABLETOP_COMPACT_FONT
@@ -571,13 +570,13 @@ private fun TabletopHome(
             FitColumn(NbDimens.cardGap) {
                 when {
                     night.state == NightState.Loading -> LoadingCard()
-                    large -> CompactNightSummary(night, state.source, Modifier.widthIn(max = NbDimens.textMax))
-                    else -> NightSummaryCard(night, state.source, Modifier.widthIn(max = NbDimens.textMax))
+                    large -> CompactNightSummary(night, state.source, maxWidth = maxWidth)
+                    else -> NightSummaryCard(night, state.source, maxWidth = maxWidth)
                 }
                 if (night.state == NightState.Learning || night.state == NightState.LearningStart) {
                     LearningProgress(
                         night.historyNights,
-                        Modifier.widthIn(max = NbDimens.textMax),
+                        Modifier.widthIn(max = maxWidth),
                         skipped = if (state.lastNightShort) 1 else 0,
                     )
                 }
@@ -587,7 +586,7 @@ private fun TabletopHome(
                         onNight = {},
                         onSeeAll = {},
                         interactive = false,
-                        modifier = Modifier.widthIn(max = NbDimens.textMax),
+                        modifier = Modifier.widthIn(max = maxWidth),
                     )
                 }
             }
@@ -600,39 +599,54 @@ private fun TabletopHome(
                 .verticalScroll(scroll)
                 .padding(bottom = padding.calculateBottomPadding() + NbSpace.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
-            // Everything below the fold aligns with the tile grid.
-            val columns = tileColumns(contentWidth(layout.widthDp.dp, padding, layout.gutter))
-            val maxWidth = if (columns > 1) NbDimens.chartMax else NbDimens.textMax
-            state.banner?.let {
-                InlineBanner(
-                    it,
-                    state.source,
-                    Modifier.widthIn(max = maxWidth),
-                    onAction = { actions.onBannerAction(it) },
-                    onDismiss = { actions.onBannerDismiss(it) },
-                    quietDays = state.quietDays,
-                    maxWidth = maxWidth,
-                )
-            }
-            NightActionsRow(
-                night,
-                state.source,
-                actions.onMetric,
-                actions.onStateAction,
-                actions.onStateSecondary,
-                actions.onHowItWorks,
-                Modifier.widthIn(max = maxWidth),
-            )
-            LastResultBlock(state, maxWidth)
-            HomeBlocks(state, actions, columns, maxWidth, Blocks(night = false, strip = false, footer = false))
-            if (state.recent.isNotEmpty()) {
-                NbTextButton(stringResource(R.string.action_see_all), onClick = actions.onSeeAll)
-            }
-            DisclaimerFooter(onAbout = actions.onAbout)
+            Column(
+                Modifier.widthIn(max = maxWidth).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
+            ) { TabletopControls(state, actions, columns, maxWidth) }
         }
     }
+}
+
+/** The bottom half of tabletop Home: everything below the fold aligns with the tile grid. */
+@Composable
+private fun ColumnScope.TabletopControls(
+    state: HomeState,
+    actions: HomeActions,
+    columns: Int,
+    maxWidth: Dp,
+) {
+    val night = state.night
+    state.banner?.let {
+        InlineBanner(
+            it,
+            state.source,
+            Modifier.widthIn(max = maxWidth),
+            onAction = { actions.onBannerAction(it) },
+            onDismiss = { actions.onBannerDismiss(it) },
+            quietDays = state.quietDays,
+            maxWidth = maxWidth,
+        )
+    }
+    NightActionsRow(
+        night,
+        state.source,
+        actions.onMetric,
+        actions.onStateAction,
+        actions.onStateSecondary,
+        actions.onHowItWorks,
+        Modifier.widthIn(max = maxWidth),
+    )
+    LastResultBlock(state, maxWidth)
+    HomeBlocks(state, actions, columns, maxWidth, Blocks(night = false, strip = false, footer = false))
+    if (state.recent.isNotEmpty()) {
+        NbTextButton(
+            stringResource(R.string.action_see_all),
+            onClick = actions.onSeeAll,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+    }
+    DisclaimerFooter(onAbout = actions.onAbout)
 }
 
 /**
@@ -676,7 +690,9 @@ internal const val STRIP_NIGHTS = 7
 internal const val STRIP_WIDE = 14
 
 private const val LOADING_TILES = 4
-private val STRIP_BESIDE_MIN = 720.dp
+
+/** 14 night targets of 48 dp plus the strip card's 12 dp side padding. */
+private val STRIP_WIDE_MIN = NbDimens.targetMin * STRIP_WIDE + NbSpace.s3 * 2
 private val LIST_PANE_MAX = 400.dp
 private val LIST_PANE_LARGE = 360.dp
 private val DETAIL_PANE_MIN = 360.dp

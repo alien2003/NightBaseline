@@ -49,6 +49,7 @@ import io.github.alien2003.nightbaseline.ui.components.CalendarCell
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
+import io.github.alien2003.nightbaseline.ui.components.cardTag
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
@@ -114,8 +115,9 @@ fun HistoryCalendar(
     }
     BoxWithConstraints(
         modifier
+            .widthIn(max = NbDimens.textMax)
             .fillMaxWidth()
-            .widthIn(max = CALENDAR_MAX + CARD_PADDING * 2)
+            .cardTag()
             .solidCard(NbShapes.l)
             .padding(CARD_PADDING),
     ) {
@@ -411,6 +413,5 @@ private val FUTURE_DISC = 32.dp
 private const val MAX_WEEKS = 6
 
 /** Cells grow to 64 dp at most (`layouts.md` 5.3: 48-64 dp); wider panes center the grid. */
-private val CALENDAR_MAX = 64.dp * DAYS + CELL_GAP * (DAYS - 1)
 private val WEEKDAY_COLUMN = 20.dp
 private val REFERENCE_MONDAY: LocalDate = LocalDate.EPOCH.with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY))

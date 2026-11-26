@@ -27,6 +27,7 @@ import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.NbChoiceRow
 import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.SectionFooter
+import io.github.alien2003.nightbaseline.ui.components.SectionHeader
 import io.github.alien2003.nightbaseline.ui.components.SettingsGroup
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
@@ -148,15 +149,19 @@ internal fun SensitivityContent(
 ) {
     val text = rememberUiText()
     val controls = NbTheme.controls
-    Column(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax)) {
-        if (title) PaneHeading(stringResource(R.string.settings_group_sensitivity), Modifier.padding(top = NbSpace.s5, bottom = NbSpace.s4))
+    Column(Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth()) {
+        if (title) {
+            // Inline in the main list: a section header like every other group (review round 4), the intro as its
+            // first line of quiet text.
+            SectionHeader(stringResource(R.string.settings_group_sensitivity))
+        }
         NbText(
             stringResource(R.string.setup_sens_intro),
             style = NbTheme.typography.body,
             color = controls.summary,
-            modifier = Modifier.padding(horizontal = NbSpace.s5, vertical = NbSpace.s3),
+            modifier = Modifier.padding(horizontal = NbControlDimens.sectionHeaderStart, vertical = NbSpace.s2),
         )
-        GroupCard(Modifier.padding(top = NbSpace.s3).selectableGroup()) {
+        GroupCard(Modifier.padding(top = NbSpace.s2).selectableGroup()) {
             SensitivityPreset.entries.forEachIndexed { i, preset ->
                 PresetRow(
                     stringResource(preset.title),
@@ -188,7 +193,7 @@ internal fun AppearanceGroup(
     actions: SettingsActions,
     title: Boolean = true,
 ) {
-    Column(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax)) {
+    Column(Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth()) {
         SettingsGroup(stringResource(R.string.settings_theme)) {
             NbChoiceRow(
                 labels = ThemeChoice.entries.map { stringResource(it.label) },

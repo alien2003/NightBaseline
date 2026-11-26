@@ -126,7 +126,7 @@ Content (always solid):
 | `MetricRangeTile` | One metric: name, last-night value + unit (largest text), `RangeBand`, `StatusLabel` (shape + words, no background) with the usual range always on its own line below it (the same rhythm in every tile). Variants: within, higher, lower, learning (n of 7), no value tonight (reason), not recorded by source. Whole tile is one 48 dp+ touch target opening Metric detail. |
 | `RangeBand` | Slider-like neutral track: personal range as a solid grey segment from low to high (no edge lines, no median tick), value marker whose **shape** encodes status (white dot with a ring inside, amber triangle outside, hollow ring while learning). Values beyond the visible track are clamped to the edge with a chevron. No band while learning: dotted outline of where it will be. |
 | `StatusLabel` / `StatusGlyph` | Small shape + words, 6 dp apart, no background or tonal chip: 8 dp dot and grey 13 sp "Usual" inside, 10 dp triangle and amber 14 sp medium label outside, grey ring / dash for learning / missing; see section 6. |
-| `HistoryStrip` | Last 7 nights as 7 columns (14 in Medium when width >= 720 dp) in one card: weekday letter (12/400 secondary), night status glyph. The title ("Last 7 nights") is a section header outside the card with "See all" at its end. Each night is a >= 48 dp target -> Night detail; when the strip is narrower than 7 x 48 dp (narrow list panes) or sits in a tabletop top half, the nights are not individually tappable and the whole strip is one target -> History. "See all" (`action_see_all`) -> History. |
+| `HistoryStrip` | Last 7 nights as 7 columns (14 when the multi-column Home column fits 14 x 48 dp) in one solid card, like every other Home card (review round 4): a header row inside the card with the title ("Last 7 nights") in the card title style (`type.itemTitle`, `text.primary`) and "See all" as a text action at its end, then per night the weekday letter (14 sp secondary) and the 28 dp night status glyph. Each night is a >= 48 dp target -> Night detail; when the strip is narrower than 7 x 48 dp (narrow list panes) or sits in a tabletop top half, the nights are not individually tappable and the whole strip is one target -> History. "See all" (`action_see_all`) -> History. |
 | `TrendChart` | Per-night points (no connecting line across missing nights) for 7/30/90 nights, personal range drawn as a band that follows the baseline as it was on each night (stepped area), gaps for nights without value, hollow points for learning nights, status shapes for points outside. Finger-following selection with `ChartTooltip`. |
 | `PeriodSelector` | Segmented control 7 / 30 / 90 nights (`Chart.kt`, the app's one segmented control): a solid 40 dp track (content layer, never glass) in a 48 dp target row, segments >= 52 dp; the selected segment sits on a solid convex thumb (vertical gradient + 1 dp top rim + soft shadow, inset 4 dp, concentric) that slides on `spring.selection` (1.0 / 247), its leading edge on a stiffer spring so it stretches toward the target while moving; no tonal capsule. Snaps under reduced motion. |
 | `ChartSummary` | Visible text under every chart, also used as the chart's content description (section 8). |
@@ -242,8 +242,10 @@ Compact, top to bottom:
 6. `HistoryStrip` titled "Last 7 nights", trailing "See all".
 7. `DisclaimerFooter`.
 
-Medium: summary card across the content width (its text max 600 dp); history strip as 14 nights beside the summary
-when width >= 720 dp, else below it; metric tiles in a 2-column grid (each >= 260 dp; 3 rows max for 6 metrics); an
+Medium and single-pane Expanded (multi-column Home): every block sits in one container (max 840 dp, centred; one
+start edge and width for all cards). Summary card across the container; the history strip is a full-width card right
+below the summary (14 nights when 14 x 48 dp fit, else 7), never a small block beside the taller summary (review
+round 4); metric tiles in a 2-column grid (each >= 260 dp; 3 rows max for 6 metrics); an
 odd last tile spans both columns.
 
 Expanded: list-detail. List pane: summary card, metric tiles (single column, compact tile variant), history strip,
@@ -336,17 +338,21 @@ Actions: primary = period selection and chart scrubbing; secondary = range expla
 Purpose: find unusual nights.
 
 Compact:
-1. `ShellTopBar` large title "History"; under it, centred, an `NbTabRow` "List / Calendar" (`history_view_list` /
-   `history_view_calendar`, persisted).
+1. `ShellTopBar` large title "History" with one action: a solid round `ShellRoundButton` that switches between
+   List and Calendar (calendar glyph while the list is shown, list glyph while the calendar is shown; TalkBack
+   `history_show_calendar` / `history_show_list`; the view is persisted in the saved state). It is an action, not a
+   tab: History has one tab level only (review round 4). Where there is no top bar (Tabletop) the button ends the
+   control row of the bottom half.
 2. List mode: `NightRow` feed, newest first, one grouped card per month under a sticky section header (solid window
    background, not glass). Rows for
    learning, short and no-data nights use their own glyphs. Infinite scroll over the local database (all stored
    nights).
 3. Calendar mode: `MonthCalendar` with month swipe and previous/next buttons; below it a legend row (glyph + label for
    each night status, so the shapes are learnable); tapping a day opens Night detail.
-4. Filter chips (`NbChipTab`; `history_filter_all`, `history_filter_moved`, `history_filter_gaps`): "All", "Moved",
-   "Learning and gaps" ("Moved" includes both levels, `S-SOME` and `S-DEV`). Each chip >= 48 dp tall, selection shown
-   by fill, rim and weight, not only color.
+4. List mode only: the filters as the one centred ColorOS tab row (`NbTabRow`, underline; `history_filter_all`,
+   `history_filter_moved`, `history_filter_gaps`): "All", "Moved", "Learning and gaps" ("Moved" includes both levels,
+   `S-SOME` and `S-DEV`). Each tab is a >= 48 dp `Role.Tab` target; selection shown by weight, colour and the
+   underline. The calendar has no filters. All History items share one container (max 600 dp, centred).
 
 Medium: single pane (the two-pane rule does not pass at 692 dp, `layouts.md` 3.3). List mode stays one column (max
 600 dp, centered; rows add a mini glyph per metric). Calendar mode shows the month grid with 48–64 dp cells and the
@@ -441,7 +447,7 @@ metric the source provides. A preview line: "With these settings, {k} of your la
 About: version, the full disclaimer, "Your data stays on this phone. NightBaseline has no internet access.",
 "Works with any app that writes to Health Connect.", licenses, source code link (text only, no browser intent needed).
 
-Medium: single centered column (max 600 dp), Sensitivity expands inline. Expanded and up, Book: list-detail, groups
+Medium: single centered column (max 600 dp; one container for every card, section header and footer, so all share one width and start edge, review round 4), Sensitivity expands inline under a section header like the other groups. Expanded and up, Book: list-detail, groups
 list on the start side, the sub-screen (source, sensitivity, about) on the end side. Tabletop: current source and
 last read on top (view), groups below. Glance: Source, Notifications, About only (`layouts.md` 5.4).
 

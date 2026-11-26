@@ -285,6 +285,7 @@ fun InlineBanner(
                 .widthIn(max = maxWidth)
                 .then(modifier)
                 .fillMaxWidth()
+                .cardTag()
                 .solidCard(NbShapes.l)
                 .padding(
                     start = NbSpace.s5,

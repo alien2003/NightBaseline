@@ -54,6 +54,8 @@ import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import io.github.alien2003.nightbaseline.ui.theme.controls
+import io.github.alien2003.nightbaseline.ui.theme.data
+import io.github.alien2003.nightbaseline.ui.theme.dataType
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.TemporalAdjusters
@@ -268,7 +270,11 @@ fun MonthCalendar(
     val cells = List(offset) { null } + (1..month.lengthOfMonth()).map { month.atDay(it) }
     val rows = cells.chunked(DAYS)
     Column(
-        modifier.widthIn(max = NbDimens.textMax).solidCard(NbShapes.l).padding(NbSpace.s3),
+        modifier
+            .widthIn(max = NbDimens.textMax)
+            .cardTag()
+            .solidCard(NbShapes.l)
+            .padding(NbSpace.s3),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -328,11 +334,12 @@ private const val DAYS = 7
 private const val METRIC_GLYPHS_PER_ROW = 3
 
 /**
- * The recent-nights strip of Home (`screens.md` 4, `coloros-conformance.md` L12): the header ("Last 7 nights") sits
- * outside the card as a section header with "See all" at its end (48 dp target); the card holds one column per night
- * with the weekday letter (12/400 secondary) and the night glyph. Nights are individual 48 dp targets only when they
- * fit (7 x 48 dp); otherwise the whole strip is one target that opens History (`a11y_history_strip`). [interactive]
- * false renders the view-only glyph row (tabletop top half).
+ * The recent-nights strip of Home and Learning (`screens.md` 4, `coloros-conformance.md` L12): one solid card like the
+ * other Home cards (review round 4). Inside it a header row with the title ("Last 7 nights") in the card title style
+ * and "See all" as a text action at its end (48 dp target), then one column per night with the weekday label (14 sp
+ * secondary) and the 28 dp night glyph. Nights are individual 48 dp targets only when they fit (7 x 48 dp); otherwise
+ * the row of nights is one target that opens History (`a11y_history_strip`). [interactive] false renders the
+ * view-only card without "See all" (tabletop top half).
  */
 @Composable
 fun HistoryStrip(
@@ -348,10 +355,19 @@ fun HistoryStrip(
     val controls = NbTheme.controls
     val stripDescription =
         text.string(R.string.a11y_history_strip, text.list(nights.map { "${text.dateShort(it.wakeDate)}: ${text.nightStatusLabel(it)}" }))
-    Column(modifier.fillMaxWidth()) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .cardTag()
+            .solidCard(NbShapes.l)
+            .clip(NbShapes.l),
+    ) {
         Row(
-            Modifier.fillMaxWidth().sizeIn(minHeight = NbDimens.targetMin),
-            verticalAlignment = Alignment.Bottom,
+            Modifier
+                .fillMaxWidth()
+                .sizeIn(minHeight = NbDimens.targetMin)
+                .padding(start = NbDimens.cardPadding, end = if (interactive) NbSpace.s1 else NbDimens.cardPadding, top = NbSpace.s2),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             NbText(
                 when {
@@ -362,24 +378,18 @@ fun HistoryStrip(
                     // Learning: fewer nights are stored than the strip holds.
                     else -> text.plural(R.plurals.home_strip_title_n, nights.size, text.int(nights.size))
                 },
-                style = NbControlType.sectionHeader,
-                color = controls.sectionHeader,
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .padding(start = NbControlDimens.sectionHeaderStart, bottom = NbControlDimens.sectionHeaderBottom)
-                        .semantics { heading() },
+                style = NbTheme.dataType.itemTitle,
+                color = colors.textPrimary,
+                modifier = Modifier.weight(1f).semantics { heading() },
             )
             if (interactive) {
-                NbTextButton(stringResource(R.string.action_see_all), onClick = onSeeAll, modifier = Modifier.padding(end = NbSpace.s1))
+                NbTextButton(stringResource(R.string.action_see_all), onClick = onSeeAll, color = colors.data.primaryText)
             }
         }
         val perNight = interactive && individualTargets
         Row(
             Modifier
                 .fillMaxWidth()
-                .solidCard(NbShapes.l)
-                .clip(NbShapes.l)
                 .then(
                     if (interactive && !individualTargets) {
                         Modifier
@@ -388,7 +398,7 @@ fun HistoryStrip(
                     } else {
                         Modifier
                     },
-                ).padding(horizontal = NbSpace.s3, vertical = NbControlDimens.rowPaddingVertical),
+                ).padding(start = NbSpace.s3, end = NbSpace.s3, bottom = NbSpace.s3),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             nights.forEach { night ->
@@ -409,13 +419,16 @@ fun HistoryStrip(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
                 ) {
-                    NbText(text.weekdayLetter(night.wakeDate), style = NbTheme.typography.caption, color = controls.summary)
-                    NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), size = 20.dp)
+                    NbText(text.weekdayLetter(night.wakeDate), style = NbTheme.typography.bodySmall, color = controls.summary)
+                    NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), size = STRIP_GLYPH)
                 }
             }
         }
     }
 }
+
+/** Night glyph of the strip: as large as the summary card's glyph, so the strip reads at the size of its neighbours. */
+private val STRIP_GLYPH = 28.dp
 
 /**
  * A section header outside a grouped card (`coloros-conformance.md` T5, S2): 12/16/500 `text.tertiary`, 24 dp above
@@ -477,6 +490,7 @@ fun GroupCard(
             .widthIn(max = NbDimens.textMax)
             .then(modifier)
             .fillMaxWidth()
+            .cardTag()
             .solidCard(NbShapes.l)
             .clip(NbShapes.l),
         content = content,

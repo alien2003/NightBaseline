@@ -411,8 +411,8 @@
     <string name="detail_computed_title">Как считается ваш обычный диапазон</string>
     <string name="detail_source_line">Измерено: %1$s. Последняя синхронизация %2$s.</string>
     <string name="history_title">История</string>
-    <string name="history_view_list">Список</string>
-    <string name="history_view_calendar">Календарь</string>
+    <string name="history_show_list">Показать списком</string>
+    <string name="history_show_calendar">Показать календарь</string>
     <string name="history_filter_all">Все</string>
     <string name="history_filter_moved">Изменения</string>
     <string name="history_filter_gaps">Обучение и пропуски</string>

@@ -268,8 +268,9 @@ metric visible without scrolling; the floating bar auto-hides on scroll. Metric 
 
 **Medium (600-839)** - rail; summary card spans the content width (max 600 for its text); metric rows become a
 **2-column grid of metric tiles** (each tile >= 260 dp; with an odd count the last tile spans both columns). Recent
-nights strip becomes a 14-night strip beside the summary if width allows (>= 720), else a 7-night strip below it
-(the owner's 692 dp inner screen: below). Tap on a tile ->
+nights strip is a full-width card directly below the summary: 14 nights when 14 x 48 dp fit in the container, else 7
+(review round 4: a strip beside the taller summary looked unfinished on the owner's inner screen). Every block shares
+one container (max 840 dp with two tile columns, 600 dp with one), so all cards have one start edge and width. Tap on a tile ->
 Metric detail as a full pane (single pane, morph).
 ```
 +--------------------------------------------------+
@@ -449,7 +450,8 @@ the user unfolds and state carries over).
 
 ### 5.3 History
 
-Two views, switched by a segmented control "List / Calendar": **List** (nights, newest first, grouped by month;
+Two views, switched by a round top-bar action (`ShellRoundButton`, review round 4; the filters are the only tab
+row): **List** (nights, newest first, grouped by month;
 each row: night label, night glyph, status label "2 moved" / "All usual" / state label) and **Calendar** (month
 grid, each day a 48 dp cell with a night glyph). Selecting a night opens **Night detail** (that night's Home-like summary and
 metric rows; a metric row opens Metric detail with that night pre-selected on the chart).
@@ -457,7 +459,7 @@ metric rows; a metric row opens Metric detail with that night pre-selected on th
 | Mode | Layout |
 |---|---|
 | Compact | single pane; List or Calendar; tap -> Night detail route (morph from row) |
-| CompactShort | List by default (Calendar allowed, scrolls); segmented control in the top bar |
+| CompactShort | List by default (Calendar allowed, scrolls); view switch in the top bar |
 | Medium | single pane; List rows widen to show a mini mark per metric (icon + shape), Calendar shows the month grid at 48-64 dp cells with the selected night's summary **below** (reflow) |
 | WideShort | Calendar start (360, scrolls), selected night summary end |
 | Expanded | list-detail `NightKey(epochDay)`: list 360 (List or Calendar), detail = Night detail |

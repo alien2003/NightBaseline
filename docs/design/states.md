@@ -310,7 +310,7 @@ Every visible string named in `screens.md` that is not a state above. Same rules
 | `detail_computed_title` | How your usual range is computed | yes |
 | `detail_source_line` | Measured by {source}. Last sync {time}. | yes |
 | `history_title` | History | yes |
-| `history_view_list` / `history_view_calendar` | List / Calendar | yes |
+| `history_show_list` / `history_show_calendar` | Show as list / Show as calendar (TalkBack labels of the top-bar view switch) | yes |
 | `history_filter_all` / `history_filter_moved` / `history_filter_gaps` | All / Moved / Learning and gaps | yes |
 | `history_legend_title` | What the marks mean | yes |
 | `source_picker_title` | Choose a source | yes |

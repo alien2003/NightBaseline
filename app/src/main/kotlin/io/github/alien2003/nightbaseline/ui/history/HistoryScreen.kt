@@ -79,8 +79,9 @@ typealias NightPreviewSlot = @Composable (night: NightUi, interactive: Boolean) 
  *   bottom half.
  * - `Glance`: list only, compact rows, the "More" button.
  *
- * The List / Calendar toggle sits in the top bar when it fits next to the title (wide windows, normal font), otherwise
- * it is the first row of the content, so the title never has to break inside a word at 200 % font.
+ * One tab level only (review round 4): the filters are the centred ColorOS tab row of the list; the List / Calendar
+ * switch is a round action in the top bar ([HistoryViewButton]), or at the end of the controls row where there is no
+ * top bar (Tabletop).
  */
 @Composable
 fun HistoryScreen(
@@ -154,7 +155,7 @@ fun HistoryScreen(
 private data class HistoryArrangement(
     val mode: LayoutMode,
     val twoPanes: Boolean,
-    /** The toggle is in the top bar (else the first content row). */
+    /** The view switch is a top-bar action (else it ends the first content row). */
     val toggleInBar: Boolean,
     /** A shell top bar exists (not in Glance and Tabletop). */
     val topBar: Boolean,
@@ -183,8 +184,8 @@ private data class HistoryArrangement(
             return HistoryArrangement(
                 mode = mode,
                 twoPanes = twoPanes,
-                // ColorOS puts the tab row under the top bar, never inside it (coloros-conformance.md L6).
-                toggleInBar = false,
+                // The view switch is a round top-bar action wherever there is a top bar (review round 4).
+                toggleInBar = mode != LayoutMode.Glance && mode != LayoutMode.Tabletop,
                 topBar = mode != LayoutMode.Glance && mode != LayoutMode.Tabletop,
                 listGutter = listGutter,
                 listWidth = listWidth,
@@ -234,7 +235,7 @@ private fun HistoryTopBar(
             scroll = scrolled,
             actions = {
                 if (arrangement.toggleInBar && !state.empty && !state.loading) {
-                    HistoryViewToggle(state.view, onView, Modifier.padding(end = NbSpace.s3))
+                    HistoryViewButton(state.view, onView)
                 }
             },
         )
@@ -260,35 +261,51 @@ private class HistoryContent(
         state.access?.let { access ->
             item(key = "banner") { HistoryAccessBanner(access, onAction = { actions.onFixAccess(access) }, Modifier.padding(top = GAP)) }
         }
-        val controls = !state.empty && !state.loading
-        if (controls && (!arrangement.toggleInBar || !arrangement.topBar)) {
-            item(key = "toggle") {
-                Box(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax), contentAlignment = Alignment.Center) {
-                    HistoryViewToggle(state.view, actions.onView)
+        when {
+            state.loading -> {
+                item(key = "loading") {
+                    HistorySkeleton(rows = SKELETON_ROWS, Modifier.widthIn(max = NbDimens.textMax).padding(top = GAP))
                 }
             }
+
+            state.empty -> {
+                item(key = "empty") { EmptyHistory(Modifier.widthIn(max = NbDimens.textMax).padding(top = GAP)) }
+            }
+
+            state.view == HistoryView.List -> {
+                listItems()
+            }
+
+            else -> {
+                calendarItems()
+            }
         }
-        when {
-            state.loading -> item(key = "loading") { HistorySkeleton(rows = SKELETON_ROWS, Modifier.padding(top = GAP)) }
-            state.empty -> item(key = "empty") { EmptyHistory(Modifier.padding(top = GAP)) }
-            state.view == HistoryView.List -> listItems()
-            else -> calendarItems()
+    }
+
+    /**
+     * The one control row: the centred filter tab row (list view) and, without a top bar, the view switch at its end.
+     * The calendar view has no filters; it keeps the row only for the view switch.
+     */
+    private fun LazyListScope.controlRow(filters: Boolean) {
+        val viewButton = !arrangement.toggleInBar
+        if (!filters && !viewButton) return
+        item(key = "controls") {
+            Row(Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    if (filters) HistoryFilterTabs(state.filter, actions.onFilter)
+                }
+                if (viewButton) HistoryViewButton(state.view, actions.onView)
+            }
         }
     }
 
     private fun LazyListScope.listItems() {
-        item(key = "filters") {
-            HistoryFilterChips(
-                state.filter,
-                actions.onFilter,
-                Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax).padding(top = NbSpace.s2),
-            )
-        }
+        controlRow(filters = true)
         val visible = state.visibleNights
         if (visible.isEmpty()) {
             item(key = "filter-empty") {
                 HistoryEmptyCard(
-                    modifier = Modifier.padding(top = GAP),
+                    modifier = Modifier.widthIn(max = NbDimens.textMax).padding(top = GAP),
                     title = null,
                     body =
                         stringResource(
@@ -320,6 +337,7 @@ private class HistoryContent(
     }
 
     private fun LazyListScope.calendarItems() {
+        controlRow(filters = false)
         item(key = "calendar") {
             HistoryCalendar(
                 month = state.month,
@@ -332,7 +350,12 @@ private class HistoryContent(
                 modifier = Modifier.padding(top = GAP),
             )
         }
-        item(key = "legend") { HistoryLegend(threshold = state.nights.firstOrNull()?.threshold ?: 2, Modifier.padding(top = GAP)) }
+        item(key = "legend") {
+            HistoryLegend(
+                threshold = state.nights.firstOrNull()?.threshold ?: 2,
+                Modifier.widthIn(max = NbDimens.textMax).padding(top = GAP),
+            )
+        }
         val night = state.selectedNight
         if (arrangement.previewBelowCalendar && night != null) {
             item(key = "preview") { Box(Modifier.padding(top = GAP)) { nightPreview(night, true) } }
@@ -446,7 +469,7 @@ private fun TabletopHistory(
                 stringResource(R.string.history_title),
                 style = NbTheme.typography.title,
                 color = colors.textPrimary,
-                modifier = Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax).semantics { heading() },
+                modifier = Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth().semantics { heading() },
             )
             content.state.selectedNight?.let { content.nightPreview(it, false) }
         }

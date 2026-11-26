@@ -48,6 +48,7 @@ import io.github.alien2003.nightbaseline.ui.components.StateCard
 import io.github.alien2003.nightbaseline.ui.components.StatsRow
 import io.github.alien2003.nightbaseline.ui.components.StatusLabel
 import io.github.alien2003.nightbaseline.ui.components.TrendChart
+import io.github.alien2003.nightbaseline.ui.components.cardTag
 import io.github.alien2003.nightbaseline.ui.components.chartSummary
 import io.github.alien2003.nightbaseline.ui.components.markerColor
 import io.github.alien2003.nightbaseline.ui.material.solidCard
@@ -273,7 +274,7 @@ internal fun ChartBlock(
 ) {
     val text = rememberUiText()
     val series = state.shownSeries
-    Column(modifier.fillMaxWidth().widthIn(max = NbDimens.chartMax), verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
+    Column(modifier.widthIn(max = NbDimens.chartMax).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
         when {
             state.metric.state == MetricState.NotProvided && state.series == null -> {
                 StateCard(
@@ -346,8 +347,9 @@ internal fun EmptyChart(
     val colors = NbTheme.colors
     Column(
         modifier
-            .fillMaxWidth()
             .widthIn(max = NbDimens.chartMax)
+            .fillMaxWidth()
+            .cardTag()
             .solidCard(NbShapes.l)
             .padding(NbSpace.s4),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s4),
@@ -394,9 +396,10 @@ internal fun LoadingBlocks(
         }
         Box(
             Modifier
-                .fillMaxWidth()
                 .widthIn(max = NbDimens.chartMax)
+                .fillMaxWidth()
                 .height(chartHeight)
+                .cardTag()
                 .solidCard(NbShapes.l),
         )
         NbText(loading, style = NbTheme.typography.body, color = colors.textSecondary)
@@ -517,7 +520,7 @@ internal fun SourceLine(
         line,
         style = NbTheme.typography.bodySmall,
         color = NbTheme.colors.textSecondary,
-        modifier = modifier.fillMaxWidth().widthIn(max = NbDimens.textMax),
+        modifier = modifier.widthIn(max = NbDimens.textMax).fillMaxWidth(),
     )
 }
 

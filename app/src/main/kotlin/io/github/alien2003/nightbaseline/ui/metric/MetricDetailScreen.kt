@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -225,7 +226,7 @@ private fun ColumnScope.SingleColumnBlocks(
     }
     HeaderCard(state, actions)
     NoticeCard(state, actions)
-    Period(state, actions, Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax), fill = true)
+    Period(state, actions, Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth(), fill = true)
     ChartBlock(state, actions, chartHeight)
     Column(Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth()) { StatsBlock(state) }
     ComputedCard(state)
@@ -313,31 +314,21 @@ private fun ColumnScope.WideColumnBlocks(
         LoadingBlocks(chartHeight)
         return
     }
-    val hasStats = state.shownPoints.any { it.state.compared }
-    val hasCard = state.notice != null && state.notice != MetricNotice.WaitingSync
-    if (hasStats || hasCard) {
-        Row(horizontalArrangement = Arrangement.spacedBy(NbDimens.groupGap)) {
-            HeaderCard(state, actions, Modifier.weight(1f))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
-                NoticeCard(state, actions)
-                StatsBlock(state)
-            }
-        }
-    } else {
-        // Nothing to put beside the header (learning, nothing compared): it takes the text column alone.
-        HeaderCard(state, actions)
-    }
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { Period(state, actions) }
+    // Review round 4: no short block beside a tall one and no header outside a card next to a card. The header card,
+    // the notice and the period readout run across the column; only the two explainer cards share a row, at one
+    // height.
+    HeaderCard(state, actions)
+    NoticeCard(state, actions)
+    StatsBlock(state)
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Period(state, actions) }
     ChartBlock(state, actions, chartHeight, showSummary = false)
-    Row(horizontalArrangement = Arrangement.spacedBy(NbDimens.groupGap)) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
-            SummaryText(state)
-            SourceLine(state)
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
-            ComputedCard(state)
-            MeaningCard()
-        }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
+        SummaryText(state)
+        SourceLine(state)
+    }
+    Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
+        ComputedCard(state, Modifier.weight(1f).fillMaxHeight())
+        MeaningCard(Modifier.weight(1f).fillMaxHeight())
     }
     if (footer) DisclaimerFooter(onAbout = actions.onAbout)
 }
@@ -458,7 +449,7 @@ private fun TabletopDetail(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
-            Row(Modifier.fillMaxWidth().widthIn(max = NbDimens.chartMax), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.widthIn(max = NbDimens.chartMax).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 ShellRoundButton(NbIcons.ArrowBack, text.string(R.string.a11y_back), onClick = actions.onBack)
                 Box(Modifier.weight(1f).padding(horizontal = NbSpace.s3)) { Period(state, actions) }
                 ShellRoundButton(NbIcons.Info, text.string(R.string.a11y_range_info), onClick = actions.onOpenExplainer)
@@ -467,7 +458,7 @@ private fun TabletopDetail(
                 val last = state.shownPoints.lastIndex
                 val current = state.selected ?: last
                 FlowRow(
-                    Modifier.fillMaxWidth().widthIn(max = NbDimens.chartMax),
+                    Modifier.widthIn(max = NbDimens.chartMax).fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(NbSpace.s3),
                     verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
                     itemVerticalAlignment = Alignment.CenterVertically,
@@ -480,7 +471,7 @@ private fun TabletopDetail(
             NoticeCard(state, actions)
             if (state.notProvidedNone) ChartBlock(state, actions, MIN_CHART)
             SelectedNightLine(state)
-            Column(Modifier.fillMaxWidth().widthIn(max = NbDimens.chartMax), verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
+            Column(Modifier.widthIn(max = NbDimens.chartMax).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
                 SummaryText(state)
                 ChartNotes(state)
             }
@@ -528,7 +519,7 @@ private fun SelectedNightLine(state: MetricDetailState) {
         text.chartPoint(state.metric.metric, point, state.source),
         style = NbTheme.dataType.itemTitle,
         color = NbTheme.colors.textPrimary,
-        modifier = Modifier.fillMaxWidth().widthIn(max = NbDimens.chartMax),
+        modifier = Modifier.widthIn(max = NbDimens.chartMax).fillMaxWidth(),
     )
 }
 

@@ -36,7 +36,7 @@ internal fun SourcePickerContent(
     actions: SettingsActions,
 ) {
     Column(
-        Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax),
+        Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
         NbText(stringResource(R.string.onb_source_body), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
@@ -60,7 +60,7 @@ internal fun AboutContent(
     actions: SettingsActions,
 ) {
     Column(
-        Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax),
+        Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
         NbCard(Modifier.fillMaxWidth()) {
@@ -90,7 +90,7 @@ internal fun AboutContent(
 internal fun LicensesContent(state: SettingsState) {
     val colors = NbTheme.colors
     Column(
-        Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax),
+        Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
         NbText(stringResource(R.string.setup_licenses_intro), style = NbTheme.typography.body, color = colors.textSecondary)

@@ -337,9 +337,12 @@ private fun SinglePaneNight(
                 .padding(horizontal = layout.gutter)
                 .padding(top = topInset(barHeight), bottom = NbSpace.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
-            NightBlocks(state, actions, columns, if (columns > 1) NbDimens.chartMax else NbDimens.textMax)
+            val maxWidth = if (columns > 1) NbDimens.chartMax else NbDimens.textMax
+            // One container for every block (review round 4): same width cap and start edge.
+            Column(Modifier.widthIn(max = maxWidth).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
+                NightBlocks(state, actions, columns, maxWidth)
+            }
         }
     }
 }
@@ -401,6 +404,9 @@ private fun TabletopNight(
     scroll: ScrollState,
 ) {
     val night = state.night
+    // Both halves share one container: the width of the tile grid below the fold (review round 4).
+    val columns = tileColumns(contentWidth(layout.widthDp.dp, padding, layout.gutter))
+    val maxWidth = if (columns > 1) NbDimens.chartMax else NbDimens.textMax
     Box(Modifier.fillMaxSize().padding(horizontal = layout.gutter)) {
         // Top half: view only and never scrolls (layouts.md 6.4); at large font it keeps the compact summary only.
         val large = LocalDensity.current.fontScale >= TABLETOP_COMPACT_FONT
@@ -414,13 +420,13 @@ private fun TabletopNight(
             FitColumn(NbDimens.cardGap) {
                 when {
                     night.state == NightState.Loading -> LoadingCard()
-                    large -> CompactNightSummary(night, state.source, Modifier.widthIn(max = NbDimens.textMax))
-                    else -> NightSummaryCard(night, state.source, Modifier.widthIn(max = NbDimens.textMax), showLabel = false)
+                    large -> CompactNightSummary(night, state.source, maxWidth = maxWidth)
+                    else -> NightSummaryCard(night, state.source, showLabel = false, maxWidth = maxWidth)
                 }
                 if (night.state == NightState.Learning && !large) {
                     LearningProgress(
                         night.historyNights,
-                        Modifier.widthIn(max = NbDimens.textMax),
+                        Modifier.widthIn(max = maxWidth),
                         skipped = if (state.lastNightShort) 1 else 0,
                     )
                 }
@@ -434,34 +440,44 @@ private fun TabletopNight(
                 .verticalScroll(scroll)
                 .padding(bottom = padding.calculateBottomPadding() + NbSpace.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
-            // Everything below the fold aligns with the tile grid.
-            val columns = tileColumns(contentWidth(layout.widthDp.dp, padding, layout.gutter))
-            val maxWidth = if (columns > 1) NbDimens.chartMax else NbDimens.textMax
-            PrevNextButtons(state, actions, Modifier.widthIn(max = maxWidth))
-            state.shownBanner?.let {
-                InlineBanner(
-                    it,
-                    state.source,
-                    Modifier.widthIn(max = maxWidth),
-                    onAction = { actions.onBannerAction(it) },
-                    onDismiss = { actions.onBannerDismiss(it) },
-                    maxWidth = maxWidth,
-                )
+            Column(Modifier.widthIn(max = maxWidth).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
+                TabletopNightControls(state, actions, columns, maxWidth)
             }
-            NightActionsRow(
-                night,
-                state.source,
-                actions.onMetric,
-                actions.onStateAction,
-                actions.onStateSecondary,
-                actions.onHowItWorks,
-                Modifier.widthIn(max = maxWidth),
-            )
-            NightBlocks(state, actions, columns, maxWidth, night = false)
         }
     }
+}
+
+/** Below the fold: previous / next, the banner, the card's actions, the measurements and the footer. */
+@Composable
+private fun ColumnScope.TabletopNightControls(
+    state: NightDetailState,
+    actions: NightDetailActions,
+    columns: Int,
+    maxWidth: Dp,
+) {
+    val night = state.night
+    PrevNextButtons(state, actions, Modifier.widthIn(max = maxWidth))
+    state.shownBanner?.let {
+        InlineBanner(
+            it,
+            state.source,
+            Modifier.widthIn(max = maxWidth),
+            onAction = { actions.onBannerAction(it) },
+            onDismiss = { actions.onBannerDismiss(it) },
+            maxWidth = maxWidth,
+        )
+    }
+    NightActionsRow(
+        night,
+        state.source,
+        actions.onMetric,
+        actions.onStateAction,
+        actions.onStateSecondary,
+        actions.onHowItWorks,
+        Modifier.widthIn(max = maxWidth),
+    )
+    NightBlocks(state, actions, columns, maxWidth, night = false)
 }
 
 /** Glance: as glance Home for this night, with back at the start of the label row and previous / next at the end. */

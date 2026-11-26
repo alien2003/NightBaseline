@@ -355,6 +355,24 @@ object NbIcons {
             }
         }
 
+    /** List view (three bulleted lines): the History view switch while the calendar is shown. */
+    val ListView: ImageVector =
+        icon("list_view", autoMirror = true) {
+            line {
+                moveTo(9f, 6.5f)
+                horizontalLineTo(20f)
+                moveTo(9f, 12f)
+                horizontalLineTo(20f)
+                moveTo(9f, 17.5f)
+                horizontalLineTo(20f)
+            }
+            fill {
+                addCircle(4.75f, 6.5f, 1.25f)
+                addCircle(4.75f, 12f, 1.25f)
+                addCircle(4.75f, 17.5f, 1.25f)
+            }
+        }
+
     /** Check mark. */
     val Check: ImageVector =
         icon("check") {

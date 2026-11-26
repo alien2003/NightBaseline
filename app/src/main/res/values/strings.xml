@@ -369,8 +369,8 @@
     <string name="detail_computed_title">How your usual range is computed</string>
     <string name="detail_source_line">Measured by %1$s. Last sync %2$s.</string>
     <string name="history_title">History</string>
-    <string name="history_view_list">List</string>
-    <string name="history_view_calendar">Calendar</string>
+    <string name="history_show_list">Show as list</string>
+    <string name="history_show_calendar">Show as calendar</string>
     <string name="history_filter_all">All</string>
     <string name="history_filter_moved">Moved</string>
     <string name="history_filter_gaps">Learning and gaps</string>

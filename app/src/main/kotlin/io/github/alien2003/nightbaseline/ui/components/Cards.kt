@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -43,6 +44,12 @@ import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import io.github.alien2003.nightbaseline.ui.theme.data
 import io.github.alien2003.nightbaseline.ui.theme.dataType
 
+/** Test tag of every content card: the layout tests check that the cards of one column share one width and start. */
+const val CARD_TAG: String = "nb-card"
+
+/** Marks a content card for the layout tests ([CARD_TAG]); placed right before the card surface, after any margin. */
+fun Modifier.cardTag(): Modifier = testTag(CARD_TAG)
+
 /**
  * A solid content card (`material.solid.card`: `surface.1`, one content radius `shape.l` 20 dp, no blur, no tint),
  * padded 16 dp, items 12 dp apart. Content inside is padded, not clipped.
@@ -56,6 +63,7 @@ fun NbCard(
     Column(
         modifier =
             modifier
+                .cardTag()
                 .solidCard(shape)
                 .padding(NbDimens.cardPadding),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s4),
@@ -93,6 +101,7 @@ fun NightSummaryCard(
             .widthIn(max = maxWidth)
             .then(modifier)
             .fillMaxWidth()
+            .cardTag()
             .solidCard(NbShapes.l)
             // The action's own 12 dp inner padding stands in for most of the bottom padding.
             .padding(
@@ -173,6 +182,7 @@ fun MetricRangeTile(
                 .then(modifier)
                 .fillMaxWidth()
                 .sizeIn(minHeight = NbDimens.targetMin)
+                .cardTag()
                 .solidCard(shape)
                 .then(if (selected) Modifier.background(colors.data.selected, shape) else Modifier)
                 .nbClickable(onClick = onClick, shape = shape, forced = forced)

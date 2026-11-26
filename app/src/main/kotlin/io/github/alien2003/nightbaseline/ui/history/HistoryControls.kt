@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.NbCard
-import io.github.alien2003.nightbaseline.ui.components.NbChipTab
 import io.github.alien2003.nightbaseline.ui.components.NbHairline
 import io.github.alien2003.nightbaseline.ui.components.NbIcon
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
@@ -43,6 +41,8 @@ import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.SectionHeader
+import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
+import io.github.alien2003.nightbaseline.ui.components.cardTag
 import io.github.alien2003.nightbaseline.ui.components.tone
 import io.github.alien2003.nightbaseline.ui.material.nbClickable
 import io.github.alien2003.nightbaseline.ui.material.solidCard
@@ -59,60 +59,47 @@ import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import io.github.alien2003.nightbaseline.ui.theme.controls
 
 /**
- * The "List / Calendar" switch (`screens.md` 7.4, `coloros-conformance.md` L6): a ColorOS tab row ([NbTabRow]) under
- * the top bar, centred, with a short underline under the selected label (weight, colour and underline; no tonal
- * capsule). Each tab is a 48 dp `Role.Tab` target.
+ * The List / Calendar switch (`screens.md` 7.4, review round 4): a solid round top-bar action ([ShellRoundButton]) like
+ * the actions of ColorOS system apps, so History has a single tab level (the filters). The glyph shows the view it
+ * switches to (calendar while the list is shown, list while the calendar is shown) and the TalkBack label says so.
  */
 @Composable
-fun HistoryViewToggle(
+fun HistoryViewButton(
     selected: HistoryView,
     onSelect: (HistoryView) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val labels =
-        HistoryView.entries.map {
-            stringResource(
-                if (it ==
-                    HistoryView.List
-                ) {
-                    R.string.history_view_list
-                } else {
-                    R.string.history_view_calendar
-                },
-            )
-        }
-    NbTabRow(labels, HistoryView.entries.indexOf(selected), onSelect = { onSelect(HistoryView.entries[it]) }, modifier = modifier)
+    val toCalendar = selected == HistoryView.List
+    ShellRoundButton(
+        icon = if (toCalendar) NbIcons.History else NbIcons.ListView,
+        contentDescription = stringResource(if (toCalendar) R.string.history_show_calendar else R.string.history_show_list),
+        onClick = { onSelect(if (toCalendar) HistoryView.Calendar else HistoryView.List) },
+        modifier = modifier,
+    )
 }
 
 /**
- * Filter chips "All / Moved / Learning and gaps" (`screens.md` 7.4, `coloros-conformance.md` L7): single choice
- * ColorOS chip tabs ([NbChipTab]): 36 dp pills in 48 dp targets, no outline and no check; the selected chip has a
- * brighter fill, a rim and a bold label. Chips wrap at large font.
+ * The filters "All / Moved / Learning and gaps" (`screens.md` 7.4, `coloros-conformance.md` L6): the one ColorOS tab
+ * row of History ([NbTabRow]), centred under the top bar, with the short underline under the selected label. Each tab
+ * is a 48 dp `Role.Tab` target; labels wrap at large font.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun HistoryFilterChips(
+fun HistoryFilterTabs(
     selected: HistoryFilter,
     onSelect: (HistoryFilter) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    FlowRow(
-        modifier.selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(NbSpace.s2),
-        verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
-    ) {
-        HistoryFilter.entries.forEach { filter ->
-            val label =
-                stringResource(
-                    when (filter) {
-                        HistoryFilter.All -> R.string.history_filter_all
-                        HistoryFilter.Moved -> R.string.history_filter_moved
-                        HistoryFilter.Gaps -> R.string.history_filter_gaps
-                    },
-                )
-            NbChipTab(label, selected = filter == selected, onClick = { onSelect(filter) })
+    val labels =
+        HistoryFilter.entries.map { filter ->
+            stringResource(
+                when (filter) {
+                    HistoryFilter.All -> R.string.history_filter_all
+                    HistoryFilter.Moved -> R.string.history_filter_moved
+                    HistoryFilter.Gaps -> R.string.history_filter_gaps
+                },
+            )
         }
-    }
+    NbTabRow(labels, HistoryFilter.entries.indexOf(selected), onSelect = { onSelect(HistoryFilter.entries[it]) }, modifier = modifier)
 }
 
 /**
@@ -131,8 +118,9 @@ fun HistoryAccessBanner(
     val action = if (access == HistoryAccess.Permission) R.string.action_open_hc_permissions else R.string.action_open_store
     Row(
         modifier
-            .fillMaxWidth()
             .widthIn(max = NbDimens.textMax)
+            .fillMaxWidth()
+            .cardTag()
             .solidCard(NbShapes.l)
             .padding(start = NbSpace.s5, top = NbSpace.s4, bottom = NbSpace.s4, end = NbSpace.s3)
             .semantics { liveRegion = LiveRegionMode.Polite },

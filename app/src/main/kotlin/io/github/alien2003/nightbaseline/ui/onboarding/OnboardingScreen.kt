@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.ui.components.NbText
+import io.github.alien2003.nightbaseline.ui.components.cardTag
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.material.solidCard
@@ -256,6 +257,7 @@ private fun CardStep(
             Modifier
                 .widthIn(max = CardMax)
                 .fillMaxWidth()
+                .cardTag()
                 .solidCard(NbShapes.l)
                 .padding(NbSpace.s8),
             horizontalArrangement = Arrangement.spacedBy(NbSpace.s8),

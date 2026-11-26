@@ -44,6 +44,7 @@ import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
+import io.github.alien2003.nightbaseline.ui.components.cardTag
 import io.github.alien2003.nightbaseline.ui.components.tone
 import io.github.alien2003.nightbaseline.ui.components.triangle
 import io.github.alien2003.nightbaseline.ui.material.solidCard
@@ -301,7 +302,13 @@ private fun SourceBody(
                 BodyText(stringResource(R.string.onb_nosource_body))
             } else {
                 BodyText(stringResource(R.string.onb_source_body))
-                Column(Modifier.fillMaxWidth().solidCard(NbShapes.l).selectableGroup()) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .cardTag()
+                        .solidCard(NbShapes.l)
+                        .selectableGroup(),
+                ) {
                     state.sources.forEachIndexed { i, source ->
                         SourceOptionRow(
                             source,
@@ -345,6 +352,7 @@ private fun Note(
     Row(
         Modifier
             .fillMaxWidth()
+            .cardTag()
             .solidCard(NbShapes.l)
             .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
             .padding(horizontal = NbSpace.s5, vertical = NbSpace.s4),

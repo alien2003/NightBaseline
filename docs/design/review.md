@@ -292,3 +292,40 @@ period thumb; single blue accent everywhere, no violet left; no tonal chips or c
   device at the system's largest font that wrapping to two lines kicks in before they touch.
 - The onboarding illustrations still repeat one dot-band drawing across the first three steps; distinct own
   drawings per step would read more finished (art task, not a canon deviation).
+
+## Round 4: owner's unfolded-screen feedback
+
+Input: the owner's screenshots of 0.1.0-dev.3 on the unfolded inner screen (2248 x 2480 px; the window reports about
+952 x 1050 dp, so the layout is single-pane Expanded with the labelled rail and two tile columns, font 1.35). Then an
+audit of every screen in the `owner-book`, `owner-tabletop`, `tablet-land` and `tablet-portrait` windows plus that
+window (`owner-unfolded`) for the same class of problems.
+
+Root cause of most findings: `Modifier.fillMaxWidth().widthIn(max = ...)` does not cap anything (the incoming
+constraints are already fixed at the full width, `widthIn` cannot shrink them), while `widthIn(...).fillMaxWidth()`
+does. Both orders were in use, so some cards stopped at 600 dp and their neighbours ran across the column.
+
+### Findings and fixes
+
+| # | Sev. | Where | Finding | Fix |
+|---|---|---|---|---|
+| 1 | high | Home, multi-column (owner's inner screen) | "Last 7 nights" sat beside the tall summary card as a low, narrow strip with its header outside the card in small grey text; the right column looked unfinished. | `HistoryStrip` is one solid card like the others: header row inside in the card title style with "See all" as a text action, 14 sp weekday labels, 28 dp glyphs. In multi-column Home it is a full-width card right below the summary (14 nights when 14 x 48 dp fit, else 7); the "beside" arrangement is gone. |
+| 2 | high | History | Two tab levels: a centred "List / Calendar" tab row and left-aligned filter chips under it. | One level: the filters are the centred ColorOS tab row (`NbTabRow`, underline) in list view; List / Calendar is a solid round top-bar action (`ShellRoundButton`, calendar / list glyph, TalkBack `history_show_calendar` / `history_show_list`, view kept in the saved state). In Tabletop (no top bar) the button ends the control row. |
+| 3 | high | Settings, Medium and Expanded single pane | "Sensitivity", "Theme", "Glass effects", their headers and the motion footnote were wider (or, on the phone, narrower and shifted) than the other groups. | One container rule: every card, header and footer of a Settings page sits in one column, max 600 dp, centred in single pane, at the pane start in the detail pane and the tabletop bottom half. The inline Sensitivity group uses the same section header as the other groups instead of a pane title. |
+| 4 | medium | Home, Night detail, Learning (single pane, wide) | "Not recorded by" row centred on its own 600 dp axis below 840 dp tiles; Learning card full width, "What to expect" and the strip at 600 dp. | The same container rule on these screens (840 dp with two tile columns, 600 dp with one). |
+| 5 | medium | Home, Night detail, tabletop | The view-only summary above the fold was 600 dp wide, the tile grid below it 730 dp. | Both halves use the grid's width. |
+| 6 | medium | History, single pane wide | Access banner, legend, empty and skeleton cards ran full width while the night rows stopped at 600 dp; the calendar card had its own cap. | All History items share the 600 dp container. |
+| 7 | medium | Metric detail, Medium and up | The header card stood beside a shorter "This period" block whose header sat outside its card; the summary text stood beside explainer cards; the period selector floated at the end. | Header card, notice and period readout run across the column; the period selector is centred; only the two explainer cards share a row, at one height. |
+
+### Test
+
+`CardAlignmentTest` (debug unit tests) renders Home, Night detail, Metric detail, History (list, calendar, banner),
+Settings (main and sub-pages), Learning and Onboarding in `owner-book`, `owner-unfolded`, `owner-tabletop`,
+`tablet-land` and `tablet-portrait` at font 1.0 and 1.35. Content cards carry `CARD_TAG`; cards are grouped into
+columns by horizontal overlap and, in Book, every card of a column must share the start edge and width within 1 dp;
+in the other windows a card may also be a tile-grid cell flush with one column edge. It failed on findings 4 and 5
+before the fixes.
+
+### Open
+
+- The chart card (`Chart.kt`) is not tagged yet (that file was being changed in parallel); its width follows the
+  same container in every layout checked by eye.

@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.GroupCard
@@ -29,6 +30,7 @@ import io.github.alien2003.nightbaseline.ui.components.NightGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
 import io.github.alien2003.nightbaseline.ui.components.StateCard
+import io.github.alien2003.nightbaseline.ui.components.cardTag
 import io.github.alien2003.nightbaseline.ui.components.tone
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.MetricUi
@@ -63,7 +65,7 @@ fun HistoryNightPreview(
         CompactNightSummary(night, source, modifier)
         return
     }
-    Column(modifier.fillMaxWidth().widthIn(max = NbDimens.textMax), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
+    Column(modifier.widthIn(max = NbDimens.textMax).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
         if (night.state.hasSummary) {
             NightSummaryCard(night, source)
         } else {
@@ -96,6 +98,7 @@ fun CompactNightSummary(
     night: NightUi,
     source: String,
     modifier: Modifier = Modifier,
+    maxWidth: Dp = NbDimens.textMax,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
@@ -103,8 +106,9 @@ fun CompactNightSummary(
     val title = text.nightTitle(night, source)
     Row(
         modifier
+            .widthIn(max = maxWidth)
             .fillMaxWidth()
-            .widthIn(max = NbDimens.textMax)
+            .cardTag()
             .solidCard(NbShapes.l)
             .clearAndSetSemantics { contentDescription = "$label. $title" }
             .padding(NbSpace.s5),
