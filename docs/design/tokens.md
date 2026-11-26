@@ -183,7 +183,7 @@ off. Under higher contrast the solid shell also gets a 1 dp border in `onGlass.p
 |---|---|---|---|
 | `color.solid.barTop` | `#FFFFFF` | `#1B1B1B` | bar and rail fill, gradient top |
 | `color.solid.barBottom` | `#F7F7F9` | `#232323` | bar and rail fill, gradient bottom |
-| `color.solid.topBar` | `= color.background` | `= color.background` | top bar fill: gradient `background` 0.85 -> 0, no hairline |
+| `color.solid.topBar` | `= color.background` | `= color.background` | top bar fill: `background` opaque over status bar + toolbar, fading to 0 over the 16 dp below; no hairline |
 | `color.solid.sheet` | `#F5F5F8` | `#171717` | sheet fill |
 | `color.solid.dialog` | `#FFFFFF` | `#232323` | dialog fill |
 | `color.solid.tooltip` | `= color.surface.elevated` | `= color.surface.elevated` | chart tooltip fill in both effect modes (with `elevation.raised`) |
@@ -504,7 +504,7 @@ texture file); it matches the fine grain seen on the system's translucent surfac
 | `material.solid.card` | `surface.1` | none | `elevation.card` | cards, tiles, chart card, settings groups, state cards |
 | `material.solid.bar` | vertical gradient `solid.barTop` -> `solid.barBottom` | same rim tokens as glass | `elevation.shell` | bar and rail in fallback |
 | `material.solid.convex` | vertical gradient `control.convexTop` -> `control.convexBottom` | `control.convexRimTop` 0.5 dp / `control.convexRimBottom` 1 dp | `elevation.control` | round back / action buttons in both modes (never blurred) |
-| `material.solid.topBar` | `solid.topBar` gradient 0.85 -> 0 over status bar + toolbar + 16 dp, no hairline | none | none | top bar in fallback |
+| `material.solid.topBar` | `solid.topBar` opaque over status bar + toolbar, fading out over the 16 dp below, no hairline | none | none | top bar in fallback |
 | `material.solid.sheet` | `solid.sheet` | same rim as glass sheet | `elevation.overlay` | sheet in fallback |
 | `material.solid.dialog` | `solid.dialog` | none | `elevation.overlay` | dialog in fallback |
 | `material.solid.tooltip` | `solid.tooltip` | none | `elevation.raised` | chart tooltip, both modes (it sits over data, so never glass) |

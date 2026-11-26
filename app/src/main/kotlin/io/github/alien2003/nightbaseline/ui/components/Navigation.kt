@@ -168,7 +168,9 @@ private fun NavItem(
                 if (!showLabel) contentDescription = label
             },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        // With labels the icons share one top line and a wrapped label only grows downwards (the bar's items are
+        // all as tall as the tallest one); the icon-only rail centres its icons.
+        verticalArrangement = if (showLabel) Arrangement.Top else Arrangement.Center,
     ) {
         if (showLabel) Spacer(Modifier.height(ShellDimens.barItemTop))
         // Outline -> filled icon: a 100 ms crossfade (snap under reduced motion).
@@ -198,7 +200,8 @@ private val NbSpaceHalf: Dp = ShellDimens.navLabelGap
 
 /**
  * A row that hugs its items ([gap] apart) while they fit and otherwise gives every item an equal share of the width
- * (each still at least 48 dp), so labels wrap instead of being cut (`layouts.md` 4.1). Items are centred vertically.
+ * (each still at least 48 dp), so labels wrap instead of being cut (`layouts.md` 4.1). Every item gets the height of
+ * the tallest one, so an item whose label wraps keeps its icon level with the others.
  */
 @Composable
 private fun HuggingRow(
@@ -216,17 +219,18 @@ private fun HuggingRow(
             } else {
                 null
             }
+        val widths = measurables.mapIndexed { i, _ -> share ?: natural[i] }
+        val tallest = measurables.mapIndexed { i, m -> m.minIntrinsicHeight(widths[i]) }.maxOrNull() ?: 0
+        val height = tallest.coerceIn(constraints.minHeight, constraints.maxHeight)
         val placeables =
             measurables.mapIndexed { i, m ->
-                val w = share ?: natural[i]
-                m.measure(Constraints(minWidth = w, maxWidth = w, maxHeight = constraints.maxHeight))
+                m.measure(Constraints(minWidth = widths[i], maxWidth = widths[i], minHeight = height, maxHeight = height))
             }
-        val height = placeables.maxOfOrNull { it.height } ?: 0
         val width = placeables.sumOf { it.width } + gaps
-        layout(width, height.coerceAtLeast(constraints.minHeight)) {
+        layout(width, height) {
             var x = 0
             placeables.forEach {
-                it.place(x, (height - it.height) / 2)
+                it.place(x, 0)
                 x += it.width + gapPx
             }
         }

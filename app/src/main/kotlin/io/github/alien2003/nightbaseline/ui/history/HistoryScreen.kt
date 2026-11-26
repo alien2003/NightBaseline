@@ -8,15 +8,18 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -37,6 +40,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -60,6 +64,7 @@ import io.github.alien2003.nightbaseline.ui.shell.CountComposition
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.ShellDimens
 import io.github.alien2003.nightbaseline.ui.theme.shellToolbarHeight
 import java.time.LocalDate
 import java.time.YearMonth
@@ -415,15 +420,49 @@ private fun SinglePaneHistory(
     barHeight: Dp,
     listState: LazyListState,
 ) {
+    // The list starts below the collapsed bar (status bar + toolbar, the edge where month headers stick); the large
+    // title block below the toolbar is content padding, so the list scrolls up 1:1 with the collapsing title
+    // (`coloros-conformance.md` C4) instead of keeping the resting bar height as an empty band with a hard cut.
+    val short = layout.mode == LayoutMode.CompactShort || layout.mode == LayoutMode.WideShort
+    val toolbar = if (short) ShellDimens.toolbarShort else ShellDimens.toolbar
+    val statusBars = WindowInsets.statusBars
+    val density = LocalDensity.current
+    val bottom = padding.calculateBottomPadding() + NbSpace.s5
+    val contentPadding =
+        remember(layout.gutter, bottom, barHeight, toolbar, statusBars, density) {
+            BelowToolbarPadding(layout.gutter, bottom, barHeight - toolbar + NbSpace.s3, statusBars, density)
+        }
     HistoryList(
         content,
         listState,
-        PaddingValues(start = layout.gutter, end = layout.gutter, top = NbSpace.s3, bottom = padding.calculateBottomPadding() + NbSpace.s5),
+        contentPadding,
         Modifier
             .fillMaxSize()
             .padding(start = padding.calculateLeftPadding(LayoutDirection.Ltr), end = padding.calculateRightPadding(LayoutDirection.Ltr))
-            .padding(top = barHeight),
+            .windowInsetsPadding(statusBars.only(WindowInsetsSides.Top))
+            .padding(top = toolbar),
     )
+}
+
+/**
+ * Content padding of the single-pane list: [gutter] at the sides, [bottom], and on top [belowToolbar] (the resting
+ * bar below its toolbar, plus the gap) minus the status bar, which the list's own position already clears. The status
+ * bar is read when the list measures, never in composition, so the first frame after the insets arrive is right.
+ */
+private class BelowToolbarPadding(
+    private val gutter: Dp,
+    private val bottom: Dp,
+    private val belowToolbar: Dp,
+    private val statusBars: WindowInsets,
+    private val density: Density,
+) : PaddingValues {
+    override fun calculateLeftPadding(layoutDirection: LayoutDirection): Dp = gutter
+
+    override fun calculateRightPadding(layoutDirection: LayoutDirection): Dp = gutter
+
+    override fun calculateTopPadding(): Dp = (belowToolbar - with(density) { statusBars.getTop(this).toDp() }).coerceAtLeast(NbSpace.s3)
+
+    override fun calculateBottomPadding(): Dp = bottom
 }
 
 @Composable
@@ -438,6 +477,7 @@ private fun TwoPaneHistory(
     val start = padding.calculateLeftPadding(LayoutDirection.Ltr)
     val bottom = padding.calculateBottomPadding() + NbSpace.s5
     val fold = layout.verticalFold
+    // Two panes have no large title: the bar keeps one height, so both panes simply start below it.
     Row(Modifier.fillMaxSize().padding(start = start, top = barHeight)) {
         HistoryList(
             content,

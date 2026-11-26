@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -18,10 +19,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -190,13 +193,9 @@ internal fun ScreenFrame(
     val density = LocalDensity.current
     val large = largeTitle && layout.mode == LayoutMode.Compact
     val short = layout.mode == LayoutMode.CompactShort || layout.mode == LayoutMode.WideShort
-    val statusBarPx =
-        with(density) {
-            WindowInsets.statusBars
-                .asPaddingValues()
-                .calculateTopPadding()
-                .roundToPx()
-        }
+    // Read when the bar reports its size, never in composition: on a cold start the insets arrive after the first
+    // composition, and a status bar of 0 subtracted from a measured bar that already includes it is one frame wrong.
+    val statusBars = WindowInsets.statusBars
     val barHeight = shellToolbarHeight(short, large)
     // The bar grows with the font scale (title and subtitle never clip), so the content starts below its measured
     // height at rest; while scrolling the measured value is kept so the content does not jump.
@@ -216,6 +215,7 @@ internal fun ScreenFrame(
                         .padding(start = contentPadding.calculateStartPadding(LocalLayoutDirection.current))
                         .onSizeChanged { size ->
                             if (scroll.value == 0) {
+                                val statusBarPx = statusBars.getTop(density)
                                 restingBarHeight = with(density) { (size.height - statusBarPx).coerceAtLeast(0).toDp() }
                             }
                         },
@@ -256,9 +256,25 @@ internal fun tileTitleColumn(gutter: Dp): TitleColumn =
         wideFrom = TileMinWidth * 2 + NbDimens.cardGap,
     )
 
-/** Space above the first block: status bar + top bar + 8 dp. */
+/**
+ * Space above the first block: status bar + top bar + 8 dp, as a value read in composition. Prefer [belowTopBar],
+ * which applies the status bar when the content is laid out (no jump when the insets arrive after the first frame).
+ */
 @Composable
 internal fun topInset(barHeight: Dp): Dp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + barHeight + NbSpace.s3
+
+/**
+ * Pads the first block below the top bar: the status bar inset (applied at layout time, like the bar's own spacer, so
+ * a cold start never draws the content one status bar too high), the bar's resting height [barHeight] and 8 dp, plus
+ * [bottom] below the last block.
+ */
+@Composable
+internal fun Modifier.belowTopBar(
+    barHeight: Dp,
+    bottom: Dp,
+): Modifier =
+    windowInsetsPadding(WindowInsets.statusBars.only(WindowInsetsSides.Top))
+        .padding(top = barHeight + NbSpace.s3, bottom = bottom)
 
 /** Width left for content inside [padding] and the gutters. */
 @Composable
@@ -406,7 +422,7 @@ private fun SinglePaneHome(
                 .verticalScroll(scroll)
                 .padding(padding)
                 .padding(horizontal = layout.gutter)
-                .padding(top = topInset(barHeight), bottom = NbSpace.s5),
+                .belowTopBar(barHeight, bottom = NbSpace.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // One container for every block (review round 4): same width cap, same start edge, centred as a whole.
@@ -433,7 +449,6 @@ private fun TwoPaneHome(
     val fold = layout.verticalFold
     val start = padding.calculateStartPadding(direction)
     val end = padding.calculateEndPadding(direction)
-    val top = topInset(barHeight)
     val bottom = padding.calculateBottomPadding() + NbSpace.s5
     val available = layout.widthDp.dp - start - end - layout.gutter * 2
     val supporting =
@@ -460,7 +475,7 @@ private fun TwoPaneHome(
                 .width(listWidth)
                 .fillMaxHeight()
                 .verticalScroll(scroll)
-                .padding(top = top, bottom = bottom),
+                .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
             HomeBlocks(state, actions, 1, NbDimens.textMax, selected = state.detailMetric, stripTargets = false)
@@ -471,7 +486,8 @@ private fun TwoPaneHome(
                 .weight(1f)
                 .fillMaxHeight()
                 .verticalScroll(rememberPaneScrollState())
-                .padding(end = if (supporting) 0.dp else endGutter, top = top, bottom = bottom),
+                .padding(end = if (supporting) 0.dp else endGutter)
+                .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
             DetailPaneContent(state, actions, layout)
@@ -483,7 +499,8 @@ private fun TwoPaneHome(
                     .width(SUPPORTING_PANE)
                     .fillMaxHeight()
                     .verticalScroll(rememberPaneScrollState())
-                    .padding(end = layout.gutter, top = top, bottom = bottom),
+                    .padding(end = layout.gutter)
+                    .belowTopBar(barHeight, bottom),
                 verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
             ) {
                 RecentNightsPane(state.recent.takeLast(STRIP_WIDE), actions.onNight)
@@ -547,7 +564,6 @@ private fun WideShortHome(
     scroll: ScrollState,
 ) {
     val direction = LocalLayoutDirection.current
-    val top = topInset(barHeight)
     val bottom = padding.calculateBottomPadding() + NbSpace.s5
     Row(
         Modifier
@@ -564,7 +580,7 @@ private fun WideShortHome(
                 .width(WIDE_SHORT_START)
                 .fillMaxHeight()
                 .verticalScroll(scroll)
-                .padding(top = top, bottom = bottom),
+                .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
             HomeBlocks(state, actions, 1, NbDimens.textMax, Blocks(tiles = false, footer = false), stripTargets = false)
@@ -574,7 +590,7 @@ private fun WideShortHome(
                 .weight(1f)
                 .fillMaxHeight()
                 .verticalScroll(rememberPaneScrollState())
-                .padding(top = top, bottom = bottom),
+                .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
             HomeBlocks(state, actions, 1, NbDimens.textMax, Blocks(night = false, strip = false))
@@ -610,7 +626,7 @@ private fun TabletopHome(
                 .fillMaxWidth()
                 .height(foldY - NbDimens.hingeClearance)
                 .clipToBounds()
-                .padding(top = topInset(barHeight), bottom = NbSpace.s3),
+                .belowTopBar(barHeight, bottom = NbSpace.s3),
         ) {
             FitColumn(NbDimens.cardGap) {
                 when {

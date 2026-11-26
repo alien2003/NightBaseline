@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -79,8 +80,13 @@ enum class ShellMaterial(
     ): Brush =
         when (this) {
             Bar, Rail -> Brush.verticalGradient(listOf(shell.barSolidTop, shell.barSolidBottom))
-            TopBar -> topBarScrim(colors.background, SOLID_TOP_BAR_DIM)
+
+            // Opaque where the status bar icons and the title sit (`tokens.md` 2.5: the text row needs a 4.5:1
+            // backing); the 16 dp below the toolbar fade out through the bar's own fadeOutBottom mask.
+            TopBar -> SolidColor(colors.background)
+
             Sheet -> Brush.verticalGradient(listOf(shell.sheetSolid, shell.sheetSolid))
+
             Dialog -> Brush.verticalGradient(listOf(shell.dialogSolid, shell.dialogSolid))
         }
 
@@ -94,9 +100,6 @@ enum class ShellMaterial(
 }
 
 private const val GLASS_NOISE = 0.03f
-
-/** Darkening of the solid top bar under the status bar (fades to 0 at the bottom of the fade zone). */
-private const val SOLID_TOP_BAR_DIM = 0.85f
 
 /** Alpha of the 1 dp contrasting border in higher-contrast mode (`coloros17-glass.md` 4.5). */
 private const val HIGH_CONTRAST_BORDER_ALPHA = 0.6f
