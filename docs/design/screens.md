@@ -114,9 +114,42 @@ Shell (glass, fallback solid; same component on every window size):
 | `ShellTopBar` | Heights per mode in `layouts.md` 4.3 (Compact: large title about 112 dp collapsing to 56 dp; Medium and up: 64 dp; short windows: 48 dp; all grow with font scale, never clip). Transparent while content is at rest (the title then sits on the solid window background); `material.glass.topBar` once content scrolls under it, with the tint at full strength before content reaches the title (`tokens.md` 7.1). Title, optional back, up to two 48 dp actions. Large-title variant on top-level screens: `type.largeTitle` at rest, `type.title` collapsed. |
 | `FloatingNavBar` | `material.glass.bar` pill, centered, hugging its items, bottom = navigation bar inset + 12 dp, height 64 dp at font 1.0 (labels below icons, grows with the label), each item >= 48x48 dp touch target (`layouts.md` 4.1). Selected item: solid tonal capsule (`primaryContainer`) plus filled icon and bold label, morphing (position + width, `spring.selection`) between items and following the finger while dragging along the bar. Measured reference pattern: floating pill 56–77 dp high, 16–22 dp above the screen bottom, not edge-docked. |
 | `FloatingNavRail` | `material.glass.rail`, vertical pill 72 dp wide, start edge + 12 dp, vertically centered, icon + label items (icon only in `WideShort`, labelled wide pill in `Large`/`ExtraLarge`). Used in `Medium`, `Expanded`, `Large`, `ExtraLarge`, `WideShort` and `Book` with a wide start pane (`layouts.md` 3.2, 4.2); `CompactShort` keeps the bottom bar. |
-| `GlassSheet` | Bottom sheet, `material.glass.sheet`, top corners `shape.sheet` (32 dp), drag handle (48 dp target, also closable with Esc and a labelled close action for TalkBack). Used in Compact, CompactShort, Tabletop (lower half only) and Glance; from Medium up the same content opens as a `GlassDialog` or in the detail pane (`layouts.md` 4.4). |
-| `GlassDialog` | Centered, `material.glass.dialog`, `shape.dialog` (32 dp); max width 480 dp for confirmations (sensitivity reset, source change), 560 dp when it hosts sheet content on wide windows. Never across a fold (`layouts.md` 6). |
+| `GlassSheet` | Bottom sheet inside a `ModalHost` (see "Sheets" below): `material.glass.sheet` (solid when nothing behind it can be blurred), top corners `ShellDimens.sheetRadius`, 36 x 4 dp handle, centred title, round close button, also closable with Esc, system Back, the predictive back gesture, a scrim tap, a drag down and a labelled close action for TalkBack. Used in Compact, CompactShort, Tabletop (lower half only) and Glance; from Medium up the same content opens as a `GlassDialog` or in the detail pane (`layouts.md` 4.4). |
+| `GlassDialog` | Inside a `ModalHost`: centred (`ModalKind.Dialog`) or docked at the bottom on phone widths (`ModalKind.DockedDialog`), `material.glass.dialog`, `shape.dialog`; max width 392 dp for confirmations (source change), 560 dp when it hosts sheet content on wide windows. Never across a fold (`layouts.md` 6). |
 | `ChartTooltip` | Small **solid** bubble (`material.solid.tooltip`, both effect modes: it floats over data, so it is not glass) that follows the finger or pointer over the chart, with date, value + unit, status glyph and label. |
+
+### Sheets
+
+Every sheet and dialog (range explainer, "Not recorded by", Glance "More", the source change confirmation) is
+presented by one `ModalHost` (`ui/components/Modal.kt`), COUI-panel style:
+
+- **One source of truth.** The caller owns the intent (`value`: non-null = open); the host owns the presentation.
+  Its phase (`Hidden`, `Showing`, `Shown`, `Hiding`) is derived from the intent and a single `Animatable` progress
+  (0 = hidden, 1 = at rest), never stored separately, so open state and visibility cannot drift apart. The last
+  value stays composed while the panel leaves; at progress 0 with no intent nothing of the panel or the scrim is in
+  the composition.
+- **One timeline.** The progress drives the panel (sheet: offset by its height; dialog: scale 0.8 -> 1, opaque from
+  35 % of the motion; docked dialog: offset) and the scrim alpha. The scrim is drawn by the host over everything
+  composed before it, so the floating bar and rail are below it and dim with it; nothing of the shell is drawn over a
+  panel.
+- **Closing always animates and always ends hidden.** Scrim tap, system Back and the predictive back gesture (the
+  panel follows the gesture by 12 % of its height and scales to 0.92 from its bottom centre; cancel returns on
+  `spring.sheetReturn`), a drag on the header or a downward pull of content already at its top (past half the height
+  or a fling > 1000 dp/s dismisses, carrying the velocity into `spring.sheetHide`, otherwise it returns), the close
+  button and a chosen option (`ModalScope.dismiss`) all ask the caller to clear the value; the host animates out.
+  Re-opening while it leaves reverses from where it is.
+- **No stuck overlay.** While leaving, the scrim no longer takes touches (the screen underneath works at once) and the
+  panel swallows touches (an option cannot be chosen twice).
+- **Never above its top.** Drags and nested scroll are clamped at the resting position; the custom overscroll
+  (`NbOverscroll`) is off inside the host, so neither the panel nor its scrolling content bounces upward past it.
+- **Motion tokens.** Sheet show `spring.sheet` (1.0 / 250), hide `spring.sheetHide` (1.0 / 440), return
+  `spring.sheetReturn` (1.0 / 247); dialogs `easing.flow` 250 ms in, `easing.exit` 150 ms out. Reduced motion: a
+  120 ms fade only, no drag.
+
+Settings sub-pages (Compact) are pages, not sheets: they push and pop like screens (`coloros-conformance.md` P1/P2).
+Each page is opaque, scrolls on its own state and keeps its padding while it leaves; on a pop the leaving page slides
+off on top of the uncovered one. The open page comes synchronously from the ViewModel, so the page on screen and the
+page Back closes are always the same.
 
 Content (always solid):
 

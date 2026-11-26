@@ -329,3 +329,48 @@ before the fixes.
 
 - The chart card (`Chart.kt`) is not tagged yet (that file was being changed in parallel); its width follows the
   same container in every layout checked by eye.
+
+## Round 5: sheets
+
+Input: the owner's report on 0.1.0-dev.6 (folded outer screen, Settings): the sliding panels "overlap each other
+crookedly" during the animation, then the app stopped responding after a Back press (no ANR, no crash, process
+alive, the screen looked normal). The phone was not used for this round; findings come from the code and from frame
+captures on the manually driven test clock (`owner-outer`, 482 x 1107 dp, Compact).
+
+### Findings and fixes
+
+| # | Sev. | Where | Finding (evidence) | Fix |
+|---|---|---|---|---|
+| 1 | high | Settings sub-pages (Sensitivity, Source, About ...), Compact | Frames of the push showed the incoming sub-page drawn over the still-visible Settings list for about a second: the pages are transparent, and the covered page stays composed until the slowest exit animation settles (> 800 ms). On a pop `AnimatedContent` drew the uncovered page **above** the leaving one, fading in from 0.7, so both pages' text overlapped. | Pages are opaque (window background); a pop puts the leaving page on top (`targetContentZIndex = -1`). Frames now show one page over the other only. |
+| 2 | high | Settings sub-pages | Both pages of a transition scrolled on one shared `ScrollState` and took the padding of the new top bar (large title -> small), so the covered list jumped mid-transition. | Every sub-page has its own scroll state (the top bar follows the shown page's); a leaving page keeps the padding it was laid out with. |
+| 3 | high | Settings, Back | The sub-page in the screen state reaches the UI through the compute dispatcher (`combine ... flowOn`), so for a moment after a tap the Back handler still saw the main list: Back then went to the section's handler (Settings -> Home) while the ViewModel had opened the sub-page. | The open page comes synchronously from the ViewModel (`SettingsViewModel.page`), used by both the screen and its Back handler. |
+| 4 | high | All sheets and dialogs | The scrim (tween) and the panel (spring) ran on separate timelines; scrim tap, Back and the semantics dismiss removed the panel at once (no exit motion) while the close button animated it; the drag launched one coroutine per pointer delta on stale values, and a late `snapTo` could cancel the return animation and leave the sheet half-way; the dialog scrim also had no Back handler (Back went to the page under it). | One `ModalHost` with a derived state machine and a single progress (see `screens.md` 4 "Sheets"). Every dismissal path animates out and ends with nothing composed; predictive back drives the panel; drags snap synchronously and are clamped at the top. |
+| 5 | medium | Sheets hosted above the graph | With glass on and no blur source (the shared sheets live outside the shell's haze source), the panel was a 92 % tint: the floating bar and page text showed through the panel. | Sheets and dialogs fall back to their solid fill when nothing behind them can be blurred. |
+| 6 | medium | Dialogs | A 50 % frame of the dialog was half-transparent over the page (text over text). | Dialogs are opaque from 35 % of their motion; the scale and the scrim continue. |
+| 7 | medium | Sheet content | `NbOverscroll` translated scrollable content inside panels (and the dialog's own scroll wrapper) past their edges. | Custom overscroll is off inside the host; content pulled down at its top drags the panel instead (nested scroll). |
+
+The freeze itself was not reproduced on the JVM: after Back at 16, 50, 120, 250 and 1000 ms into the push, real touch
+input reached the list every time. The most likely mechanism on the phone is findings 1 and 3 together (a covered
+page still composed under a transparent page for up to a second, and Back handled by the wrong handler while the
+state was in flight) **[hypothesis until the owner retries 0.1.0-dev.7]**.
+
+### Tests
+
+- `SheetDismissTest` (Robolectric, real touch input): Home explainer, Metric detail explainer and Glance "More" x
+  {Back, scrim tap, drag down, option, Back while still opening}: afterwards no panel and no scrim node, and a touch on
+  the trigger underneath opens the sheet again.
+- `ModalHostTest`: closing animates (the panel is still there two frames later) and then nothing is left; rapid
+  open / close / re-open never sticks; an option chosen while opening dismisses once; the scrim covers a bar drawn
+  before it and takes its touch; a drag upward never moves the panel above its top.
+- `SettingsSubPageBackTest` (owner-outer): Back at any moment of the push closes the sub-page, never the section, and
+  touches work afterwards.
+- `SheetFramesScreenshotsTest`: the explainer at 0, ~50 and 100 % of its open motion in light and dark on `phone`
+  (sheet) and `owner-book` (dialog), and the Settings push / pop at fixed times on `owner-outer`
+  (`frames-*.png`). Checked by eye: no overlapping text in any frame.
+
+### Open
+
+- The shell top bar switches its title at the start of a push or pop (it is not part of the page); ColorOS moves the
+  toolbar with the page. A per-page toolbar is a larger change to `ShellPage`.
+- The predictive back preview values (12 % travel, scale 0.92) are estimates until a slow-gesture capture exists
+  (`coloros-conformance.md` P3); the navigation-level predictive pop is unchanged.

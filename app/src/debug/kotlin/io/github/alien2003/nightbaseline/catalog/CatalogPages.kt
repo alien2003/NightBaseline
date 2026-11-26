@@ -47,6 +47,7 @@ import io.github.alien2003.nightbaseline.ui.components.LearningCard
 import io.github.alien2003.nightbaseline.ui.components.LearningProgress
 import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.MetricRangeTile
+import io.github.alien2003.nightbaseline.ui.components.ModalKind
 import io.github.alien2003.nightbaseline.ui.components.MonthCalendar
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbText
@@ -63,6 +64,7 @@ import io.github.alien2003.nightbaseline.ui.components.SettingsGroup
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
+import io.github.alien2003.nightbaseline.ui.components.StaticModal
 import io.github.alien2003.nightbaseline.ui.components.StatsRow
 import io.github.alien2003.nightbaseline.ui.components.StatusLabel
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
@@ -342,13 +344,15 @@ private fun ShellPage() {
         Entry("bottom sheet", width) {
             OverBackdrop(380.dp) {
                 Box(Modifier.fillMaxWidth().heightIn(min = 380.dp), contentAlignment = Alignment.BottomCenter) {
-                    GlassSheet(title = rememberUiText().string(R.string.explainer_title), onClose = {}) {
-                        NbCard(Modifier.fillMaxWidth()) {
-                            NbText(
-                                rememberUiText().string(R.string.explainer_range),
-                                style = NbTheme.typography.body,
-                                color = NbTheme.colors.textPrimary,
-                            )
+                    StaticModal {
+                        GlassSheet(title = rememberUiText().string(R.string.explainer_title)) {
+                            NbCard(Modifier.fillMaxWidth()) {
+                                NbText(
+                                    rememberUiText().string(R.string.explainer_range),
+                                    style = NbTheme.typography.body,
+                                    color = NbTheme.colors.textPrimary,
+                                )
+                            }
                         }
                     }
                 }
@@ -357,15 +361,17 @@ private fun ShellPage() {
         Entry("dialog", width) {
             val text = rememberUiText()
             OverBackdrop(380.dp) {
-                GlassDialog(
-                    title = text.string(R.string.sens_reset_title),
-                    body = text.string(R.string.sens_reset_body),
-                    confirm = text.string(R.string.action_reset),
-                    onConfirm = {},
-                    dismiss = text.string(R.string.action_cancel),
-                    onDismiss = {},
-                    modifier = Modifier.padding(NbSpace.s5),
-                )
+                StaticModal(ModalKind.Dialog) {
+                    GlassDialog(
+                        title = text.string(R.string.sens_reset_title),
+                        body = text.string(R.string.sens_reset_body),
+                        confirm = text.string(R.string.action_reset),
+                        onConfirm = {},
+                        dismiss = text.string(R.string.action_cancel),
+                        onDismiss = {},
+                        modifier = Modifier.padding(NbSpace.s5),
+                    )
+                }
             }
         }
     }

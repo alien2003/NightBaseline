@@ -47,8 +47,10 @@ import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.algo.MetricId
 import io.github.alien2003.nightbaseline.data.hc.HcPermissions
 import io.github.alien2003.nightbaseline.ui.components.GlassSheet
+import io.github.alien2003.nightbaseline.ui.components.ModalHost
+import io.github.alien2003.nightbaseline.ui.components.ModalKind
+import io.github.alien2003.nightbaseline.ui.components.ModalScope
 import io.github.alien2003.nightbaseline.ui.components.NbText
-import io.github.alien2003.nightbaseline.ui.components.OverlayHost
 import io.github.alien2003.nightbaseline.ui.components.SecondaryButton
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.history.HistoryAccess
@@ -64,12 +66,13 @@ import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.layout.NavigationKind
 import io.github.alien2003.nightbaseline.ui.learning.LearningActions
 import io.github.alien2003.nightbaseline.ui.learning.LearningScreen
-import io.github.alien2003.nightbaseline.ui.metric.InfoOverlay
+import io.github.alien2003.nightbaseline.ui.metric.InfoPanel
 import io.github.alien2003.nightbaseline.ui.metric.InfoParagraphs
 import io.github.alien2003.nightbaseline.ui.metric.MetricDetailActions
 import io.github.alien2003.nightbaseline.ui.metric.MetricDetailScreen
 import io.github.alien2003.nightbaseline.ui.metric.MetricDetailViewModel
-import io.github.alien2003.nightbaseline.ui.metric.RangeExplainerOverlay
+import io.github.alien2003.nightbaseline.ui.metric.RangeExplainerPanel
+import io.github.alien2003.nightbaseline.ui.metric.infoModalKind
 import io.github.alien2003.nightbaseline.ui.model.BannerKind
 import io.github.alien2003.nightbaseline.ui.model.ChartPeriod
 import io.github.alien2003.nightbaseline.ui.model.NightState
@@ -427,29 +430,32 @@ fun AppNavHost(
                         scroll = scroll,
                         onSelectTab = openTab,
                     )
-                    if (explainer) BackHandler { explainer = false }
                 }
             }
             composable<OnboardingRoute> {
                 OnboardingDestination(layout, navController, system, onRefresh, about)
             }
         }
-        sheet?.let { open ->
-            BackHandler { sheet = null }
+        // One host for the shared sheets: it animates every close (scrim, Back, drag, option) and leaves nothing
+        // composed once hidden. The Glance "More" sheet is always a sheet; the info panels follow the layout.
+        ModalHost(
+            sheet,
+            onDismiss = { sheet = null },
+            kind = if (sheet == AppSheet.More) ModalKind.Sheet else infoModalKind(layout),
+        ) { open ->
             when (open) {
                 AppSheet.Explainer -> {
-                    RangeExplainerOverlay(layout, sideLine = null, onClose = { sheet = null })
+                    RangeExplainerPanel(layout, sideLine = null)
                 }
 
                 AppSheet.NotRecorded -> {
-                    InfoOverlay(layout, sheetTitle, onClose = { sheet = null }) {
+                    InfoPanel(layout, sheetTitle) {
                         InfoParagraphs(listOf(stringResource(R.string.detail_not_provided_body, sheetSource)), it)
                     }
                 }
 
                 AppSheet.More -> {
                     MoreSheet(
-                        onClose = { sheet = null },
                         onOpen = { tab ->
                             sheet = null
                             openTab(tab)
@@ -755,12 +761,14 @@ private fun SettingsDestination(
 ) {
     val vm: SettingsViewModel = appViewModel()
     val state by vm.ui.collectAsStateWithLifecycle()
+    val page by vm.page.collectAsStateWithLifecycle()
     val scroll = rememberScrollState()
     val reason = NbTheme.effects.reason
     state?.let { s ->
-        ActiveBackHandler(s.page != SettingsPage.Main && !layout.twoPanes, active) { vm.back() }
+        // The page comes straight from the ViewModel: what is shown and what Back closes are the same page.
+        ActiveBackHandler(page != SettingsPage.Main && !layout.twoPanes, active) { vm.back() }
         SettingsScreen(
-            s.copy(glassReason = reason),
+            s.copy(glassReason = reason, page = page),
             layout,
             actions =
                 SettingsActions(
@@ -837,15 +845,10 @@ private fun OnboardingDestination(
 
 /** Glance "More" (`screens.md` 2): a glass sheet with labelled History and Settings entries. */
 @Composable
-private fun MoreSheet(
-    onClose: () -> Unit,
-    onOpen: (TopLevel) -> Unit,
-) {
-    OverlayHost(onDismiss = onClose, alignment = Alignment.BottomCenter) {
-        GlassSheet(stringResource(R.string.action_more), onClose = onClose) {
-            listOf(TopLevel.Home, TopLevel.History, TopLevel.Settings).forEach { tab ->
-                SecondaryButton(stringResource(tab.label), onClick = { onOpen(tab) }, modifier = Modifier.fillMaxWidth())
-            }
+private fun ModalScope.MoreSheet(onOpen: (TopLevel) -> Unit) {
+    GlassSheet(stringResource(R.string.action_more)) {
+        listOf(TopLevel.Home, TopLevel.History, TopLevel.Settings).forEach { tab ->
+            SecondaryButton(stringResource(tab.label), onClick = { onOpen(tab) }, modifier = Modifier.fillMaxWidth())
         }
     }
 }

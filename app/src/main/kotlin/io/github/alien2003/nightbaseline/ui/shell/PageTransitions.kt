@@ -66,13 +66,16 @@ data class PageTransitions(
     fun popExit(): ExitTransition =
         if (reduced) fadeOut(tween(NbDurations.REDUCED)) else slideOutHorizontally(page<IntOffset>()) { sign * it }
 
-    /** A push ([forward]) or pop for `AnimatedContent`. */
+    /**
+     * A push ([forward]) or pop for `AnimatedContent`. The page that moves over the full width is always on top: the
+     * pushed page on a push, the leaving page on a pop (it slides off above the uncovered page, which comes back
+     * from under it with the parallax; `AnimatedContent` would otherwise draw the uncovered page over it).
+     */
     fun content(forward: Boolean): ContentTransform =
         if (forward) {
             pushEnter() togetherWith pushExit()
         } else {
-            popEnter() togetherWith
-                popExit()
+            (popEnter() togetherWith popExit()).apply { targetContentZIndex = -1f }
         }
 
     private fun covered(): ExitTransition = if (dim) fadeOut(page(), targetAlpha = 1f - DIM) else ExitTransition.None

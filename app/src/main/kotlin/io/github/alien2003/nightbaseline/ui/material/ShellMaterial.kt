@@ -155,11 +155,31 @@ fun Modifier.shellSurface(
     val glass = effects.glass
     val fill: Modifier =
         when {
-            strength <= 0f -> Modifier
-            glass && hazeState != null -> Modifier.hazeBlur(HazeInput.Sources(hazeState), style)
-            glass && topBar -> Modifier
-            glass -> Modifier.background(tint.copy(alpha = tint.alpha * strength), shape)
-            else -> Modifier.background(material.solidFill(shell, colors), shape, alpha = strength)
+            strength <= 0f -> {
+                Modifier
+            }
+
+            glass && hazeState != null -> {
+                Modifier.hazeBlur(HazeInput.Sources(hazeState), style)
+            }
+
+            glass && topBar -> {
+                Modifier
+            }
+
+            // A sheet or dialog with no backdrop to blur (hosted above the whole graph) is solid: a bare 92 % tint
+            // would let the floating bar and the text under it show through the panel.
+            glass && (material == ShellMaterial.Sheet || material == ShellMaterial.Dialog) -> {
+                Modifier.background(material.solidFill(shell, colors), shape, alpha = strength)
+            }
+
+            glass -> {
+                Modifier.background(tint.copy(alpha = tint.alpha * strength), shape)
+            }
+
+            else -> {
+                Modifier.background(material.solidFill(shell, colors), shape, alpha = strength)
+            }
         }
     // Drawn on top of the blur: the darkening of the top bar, the bar's light towards its bottom edge.
     val overlay: Modifier =

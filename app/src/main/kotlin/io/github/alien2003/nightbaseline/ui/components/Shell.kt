@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -310,73 +311,42 @@ fun rememberPaneScrollState(): ScrollState {
     return state
 }
 
-/** Sheet show / return / hide springs (`coloros-conformance.md` G1, critically damped). */
-private const val SHEET_SHOW_STIFFNESS = 250f
-private const val SHEET_RETURN_STIFFNESS = 247f
-private const val SHEET_HIDE_STIFFNESS = 440f
-
-/** A downward fling faster than this (dp/s) dismisses the sheet. */
-private const val SHEET_FLING_DISMISS = 1000f
-
-/** Share of its height a sheet must be dragged down to dismiss on release. */
-private const val SHEET_DISMISS_FRACTION = 0.5f
-
-/** Resistance of the upward rubber band. */
-private const val SHEET_RUBBER = 0.3f
-
 /**
- * The bottom sheet (`coloros-conformance.md` G1–G3, COUI-like): the sheet material (blur with a near-opaque tint,
- * solid in the fallback, a top highlight only, soft overlay shadow), top corners 28 dp, the ColorOS header (a 36 x 4
- * dp handle, a centred `type.dialogTitle`, a round close button at the end) and 16 dp side padding. It slides up on a
- * critically damped spring; dragging the header moves it with the finger (upward with a rubber band) and a release
- * beyond half its height or a downward fling dismisses it. Cards inside it are solid; text placed directly on the
- * tint uses `onGlass.*`. Drawn in place (inside the window, so the blur sees the content behind it); [GlassScrim]
- * dims the rest. TalkBack and Esc use the labelled close action.
+ * The bottom sheet (`coloros-conformance.md` G1–G3, COUI panel-like), drawn inside a [ModalHost]: the sheet material
+ * (blur with a near-opaque tint, solid in the fallback, a top highlight only, soft overlay shadow), top corners
+ * `ShellDimens.sheetRadius`, the ColorOS header (a 36 x 4 dp handle, a centred `type.dialogTitle`, a round close button
+ * at the end) and 16 dp side padding. Its position is the host's single progress ([modalPanel]): it slides up on
+ * `spring.sheet`, follows a drag on the header (never above its resting top) and content pulled down past its top
+ * (nested scroll), and on release returns on `spring.sheetReturn` or, past half its height or on a downward fling,
+ * leaves on `spring.sheetHide` carrying the fling's velocity. Cards inside it are solid; text placed directly on the
+ * tint uses `onGlass.*`. TalkBack and Esc use the labelled close action.
  */
 @Composable
-fun GlassSheet(
+fun ModalScope.GlassSheet(
     title: String,
-    onClose: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = NbTheme.colors
     val shell = ShellTokens.colors
-    val motion = NbTheme.motion
     val density = LocalDensity.current
     val close = stringResource(R.string.a11y_close)
-    val scope = rememberCoroutineScope()
-    var heightPx by remember { mutableFloatStateOf(0f) }
-    // Entrance as a share of the sheet's height (1 = below its resting place), plus the finger's drag in px.
-    val enter = remember { Animatable(if (motion.reduced) 0f else 1f) }
-    val offset = remember { Animatable(0f) }
-    val rubber = with(density) { ShellDimens.sheetRubberBand.toPx() }
-    LaunchedEffect(Unit) { enter.animateTo(0f, spring(1f, SHEET_SHOW_STIFFNESS)) }
-    val dismiss: () -> Unit = {
-        scope.launch {
-            if (!motion.reduced && heightPx > 0f) offset.animateTo(heightPx, spring(1f, SHEET_HIDE_STIFFNESS))
-            onClose()
-        }
-    }
-    val drag =
-        rememberDraggableState { delta ->
-            val current = offset.value
-            val next = if (current + delta < 0f) (current + delta * SHEET_RUBBER).coerceAtLeast(-rubber) else current + delta
-            scope.launch { offset.snapTo(next) }
-        }
+    val modal = state
+    val drag = rememberDraggableState { delta -> modal.dragBy(delta) }
+    val nested = remember(modal, density) { modal.nestedScroll(density) }
     Column(
         modifier
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(top = ShellDimens.sheetTopGap)
             .fillMaxWidth()
             .widthIn(max = NbDimens.dialogMaxWidthWide)
-            .onSizeChanged { heightPx = it.height.toFloat() }
-            .graphicsLayer { translationY = enter.value * size.height + offset.value }
+            .modalPanel(modal)
             .shellSurface(ShellMaterial.Sheet, ShellShapes.sheet)
+            .nestedScroll(nested)
             .semantics {
                 paneTitle = title
                 dismiss(close) {
-                    onClose()
+                    modal.dismiss()
                     true
                 }
             },
@@ -385,15 +355,8 @@ fun GlassSheet(
             Modifier.draggable(
                 drag,
                 Orientation.Vertical,
-                enabled = !motion.reduced,
-                onDragStopped = { velocity ->
-                    val down = with(density) { velocity.toDp().value }
-                    if (offset.value > heightPx * SHEET_DISMISS_FRACTION || down > SHEET_FLING_DISMISS) {
-                        dismiss()
-                    } else {
-                        offset.animateTo(0f, spring(1f, SHEET_RETURN_STIFFNESS))
-                    }
-                },
+                enabled = !modal.reduced && modal.target,
+                onDragStopped = { velocity -> modal.settle(velocity, density) },
             ),
         ) {
             Box(
@@ -429,7 +392,7 @@ fun GlassSheet(
                 ShellRoundButton(
                     NbIcons.Close,
                     contentDescription = close,
-                    onClick = dismiss,
+                    onClick = { modal.dismiss() },
                     modifier = Modifier.align(Alignment.CenterEnd),
                 )
             }
@@ -451,14 +414,15 @@ fun GlassSheet(
  * the fallback, no rim), 30 dp corners, at most 392 dp wide, 24 dp padding, a centred `type.dialogTitle`, a centred
  * message in `text.secondary` 6 dp below, and 22 dp lower two equal 44 dp pills (48 dp targets) 8 dp apart: the
  * neutral dismiss pill and the accent confirm pill (gradient, top gloss, accent glow; also when the action is
- * destructive, the wording carries the consequence). On phones the caller docks it at the bottom ([docked]: 16 dp
- * margins, slides up with a fade); on wider windows it is centred (scale 0.8 -> 1 with a fade). Under reduced motion
- * it only fades. Never placed across a fold (the caller positions it).
+ * destructive, the wording carries the consequence). Drawn inside a [ModalHost]: on phones the caller docks it at
+ * the bottom ([ModalKind.DockedDialog]: 16 dp margins, slides up with a fade); on wider windows it is centred
+ * ([ModalKind.Dialog]: scale 0.8 -> 1 with a fade), both from the host's single progress. Under reduced motion it
+ * only fades. Never placed across a fold (the caller positions it).
  *
  * @param wide sheet content in a dialog: up to 560 dp wide.
  */
 @Composable
-fun GlassDialog(
+fun ModalScope.GlassDialog(
     title: String,
     body: String,
     confirm: String,
@@ -467,32 +431,15 @@ fun GlassDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     wide: Boolean = false,
-    docked: Boolean = false,
 ) {
     val colors = NbTheme.colors
     val type = ShellTokens.type
-    val motion = NbTheme.motion
-    val appear = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        appear.animateTo(1f, tween(if (motion.reduced) NbDurations.REDUCED else NbDurations.MEDIUM, easing = NbEasing.Flow))
-    }
     Column(
         modifier
             .widthIn(max = if (wide) NbDimens.dialogMaxWidthWide else ShellDimens.dialogMaxWidth)
             .fillMaxWidth()
-            .graphicsLayer {
-                val p = appear.value
-                alpha = p
-                if (!motion.reduced) {
-                    if (docked) {
-                        translationY = (1f - p) * size.height
-                    } else {
-                        val s = DIALOG_START_SCALE + (1f - DIALOG_START_SCALE) * p
-                        scaleX = s
-                        scaleY = s
-                    }
-                }
-            }.shellSurface(ShellMaterial.Dialog, ShellShapes.dialog)
+            .modalPanel(state)
+            .shellSurface(ShellMaterial.Dialog, ShellShapes.dialog)
             .semantics { paneTitle = title }
             .padding(
                 start = ShellDimens.dialogButtonInset,
@@ -516,8 +463,6 @@ fun GlassDialog(
         }
     }
 }
-
-private const val DIALOG_START_SCALE = 0.8f
 
 /** Height share of the top gloss band on an accent pill. */
 private const val GLOSS_END = 0.5f
@@ -570,38 +515,5 @@ private fun DialogButton(
             color = if (primary) Color.White else colors.textPrimary,
             modifier = Modifier.padding(horizontal = ShellDimens.toolbarMargin, vertical = inset + NbDimens.targetSpacing),
         )
-    }
-}
-
-/** `color.scrim` over the content behind a sheet or dialog; a tap outside closes it (TalkBack uses the close action). */
-@Composable
-fun BoxScope.GlassScrim(onDismiss: () -> Unit) {
-    val close = stringResource(R.string.a11y_close)
-    val motion = NbTheme.motion
-    val appear = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        appear.animateTo(1f, tween(if (motion.reduced) NbDurations.REDUCED else NbDurations.MEDIUM, easing = NbEasing.Flow))
-    }
-    Box(
-        Modifier
-            .matchParentSize()
-            .graphicsLayer { alpha = appear.value }
-            .background(NbTheme.colors.scrim)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
-            .semantics { contentDescription = close },
-    )
-}
-
-/** Hosts [content] above a scrim in a full-size box (sheets at the bottom, dialogs centred or docked). */
-@Composable
-fun OverlayHost(
-    onDismiss: () -> Unit,
-    alignment: Alignment,
-    modifier: Modifier = Modifier,
-    content: @Composable BoxScope.() -> Unit,
-) {
-    Box(modifier.fillMaxSize(), contentAlignment = alignment) {
-        GlassScrim(onDismiss)
-        content()
     }
 }

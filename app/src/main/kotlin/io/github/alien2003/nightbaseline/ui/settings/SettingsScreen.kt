@@ -2,9 +2,9 @@ package io.github.alien2003.nightbaseline.ui.settings
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -38,11 +39,12 @@ import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.GlassDialog
 import io.github.alien2003.nightbaseline.ui.components.GroupCard
+import io.github.alien2003.nightbaseline.ui.components.ModalHost
+import io.github.alien2003.nightbaseline.ui.components.ModalKind
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NbText
-import io.github.alien2003.nightbaseline.ui.components.OverlayHost
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
@@ -83,11 +85,12 @@ fun SettingsScreen(
     val twoPanes = layout.twoPanes && layout.mode != LayoutMode.Tabletop && layout.mode != LayoutMode.Glance
     val page = if (twoPanes) SettingsPage.Main else state.page
     val back = if (page == SettingsPage.Main) null else actions.onBack
+    val scrolls = remember(scroll) { PageScrolls(scroll) }
     ShellPage(
         layout = layout,
         tab = TopLevel.Settings,
         title = stringResource(pageTitle(page)),
-        scroll = scroll,
+        scroll = if (twoPanes) scroll else scrolls.of(page),
         modifier = modifier,
         onSelectTab = onSelectTab,
         onBack = back,
@@ -112,19 +115,39 @@ fun SettingsScreen(
             }
 
             else -> {
-                // Sub-pages push and pop like screens (coloros-conformance.md P2): depth decides the direction.
+                // Sub-pages push and pop like screens (coloros-conformance.md P2): depth decides the direction. Each
+                // page is opaque (the covered page never shows through the incoming one), scrolls on its own state
+                // and keeps the padding it was laid out with while it leaves (review round 5).
                 val transitions = rememberPageTransitions()
                 AnimatedContent(
                     targetState = page,
                     transitionSpec = { transitions.content(forward = depth(targetState) > depth(initialState)) },
                     label = "settingsPage",
                 ) { shown ->
-                    SinglePaneColumn(layout, padding, scroll) { PageContent(state, actions, shown, inlineSensitivity(layout)) }
+                    val own = remember { PaddingHolder(padding) }
+                    if (shown == page) own.value = padding
+                    SinglePaneColumn(layout, own.value, scrolls.of(shown)) {
+                        PageContent(state, actions, shown, inlineSensitivity(layout))
+                    }
                 }
             }
         }
     }
 }
+
+/** The scroll state of each single-pane page: the main list uses the caller's, sub-pages their own. */
+private class PageScrolls(
+    private val main: ScrollState,
+) {
+    private val pages = mutableMapOf<SettingsPage, ScrollState>()
+
+    fun of(page: SettingsPage): ScrollState = if (page == SettingsPage.Main) main else pages.getOrPut(page) { ScrollState(0) }
+}
+
+/** The padding a page was last laid out with while shown; plain (not state), read only by that page. */
+private class PaddingHolder(
+    var value: PaddingValues,
+)
 
 private fun pageTitle(page: SettingsPage): Int =
     when (page) {
@@ -196,6 +219,7 @@ private fun SinglePaneColumn(
     Column(
         Modifier
             .fillMaxSize()
+            .background(NbTheme.colors.background)
             .verticalScroll(scroll)
             .padding(padding)
             .padding(horizontal = layout.gutter),
@@ -455,12 +479,11 @@ private fun GlanceSettings(
  * the fold) and in the bottom half in Tabletop.
  */
 @Composable
-private fun BoxScope.SourceChangeDialog(
+private fun SourceChangeDialog(
     state: SettingsState,
     layout: LayoutSpec,
     actions: SettingsActions,
 ) {
-    val source = state.pendingSource ?: return
     val bookFold = layout.verticalFold?.takeIf { layout.mode == LayoutMode.Book }
     val tabletopFold = layout.horizontalFold?.takeIf { layout.mode == LayoutMode.Tabletop }
     val docked = bookFold == null && tabletopFold == null && layout.widthDp < ShellDimens.DIALOG_DOCK_MAX_WIDTH
@@ -471,32 +494,33 @@ private fun BoxScope.SourceChangeDialog(
             else -> Modifier
         }
     val alignment = if (docked) Alignment.BottomCenter else Alignment.Center
-    Box(Modifier.matchParentSize()) {
-        OverlayHost(onDismiss = actions.onCancelSource, alignment = alignment) {
-            // Scrolls when the window is too short for the dialog (cover screen, tabletop half, 200 % font).
-            BoxWithConstraints(Modifier.fillMaxSize().then(placement)) {
-                Box(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
-                    contentAlignment = alignment,
-                ) {
-                    GlassDialog(
-                        title = stringResource(R.string.source_change_title, source.label),
-                        body = stringResource(R.string.source_change_body, source.label),
-                        confirm = stringResource(R.string.action_switch),
-                        onConfirm = actions.onConfirmSource,
-                        dismiss = stringResource(R.string.action_cancel),
-                        onDismiss = actions.onCancelSource,
-                        docked = docked,
-                        modifier =
-                            if (docked) {
-                                Modifier
-                                    .windowInsetsPadding(WindowInsets.navigationBars)
-                                    .padding(ShellDimens.dialogMargin)
-                            } else {
-                                Modifier.padding(layout.gutter)
-                            },
-                    )
-                }
+    ModalHost(
+        state.pendingSource,
+        onDismiss = actions.onCancelSource,
+        kind = if (docked) ModalKind.DockedDialog else ModalKind.Dialog,
+    ) { source ->
+        // Scrolls when the window is too short for the dialog (cover screen, tabletop half, 200 % font).
+        BoxWithConstraints(Modifier.fillMaxSize().then(placement)) {
+            Box(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
+                contentAlignment = alignment,
+            ) {
+                GlassDialog(
+                    title = stringResource(R.string.source_change_title, source.label),
+                    body = stringResource(R.string.source_change_body, source.label),
+                    confirm = stringResource(R.string.action_switch),
+                    onConfirm = actions.onConfirmSource,
+                    dismiss = stringResource(R.string.action_cancel),
+                    onDismiss = { dismiss() },
+                    modifier =
+                        if (docked) {
+                            Modifier
+                                .windowInsetsPadding(WindowInsets.navigationBars)
+                                .padding(ShellDimens.dialogMargin)
+                        } else {
+                            Modifier.padding(layout.gutter)
+                        },
+                )
             }
         }
     }

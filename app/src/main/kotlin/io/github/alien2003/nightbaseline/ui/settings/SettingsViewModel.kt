@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -57,6 +58,16 @@ class SettingsViewModel
                             ?: SettingsSection.Source,
                 ),
             )
+
+        /**
+         * The open page, synchronously: the screen and its Back handler read it from here, so a sub-page opened by a
+         * tap is shown and handled by Back in the same frame (the [ui] state reaches it later, through the compute
+         * dispatcher).
+         */
+        val page: StateFlow<SettingsPage> =
+            options
+                .map { it.page }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, options.value.page)
 
         init {
             if (options.value.page == SettingsPage.SourcePicker || options.value.section == SettingsSection.Source) loadSources()

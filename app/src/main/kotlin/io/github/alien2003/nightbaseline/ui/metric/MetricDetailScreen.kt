@@ -52,11 +52,13 @@ import io.github.alien2003.nightbaseline.ui.components.DASH
 import io.github.alien2003.nightbaseline.ui.components.DisclaimerFooter
 import io.github.alien2003.nightbaseline.ui.components.GlassSheet
 import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
+import io.github.alien2003.nightbaseline.ui.components.ModalHost
+import io.github.alien2003.nightbaseline.ui.components.ModalKind
+import io.github.alien2003.nightbaseline.ui.components.ModalScope
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NbText
-import io.github.alien2003.nightbaseline.ui.components.OverlayHost
 import io.github.alien2003.nightbaseline.ui.components.PeriodSelector
 import io.github.alien2003.nightbaseline.ui.components.RangeBand
 import io.github.alien2003.nightbaseline.ui.components.SecondaryButton
@@ -66,6 +68,7 @@ import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.chartPoint
 import io.github.alien2003.nightbaseline.ui.components.chartSummary
+import io.github.alien2003.nightbaseline.ui.components.modalPanel
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.components.tone
 import io.github.alien2003.nightbaseline.ui.components.withEnd
@@ -140,7 +143,7 @@ fun MetricDetailScreen(
                 }
             }
         },
-        overlay = { if (state.explainerOpen) ExplainerOverlay(state, layout, actions) },
+        overlay = { ExplainerOverlay(state, layout, actions) },
     ) { padding ->
         val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val top = maxOf(barBottom, statusBar + topBarHeight(layout.mode)) + NbSpace.s3
@@ -695,37 +698,44 @@ private fun ExplainerOverlay(
     actions: MetricDetailActions,
 ) {
     val text = rememberUiText()
-    RangeExplainerOverlay(layout, sideLine = text.sideLine(state), onClose = actions.onCloseExplainer)
+    ModalHost(state.explainerOpen.takeIf { it }, onDismiss = actions.onCloseExplainer, kind = infoModalKind(layout)) {
+        RangeExplainerPanel(layout, sideLine = text.sideLine(state))
+    }
 }
 
 /**
- * "How your usual range works" (`states.md` 8) for any screen: a glass sheet in Compact, CompactShort, Tabletop
- * (lower half only) and Glance, a glass dialog from Medium up (in the end pane in Book). [sideLine] is the
- * metric-specific line ("Only lower values of SpO2 count"), null outside Metric detail.
+ * "How your usual range works" (`states.md` 8) for any screen, inside a [ModalHost] of [infoModalKind]: a glass sheet
+ * in Compact, CompactShort, Tabletop (lower half only) and Glance, a glass dialog from Medium up (in the end pane in
+ * Book). [sideLine] is the metric-specific line ("Only lower values of SpO2 count"), null outside Metric detail.
  */
 @Composable
-fun RangeExplainerOverlay(
+fun ModalScope.RangeExplainerPanel(
     layout: LayoutSpec,
     sideLine: String?,
-    onClose: () -> Unit,
 ) {
     val text = rememberUiText()
-    InfoOverlay(layout, text.string(R.string.explainer_title), onClose) { ExplainerBody(sideLine, it) }
+    InfoPanel(layout, text.string(R.string.explainer_title)) { ExplainerBody(sideLine, it) }
 }
 
+/** The [ModalKind] of an [InfoPanel] in [layout]: a sheet on phone-like windows, a centred dialog from Medium up. */
+fun infoModalKind(layout: LayoutSpec): ModalKind =
+    if (layout.mode in setOf(LayoutMode.Compact, LayoutMode.CompactShort, LayoutMode.Tabletop, LayoutMode.Glance)) {
+        ModalKind.Sheet
+    } else {
+        ModalKind.Dialog
+    }
+
 /**
- * A titled sheet or dialog (`layouts.md` 4.4): a glass sheet in Compact, CompactShort, Tabletop (lower half only)
- * and Glance, a centred glass dialog from Medium up, placed in the end pane in Book. [body] gets the modifier that
- * lets it scroll inside the available height.
+ * A titled sheet or dialog (`layouts.md` 4.4) inside a [ModalHost] of [infoModalKind]: a glass sheet in Compact,
+ * CompactShort, Tabletop (lower half only) and Glance, a centred glass dialog from Medium up, placed in the end pane
+ * in Book. [body] gets the modifier that lets it scroll inside the available height.
  */
 @Composable
-fun InfoOverlay(
+fun ModalScope.InfoPanel(
     layout: LayoutSpec,
     title: String,
-    onClose: () -> Unit,
     body: @Composable ColumnScope.(Modifier) -> Unit,
 ) {
-    val sheet = layout.mode in setOf(LayoutMode.Compact, LayoutMode.CompactShort, LayoutMode.Tabletop, LayoutMode.Glance)
     val maxHeight =
         when (layout.mode) {
             LayoutMode.Tabletop -> {
@@ -741,19 +751,15 @@ fun InfoOverlay(
                 (layout.heightDp * SHEET_SHARE).dp
             }
         }
-    if (sheet) {
-        OverlayHost(onDismiss = onClose, alignment = Alignment.BottomCenter) {
-            GlassSheet(title, onClose = onClose, modifier = Modifier.heightIn(max = maxHeight)) {
-                body(Modifier.weight(1f, fill = false))
-            }
+    if (state.kind == ModalKind.Sheet) {
+        GlassSheet(title, modifier = Modifier.heightIn(max = maxHeight)) {
+            body(Modifier.weight(1f, fill = false))
         }
     } else {
         val fold = layout.verticalFold
         val startPad = fold?.let { (it.positionDp + it.occludedDp / 2).dp + NbDimens.hingeClearance } ?: 0.dp
-        OverlayHost(onDismiss = onClose, alignment = Alignment.Center) {
-            Box(Modifier.fillMaxSize().padding(start = startPad).padding(NbSpace.s7), contentAlignment = Alignment.Center) {
-                InfoDialog(title, onClose, maxHeight, body)
-            }
+        Box(Modifier.fillMaxSize().padding(start = startPad).padding(NbSpace.s7), contentAlignment = Alignment.Center) {
+            InfoDialog(title, maxHeight, body)
         }
     }
 }
@@ -761,9 +767,8 @@ fun InfoOverlay(
 private const val SHEET_SHARE = 0.85f
 
 @Composable
-private fun InfoDialog(
+private fun ModalScope.InfoDialog(
     title: String,
-    onClose: () -> Unit,
     maxHeight: Dp,
     body: @Composable ColumnScope.(Modifier) -> Unit,
 ) {
@@ -773,6 +778,7 @@ private fun InfoDialog(
         Modifier
             .widthIn(max = NbDimens.dialogMaxWidthWide)
             .heightIn(max = maxHeight)
+            .modalPanel(state)
             .shellSurface(ShellMaterial.Dialog, NbShapes.dialog)
             .semantics { paneTitle = title }
             .padding(NbSpace.s7),
@@ -787,13 +793,13 @@ private fun InfoDialog(
                 color = colors.onGlassPrimary,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
-            ShellRoundButton(NbIcons.Close, text.string(R.string.a11y_close), onClick = onClose)
+            ShellRoundButton(NbIcons.Close, text.string(R.string.a11y_close), onClick = { dismiss() })
         }
         body(Modifier.weight(1f, fill = false))
     }
 }
 
-/** Paragraphs on a solid card inside an [InfoOverlay]. */
+/** Paragraphs on a solid card inside an [InfoPanel]. */
 @Composable
 fun InfoParagraphs(
     paragraphs: List<String>,
