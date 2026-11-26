@@ -194,7 +194,10 @@ fun HistoryLegend(
             horizontalArrangement = Arrangement.spacedBy(NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
         ) {
-            entries.forEach { (state, label) ->
+            // States that share a shape (no data, too few readings) share one entry, so no shape appears twice.
+            entries.groupBy { it.first.glyph }.values.forEach { group ->
+                val state = group.first().first
+                val label = group.joinToString(" / ") { it.second }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
                     NightGlyphIcon(state.glyph, colors.tone(state.tone), size = LEGEND_GLYPH)
                     NbText(label, style = NbTheme.typography.bodySmall, color = colors.textSecondary)

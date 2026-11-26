@@ -16,15 +16,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -385,7 +382,7 @@ fun NbChipTab(
 
 /**
  * A ColorOS choice row (`coloros-conformance.md` L9, Settings > Display "Light mode / Dark mode"): equal columns,
- * each an illustration ([art], decorative), a 14 sp label and an [NbRadio] below it, split by 1 px vertical hairlines;
+ * each an illustration ([art], decorative), a 14 sp label and an [NbRadio] below it, without dividers (as measured);
  * the selected label is the accent at 500 (with the filled radio, never colour alone). Each column is one >= 48 dp
  * radio target. When the labels do not fit (large font, narrow window) it falls back to trailing-radio rows.
  */
@@ -409,18 +406,9 @@ fun NbChoiceRow(
             }
             return@BoxWithConstraints
         }
-        val hairline = with(density) { 1f.toDp() }
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).selectableGroup()) {
+        // No vertical hairlines between the columns: Settings > Display shows the choices on one open card.
+        Row(Modifier.fillMaxWidth().selectableGroup()) {
             labels.forEachIndexed { i, label ->
-                if (i > 0) {
-                    Box(
-                        Modifier
-                            .padding(vertical = NbControlDimens.rowPaddingHorizontal)
-                            .width(hairline)
-                            .fillMaxHeight()
-                            .background(controls.hairline),
-                    )
-                }
                 val isSelected = i == selected
                 Column(
                     Modifier
@@ -436,7 +424,8 @@ fun NbChoiceRow(
                     NbText(
                         label,
                         style = NbControlType.label.copy(fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal),
-                        color = if (isSelected) controls.accentText else controls.title,
+                        // Unselected labels are grey as in Settings > Display; the selected one is the accent (with the radio).
+                        color = if (isSelected) controls.accentText else controls.summary,
                         textAlign = TextAlign.Center,
                     )
                     NbRadio(isSelected)

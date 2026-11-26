@@ -109,6 +109,7 @@ light so they pass 4.5:1 on every surface up to `surface.3`.
 |---|---|---|---|---|
 | `color.status.within` | `#19762A` | `#24B232` | small filled dot (metric), circle with check (night) | inside the usual range; used sparingly, the label is grey "Usual" |
 | `color.status.moved` | `#8F5A00` | `#E5A100` | triangle(s) in the direction of change; rounded square with 1 or 2 triangles (night) | moved outside the usual range (ColorOS amber) |
+| `color.status.movedGlyph` | `#B07000` | `= color.status.moved` | the moved shapes only: triangles, the night glyph, band and chart markers (graphics, 3:1) | the brighter ColorOS amber in light, where the 4.5:1 text colour reads brown |
 | `color.status.above` | `= color.status.moved` | `= color.status.moved` | upward triangle, marker right of the band | higher than usual |
 | `color.status.below` | `= color.status.moved` | `= color.status.moved` | downward triangle, marker left of the band | lower than usual |
 | `color.status.neutral` | `#666666` | `#969696` | dotted ring, dash, half circle, slashed circle | learning, missing, short night, not provided |
@@ -135,7 +136,7 @@ against the card (3.36 / 3.27). No edge lines, no median tick. Markers get a 2 d
 | `color.chart.bandArea` | `#000000 @ 8%` | `#FFFFFF @ 12%` | the chart's stepped usual-range area |
 | `color.chart.guide` | `= color.text.secondary` | `= color.text.secondary` | vertical selection guide under the finger / pointer |
 
-Marker colours: `marker.within` (inside), `status.moved` (triangle, 3:1 on the track and the card),
+Marker colours: `marker.within` (inside), `status.movedGlyph` (triangle, 3:1 on the track and the card),
 `status.neutral` (learning, on the track), `chart.point` (chart points inside the range).
 
 ### 2.5 Glass tints, rim, text on glass
@@ -296,8 +297,10 @@ Format (parsed by `tools/design/contrast_check.py`):
 | graphic.band.fill.surface1 | color.band.fill | color.surface.1 | both | 3.0 |
 | graphic.marker.within.fill | color.marker.within | color.band.fill | both | 3.0 |
 | graphic.marker.within.surface1 | color.status.within | color.surface.1 | both | 3.0 |
-| graphic.marker.moved.track | color.status.moved | color.control.track | both | 3.0 |
-| graphic.marker.moved.surface1 | color.status.moved | color.surface.1 | both | 3.0 |
+| graphic.marker.moved.track | color.status.movedGlyph | color.control.track | both | 3.0 |
+| graphic.marker.moved.surface1 | color.status.movedGlyph | color.surface.1 | both | 3.0 |
+| graphic.marker.moved.surface3 | color.status.movedGlyph | color.surface.3 | both | 3.0 |
+| graphic.marker.moved.background | color.status.movedGlyph | color.background | both | 3.0 |
 | graphic.marker.neutral.track | color.status.neutral | color.control.track | both | 3.0 |
 | graphic.chart.point.surface1 | color.chart.point | color.surface.1 | both | 3.0 |
 | graphic.learningOutline.surface1 | color.band.learningOutline | color.surface.1 | both | 3.0 |

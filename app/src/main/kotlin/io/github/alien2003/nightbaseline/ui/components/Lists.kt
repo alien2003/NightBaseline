@@ -45,6 +45,7 @@ import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
 import io.github.alien2003.nightbaseline.ui.material.nbClickable
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.NightUi
+import io.github.alien2003.nightbaseline.ui.model.StatusTone
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
 import io.github.alien2003.nightbaseline.ui.theme.NbControlDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbControlType
@@ -104,10 +105,11 @@ enum class GroupPosition {
 
 /**
  * A History feed row (`screens.md` 4, `coloros-conformance.md` L11): one row of a month's grouped 20 dp card (see
- * [position]): a 24 dp night glyph, night label (16/500) and status summary, and a wrapping set of small per-metric
- * glyphs (2..6) at the end; >= 48 dp, 10 dp vertical padding; hairline above inset 56 dp / 16 dp; the selected row on
- * a neutral fill (never a tonal colour). Rows in a grouped card light up on press but do not shrink. One merged
- * TalkBack node ("{night label}: {status}. {k} moved: {metrics}."), role button.
+ * [position]): a 24 dp night glyph, night label (16/500) and status summary, and, on nights where something moved,
+ * a wrapping set of small per-metric glyphs (2..6) at the end (moved in amber, the rest grey); >= 48 dp, 10 dp
+ * vertical padding; hairline above inset 56 dp / 16 dp; the selected row on a neutral fill (never a tonal colour).
+ * Rows in a grouped card light up on press but do not shrink. One merged TalkBack node ("{night label}: {status}.
+ * {k} moved: {metrics}."), role button.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -155,14 +157,19 @@ fun NightRow(
                 NbText(label, style = NbControlType.itemTitle, color = controls.title)
                 NbText(status, style = NbControlType.summary, color = controls.summary)
             }
-            FlowRow(
-                Modifier.widthIn(max = 72.dp).clearAndSetSemantics {},
-                maxItemsInEachRow = METRIC_GLYPHS_PER_ROW,
-                horizontalArrangement = Arrangement.spacedBy(NbSpace.s1),
-                verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
-            ) {
-                night.metrics.filter { it.state.compared || it.state.moved }.forEach { metric ->
-                    MetricGlyphIcon(metric.state.glyph, colors.tone(metric.state.tone), size = 12.dp)
+            // Per-metric shapes only on nights where something moved: which ones moved (amber triangles) among the
+            // compared ones (calm grey dots). "All usual" rows stay clean; the summary already says it.
+            if (night.movedMetrics.isNotEmpty()) {
+                FlowRow(
+                    Modifier.widthIn(max = 72.dp).clearAndSetSemantics {},
+                    maxItemsInEachRow = METRIC_GLYPHS_PER_ROW,
+                    horizontalArrangement = Arrangement.spacedBy(NbSpace.s1),
+                    verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
+                ) {
+                    night.metrics.filter { it.state.compared || it.state.moved }.forEach { metric ->
+                        val tone = if (metric.state.moved) metric.state.tone else StatusTone.Neutral
+                        MetricGlyphIcon(metric.state.glyph, colors.tone(tone), size = 12.dp)
+                    }
                 }
             }
         }

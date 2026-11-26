@@ -96,7 +96,7 @@ internal fun StepIllustration(
                 val center = (bandTop + bandBottom) / 2
                 val outside = kind == Illustration.Outside && i == offsets.lastIndex
                 if (outside) {
-                    drawPath(triangle(Offset(x, size.height * 0.14f), 14.dp.toPx(), up = true), colors.statusMoved)
+                    drawPath(triangle(Offset(x, size.height * 0.14f), 14.dp.toPx(), up = true), colors.statusMovedGlyph)
                 } else if (kind == Illustration.Learning) {
                     drawCircle(
                         colors.chartPoint,

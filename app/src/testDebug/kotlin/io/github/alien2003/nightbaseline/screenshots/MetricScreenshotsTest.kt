@@ -33,6 +33,7 @@ import io.github.alien2003.nightbaseline.ui.layout.FoldInfo
 import io.github.alien2003.nightbaseline.ui.layout.LayoutInputs
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
+import io.github.alien2003.nightbaseline.ui.layout.NavigationKind
 import io.github.alien2003.nightbaseline.ui.layout.resolveLayout
 import io.github.alien2003.nightbaseline.ui.metric.METRIC_TOP_BAR_TAG
 import io.github.alien2003.nightbaseline.ui.metric.MetricDetailSamples
@@ -135,7 +136,10 @@ class MetricScreenshotsTest(
                     verticalFold = device.verticalFold,
                     horizontalFold = device.horizontalFold,
                 ),
-            )
+            ).let {
+                // Metric detail is a pushed route: on phones the app hides the bar there (AppNavHost forDetail).
+                if (it.navigation == NavigationKind.Bar) it.copy(navigation = NavigationKind.None) else it
+            }
         val samples = if (device.id == "phone") MetricSample.entries else KEY_SAMPLES
         for (dark in listOf(false, true)) {
             val theme = if (dark) "dark" else "light"
@@ -221,7 +225,8 @@ class MetricScreenshotsTest(
                 .firstOrNull()
                 ?.boundsInRoot
                 ?.bottom
-                ?.let { (it + 2 * device.dpi / 160f).roundToInt() } ?: 0
+                // Below the top bar's darkening / blur fade, so a slice never repeats faded content over the next.
+                ?.let { (it + TOP_FADE_DP * device.dpi / 160f).roundToInt() } ?: 0
         val px = device.dpi / 160f
         val history = navHistoryTab()
         // A floating bar sits at the bottom; otherwise the History tab belongs to the rail at the start edge.
@@ -358,6 +363,7 @@ class MetricScreenshotsTest(
         private const val PNG_QUALITY = 100
         private const val NAV_HISTORY = "History"
         private const val BAR_ZONE_DP = 160
+        private const val TOP_FADE_DP = 28
         private const val SCROLLED_DP = 90
         private val PLACEHOLDER = Regex("""%(\d+\$)?[-#+0,(]*\d*(\.\d+)?[a-zA-Z]""")
 

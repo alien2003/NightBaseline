@@ -905,7 +905,7 @@ private fun DrawScope.drawPoints(
             MetricState.Higher, MetricState.Lower -> {
                 val side = triangleSide * scale
                 drawCircle(colors.markerHalo, radius = side * 0.5f + halo, center = center)
-                drawPath(triangle(center, side, up = p.state == MetricState.Higher), colors.statusMoved)
+                drawPath(triangle(center, side, up = p.state == MetricState.Higher), colors.statusMovedGlyph)
             }
 
             MetricState.Within, MetricState.SideIgnoredHigher, MetricState.SideIgnoredLower -> {

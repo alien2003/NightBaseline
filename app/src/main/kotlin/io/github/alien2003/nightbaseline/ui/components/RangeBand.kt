@@ -185,7 +185,7 @@ private fun DrawScope.drawMarker(
 /** Marker colour for a state (used by the chart legend and the glance rows too). */
 fun NbColors.markerColor(state: MetricState): Color =
     when (state) {
-        MetricState.Higher, MetricState.Lower -> statusMoved
+        MetricState.Higher, MetricState.Lower -> statusMovedGlyph
         MetricState.Within, MetricState.SideIgnoredHigher, MetricState.SideIgnoredLower -> statusWithin
         else -> statusNeutral
     }

@@ -244,3 +244,51 @@ Findings to fix:
    change how big a change must be (fewer / more notes) and that two measurements must move for all three, matching
    `SensitivityLevel` (z 3.0 / 2.5 / 2.0) and ALGORITHM.md; "Fewer notes" uses `sens_fewer_desc` again and the
    interim `setup_sens_fewer_desc` is removed. `screens.md` 7.7 lists the z values per preset.
+
+## Round 3: ColorOS 17 canon
+
+Date: 2026-11-26. Scope: the whole app after the conformance work packages and the integration sweep
+(`coloros-conformance.md`), compared strictly with the ColorOS 17 references: dark captures of Settings > Display,
+Clock, Health Connect (a Material counter-example) and light captures of Settings > Accessibility, Clock and
+Calculator (`.data/design-refs/`, never copied). Method: `:app:testDebugUnitTest -PtestForkEvery=1`, then a broad
+sample of `app/build/screenshots` read side by side with the references at matching crops: every screen (Home and
+its states, Learning, Night detail, Metric detail, History list and calendar, Settings main and sub-pages, the
+source dialog, onboarding steps, the shell catalogue with bar, rail, top bar, sheet and dialog), light and dark,
+phone, owner-book and tablet, font 1.0 and 2.0, glass and solid.
+
+What already matched (no change): true black / #F0F1F2 windows with white or #1A1A1A cards, 20 dp radius and 16 dp
+gutters; grey section headers outside the cards with inset hairlines; 48 dp rows with medium titles and grey
+summaries; ColorOS switch, trailing radio and small grey chevron; convex round back and action buttons (soft shadow
+in light); the floating pill bar without a selection capsule (filled icon + bold label), its rim and bottom band;
+the History tab row with the dark underline; the bottom-docked 30 dp dialog with two equal pills (neutral + accent
+gradient with glow); the large title scrolling with content and the 18 sp bold collapsed title; the solid sliding
+period thumb; single blue accent everywhere, no violet left; no tonal chips or containers.
+
+### Findings and fixes
+
+| # | Sev. | Where | Finding | Fix |
+|---|---|---|---|---|
+| 1 | high | History feed, Home "Recent nights" pane | Every "All usual" row carried a green check plus a 3 x 2 grid of saturated green dots: in a month of nights the list read as a green dot matrix, busy and louder than the references' clean rows (overload, and against the calm tone: "within" should carry almost no colour). | `NightRow` shows the per-metric shapes only on nights where something moved, and there only the moved metrics in amber (triangles), the compared ones as grey dots. "All usual" rows are title + summary + the night glyph, like a ColorOS list row. |
+| 2 | high | Light theme, every moved shape | The light moved colour #8F5A00 (needed for 4.5:1 text) read as brown, not ColorOS amber, on the summary glyph, the band and chart triangles, calendar and list glyphs. | New token `color.status.movedGlyph` (light #B07000, dark = #E5A100) for shapes only (3:1 graphics: 4.07 on white, 3.60 on the window, 3.33 on `surface.3`, 3.41 on the track); text keeps `status.moved`. `tone()`, `markerColor()`, the chart triangles and the onboarding drawing use it; the `graphic.marker.moved.*` pairs (now four, also on `surface.3` and the window) in `tokens.md` 2.9 and `Contrast.kt`; `contrast_check.py` passes 164 / 164. |
+| 3 | medium | Home and Night detail metric tiles | Status label and "Usual range: ..." shared one wrapping line, so neighbouring tiles wrapped differently (heart rate on one line, breathing on two): uneven rhythm between cards of the same kind. | The usual range is always on its own line under the status label; every tile has the same structure. |
+| 4 | medium | Settings > Theme (`NbChoiceRow`) | Columns were split by vertical hairlines and unselected labels were white. Settings > Display shows the choices on one open card without dividers and grey unselected labels (only the selected one is the accent). | Dividers removed; unselected labels `text.secondary`, selected `primaryText` 500 with the filled radio. `screens.md` updated. (`reference-analysis.md` §1.1 mentions hairlines for a three-way row; the Display capture shows none.) |
+| 5 | medium | Onboarding, all steps | A blue accent wash (10 % accent to background) tinted the whole window, navy in dark and pale blue in light: the only tinted background in the app, closer to a Material You surface tint than to ColorOS's hue-free windows. | Plain `background` like every other screen; `screens.md` 7.5 updated. |
+| 6 | low | History calendar legend | "No data" and "Too few readings" share the dash-in-circle glyph (`screens.md` 6) and appeared as two legend entries with the same shape. | Legend entries that share a shape are merged ("No data / Too few readings"). |
+| 7 | medium | Metric detail header | The header put the status label above the band, while every metric tile (Home, Night detail) puts it below: the same data in two orders on neighbouring screens. | Header order is value, band, status, usual range, like the tiles. |
+| 8 | low (test) | `MetricScreenshotsTest` | Phone Metric detail was rendered with the floating bar, which the app hides on pushed routes (`AppNavHost.forDetail`), and the stitched full-page image repeated a faded strip at each seam (the top bar's darkening fade, introduced by the sweep, was inside the slice), so the stats card looked garbled. | The test uses the detail layout (no bar on phones) and cuts slices 28 dp below the top bar, past the fade. Not an app bug. |
+
+### Open after this round (needs the owner's phone)
+
+- Blur look: Robolectric does not render the Haze blur (`haze-blur-probe.txt`), so the bar, rail, top bar, sheet and
+  dialog were judged on tint, rim and shadow only. Check on the device: bar and top-bar blur strength against the
+  Clock and Settings captures, the progressive top-bar fade over scrolled cards (light and dark), and that the
+  collapsed title stays readable over busy content without a backing.
+- Glow: the touch-following light (110 ms in, 480 ms out) on the bar, round buttons, period thumb and primary
+  button, and the primary button's accent glow, are static or absent in screenshots.
+- Motion feel: press shrink and velocity-aware rebound, the period thumb's spring and stretch, sheet drag and
+  dismissal, the docked dialog's slide, push / pop with the page dim, overscroll translate, predictive back.
+- Frame timing: `tokens.md` 7.4 scenarios with glass on and off (needs `gfxinfo` with the owner's permission).
+- Font 2.0 bar: the three labels fit on one line on the 412 dp phone with little air between them; confirm on the
+  device at the system's largest font that wrapping to two lines kicks in before they touch.
+- The onboarding illustrations still repeat one dot-band drawing across the first three steps; distinct own
+  drawings per step would read more finished (art task, not a canon deviation).

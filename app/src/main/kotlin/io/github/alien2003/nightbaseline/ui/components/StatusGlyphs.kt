@@ -38,11 +38,14 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sqrt
 
-/** `color.status.*` of [tone]. */
+/**
+ * Colour of the status *shape* of [tone] (glyphs, markers): `color.status.*`, with `status.movedGlyph` for moved (in
+ * light the brighter amber that passes 3:1 for graphics; moved text uses `status.moved`, see [StatusLabel]).
+ */
 fun NbColors.tone(tone: StatusTone): Color =
     when (tone) {
         StatusTone.Within -> statusWithin
-        StatusTone.Moved -> statusMoved
+        StatusTone.Moved -> statusMovedGlyph
         StatusTone.Neutral -> statusNeutral
         StatusTone.Info -> statusInfo
     }

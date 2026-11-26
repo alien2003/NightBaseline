@@ -203,11 +203,9 @@ fun MetricRangeTile(
             if (metric.state != MetricState.AccessOff) {
                 RangeBand(metric.range, metric.value, metric.state)
             }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
-                verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
-                itemVerticalAlignment = Alignment.CenterVertically,
-            ) {
+            // Status and usual range always stacked: side by side they wrapped differently from tile to tile, so
+            // neighbouring cards had different rhythms (review round 3).
+            Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
                 StatusLabel(text.status(metric, source), metric.state.glyph, metric.state.tone)
                 metric.range?.takeIf { metric.state != MetricState.Learning }?.let { range ->
                     NbText(

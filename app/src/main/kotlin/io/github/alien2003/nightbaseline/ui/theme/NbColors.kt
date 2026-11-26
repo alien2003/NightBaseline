@@ -62,6 +62,8 @@ data class NbColors(
     val statusWithin: Color,
     /** `color.status.moved` (also `status.above` and `status.below`). */
     val statusMoved: Color,
+    /** `color.status.movedGlyph`: moved shapes (triangles, night glyph, chart and band markers); 3:1 graphics. */
+    val statusMovedGlyph: Color,
     /** `color.status.neutral` (also `status.learning` and `status.missing`). */
     val statusNeutral: Color,
     /** `color.band.fill`: solid usual-range segment on the track. */
@@ -180,6 +182,7 @@ val LightNbColors: NbColors =
         glowNeutral = tint(0xFFFFFF, 30f),
         statusWithin = Color(0xFF19762A),
         statusMoved = Color(0xFF8F5A00),
+        statusMovedGlyph = Color(0xFFB07000),
         statusNeutral = Color(0xFF666666),
         bandFill = Color(0xFF8C8C8C),
         markerWithin = Color(0xFFFFFFFF),
@@ -236,6 +239,7 @@ val DarkNbColors: NbColors =
         glowNeutral = tint(0xFFFFFF, 13.5f),
         statusWithin = Color(0xFF24B232),
         statusMoved = Color(0xFFE5A100),
+        statusMovedGlyph = Color(0xFFE5A100),
         statusNeutral = Color(0xFF969696),
         bandFill = Color(0xFF6B6B6B),
         markerWithin = Color(0xFFFFFFFF),
@@ -300,6 +304,7 @@ private val tokenAccessors: Map<String, (NbColors) -> Color> =
         "color.glow.neutral" to { it.glowNeutral },
         "color.status.within" to { it.statusWithin },
         "color.status.moved" to { it.statusMoved },
+        "color.status.movedGlyph" to { it.statusMovedGlyph },
         "color.status.above" to { it.statusAbove },
         "color.status.below" to { it.statusBelow },
         "color.status.neutral" to { it.statusNeutral },

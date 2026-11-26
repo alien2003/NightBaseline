@@ -26,7 +26,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -45,13 +44,13 @@ import io.github.alien2003.nightbaseline.ui.theme.controls
 private const val ILLUSTRATION_MAX_FONT = 1.5f
 private const val ILLUSTRATION_MIN_HEIGHT = 640f
 private const val START_COLUMN_SHARE = 0.4f
-private const val GRADIENT_ALPHA = 0.10f
 private val TextColumnMax = 480.dp
 private val CardMax = 840.dp
 
 /**
  * The first run (`screens.md` 7.5, `states.md` 7.3, `layouts.md` 5.5): full screen, outside the shell (no navigation,
- * no glass), solid background with a quiet static gradient. Stateless: [state] in, [actions] out. Per mode: Compact
+ * no glass), the plain neutral window background of every other screen (no tinted wash). Stateless: [state] in,
+ * [actions] out. Per mode: Compact
  * with the primary button pinned at the bottom; CompactShort and Glance without illustration, everything scrolls;
  * Medium and WideShort two columns (start 40 %: illustration and step indicator, or the title in large type in
  * WideShort; end: text and actions, max 480 dp); Expanded and up the same two columns in a centred card (max 840 dp);
@@ -73,7 +72,6 @@ fun OnboardingScreen(
         modifier
             .fillMaxSize()
             .background(colors.background)
-            .background(Brush.verticalGradient(listOf(NbTheme.controls.accent.copy(alpha = GRADIENT_ALPHA), colors.background)))
             .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
         when (layout.mode) {

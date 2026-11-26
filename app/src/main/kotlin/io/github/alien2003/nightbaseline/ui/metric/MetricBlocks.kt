@@ -138,10 +138,11 @@ internal fun HeaderCard(
         ) {
             NbText(text.nightLabelOf(state), style = NbTheme.dataType.statusCalm, color = colors.textSecondary)
             if (metric.state != MetricState.NotProvided && metric.state != MetricState.AccessOff) HeaderValue(metric)
-            StatusLabel(text.status(metric, state.source), metric.state.glyph, metric.state.tone)
+            // Same order as the metric tiles on Home and Night detail: value, band, status, range (review round 3).
             if (metric.range != null && metric.value != null) {
                 RangeBand(metric.range, metric.value, metric.state)
             }
+            StatusLabel(text.status(metric, state.source), metric.state.glyph, metric.state.tone)
             text.usualRange(metric)?.takeIf { !state.learning }?.let {
                 NbText(it, style = NbTheme.typography.body, color = colors.textPrimary)
             }
