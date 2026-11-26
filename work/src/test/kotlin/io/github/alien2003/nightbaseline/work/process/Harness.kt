@@ -28,11 +28,13 @@ class MutableClock(
 }
 
 /** The processor and the backfill over fakes: Health Connect (with the real reader), Room, settings, notifications. */
-class Harness {
+class Harness(
+    /** Device zone. */
+    val zone: ZoneId = ZoneOffset.ofHours(3),
+) {
     val clock = MutableClock()
     val gateway = FakeHealthConnectGateway { clock.nowMs }
     var inForeground = false
-    val zone: ZoneId = ZoneOffset.ofHours(3)
     val reader = HealthConnectReader(gateway, { inForeground }, { zone }, ownPackage = "io.github.alien2003.nightbaseline")
     val settings = FakeSettingsRepository()
     val nights = InMemoryNightRepository()
@@ -47,7 +49,8 @@ class Harness {
     val problems = mutableListOf<DataProblem?>()
     val problemNotifier = ProblemNotifier { problems += it }
     val reevaluator = NightReevaluator(settings, nights, runLog, clock)
-    val processor = NightProcessor(settings, reader, nights, notifier, runLog, clock, { zone }, reevaluator)
+    val diagnostics = mutableListOf<String>()
+    val processor = NightProcessor(settings, reader, nights, notifier, runLog, clock, { zone }, reevaluator) { diagnostics += it }
     val backfill = HistoryBackfill(settings, reader, nights, runLog, clock)
 
     /** Stored record of [night]. */

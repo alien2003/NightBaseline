@@ -199,6 +199,30 @@ interop: `.mise.toml` sets `ADB_WIN=adb.exe`, which works when `adb.exe` is on t
 **Native Linux.** The Linux `adb` from `.tooling/android-sdk/platform-tools` works directly
 (`mise exec -- adb install -r …`). This path has not been tested.
 
+### Night check diagnostics
+
+Every night check (the daily work and "Check now") writes its decisions to logcat, tag `NightBaseline`, info level
+(`NightDiagnostics` in `:work`). The lines carry only local `HH:mm` times, night dates and reasons: never a measured
+value, a duration or a sample count. With the owner's permission for that specific read:
+
+```sh
+"$ADB_WIN" logcat -d -s NightBaseline:I
+```
+
+| Line | Meaning |
+|---|---|
+| `check at HH:mm` | A check started. |
+| `no night of the source since <date>` | No session of the configured source in the read window. |
+| `newest night <date>: HH:mm-HH:mm[, ambiguous]` | The newest main night (`NightSelector`) and its visible start and end. |
+| `target night <date>` | That night is not stored yet: it is judged for completeness. |
+| `night <date> too short to be the target` / `night <date> already stored: no new night` | Why no new night is judged. |
+| `night <date> end HH:mm: up HH:mm, heart_rate HH:mm, respiratory_rate HH:mm, spo2 HH:mm, last night write HH:mm -> <READINESS> (<reasons>)` | The inputs of the night-complete rule: the first brisk step record after the end (`no step records` when the source writes none), the newest sample per channel inside the night, the newest write of the night's own records, and the verdict (`COMPLETE`, `WAIT` with `NOT_UP_YET` / `CHANNEL_INCOMPLETE` / `SOURCE_STILL_WRITING`, `CAP_REACHED`). `none` means nothing was found. |
+| `night <date> waits: next check HH:mm` | The night is not complete; the next check. |
+| `no new night yet: next check HH:mm` / `nothing new: next check at the daily time` | No new night is visible (hourly until 14:00) or the day is given up. |
+| `night <date> evaluated and stored[, notified]` | The new night was evaluated. |
+| `night <date> filled in as history` / `re-evaluated` / `no longer in the source: kept as final` | Older nights handled in the same run. |
+| `check blocked: <REASON>` / `check failed: <ErrorType>` | Nothing could be read (missing permission, Health Connect unavailable) or a read failed. |
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every push to a branch, on pull requests and on manual dispatch. Tag pushes are

@@ -34,6 +34,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 /**
@@ -69,16 +70,21 @@ class NightProcessor
         private val clock: Clock,
         private val zone: ZoneSource,
         private val reevaluator: NightReevaluator,
+        private val diagnostics: NightDiagnostics,
     ) {
         /** Runs one check. Throws [HcError.RateLimited] / [HcError.Other]; refusals become [ProcessOutcome.Blocked]. */
         suspend fun process(): ProcessOutcome {
             val s = settings.settings.first()
             val params = s.algoParams()
             reevaluator.reevaluateIfNeeded(params)
+            val now = clock.millis()
+            diagnostics.log("check at ${hm(now)}")
             return try {
-                Run(s, params, clock.millis()).execute()
+                Run(s, params, now).execute()
             } catch (e: HcError) {
-                val reason = blockReasonOf(e) ?: throw e
+                val reason = blockReasonOf(e)
+                diagnostics.log(if (reason == null) "check failed: ${e.javaClass.simpleName}" else "check blocked: ${reason.name}")
+                if (reason == null) throw e
                 runLog.log(RunLogKind.BLOCKED, "night check blocked: ${reason.name}")
                 ProcessOutcome.Blocked(reason)
             }
@@ -105,6 +111,7 @@ class NightProcessor
                 val candidates = NightSelector.select(reader.readSessions(source, from, now), params).filter { it.endMs <= now }
                 nights.since(source, localDate(from)).associateByTo(stored) { it.date }
                 val target = candidates.lastOrNull { it.totalMinutes >= params.minNightMinutes }?.takeIf { it.date !in stored }
+                traceSelection(candidates, target)
                 val verdict = target?.let { judge(it) }
                 val complete = verdict != null && verdict.readiness != Readiness.WAIT
                 fillAndReevaluate(candidates, target, complete)
@@ -112,6 +119,25 @@ class NightProcessor
                     target == null -> waitForNewNight(candidates)
                     !complete -> retry(target, checkNotNull(verdict))
                     else -> evaluateTarget(target)
+                }
+            }
+
+            /** Diagnostics: the newest night seen and why it is or is not the target. */
+            private fun traceSelection(
+                candidates: List<NightCandidate>,
+                target: NightCandidate?,
+            ) {
+                val newest = candidates.lastOrNull()
+                if (newest == null) {
+                    diagnostics.log("no night of the source since ${localDate(now - (params.lookbackDays + 2L) * DAY_MS)}")
+                    return
+                }
+                val ambiguous = if (newest.ambiguous) ", ambiguous" else ""
+                diagnostics.log("newest night ${newest.date}: ${hm(newest.startMs)}-${hm(newest.endMs)}$ambiguous")
+                when {
+                    target != null -> diagnostics.log("target night ${target.date}")
+                    newest.totalMinutes < params.minNightMinutes -> diagnostics.log("night ${newest.date} too short to be the target")
+                    else -> diagnostics.log("night ${newest.date} already stored: no new night")
                 }
             }
 
@@ -133,9 +159,20 @@ class NightProcessor
                     val old = stored[date]
                     val candidate = byDate[date]
                     when {
-                        old == null -> store(compute(checkNotNull(candidate)), final = true, count = 1, previous = null)
-                        candidate == null -> store(old.copy(final = true))
-                        else -> reevaluate(old, candidate)
+                        old == null -> {
+                            diagnostics.log("night $date filled in as history")
+                            store(compute(checkNotNull(candidate)), final = true, count = 1, previous = null)
+                        }
+
+                        candidate == null -> {
+                            diagnostics.log("night $date no longer in the source: kept as final")
+                            store(old.copy(final = true))
+                        }
+
+                        else -> {
+                            diagnostics.log("night $date re-evaluated")
+                            reevaluate(old, candidate)
+                        }
                     }
                 }
             }
@@ -171,11 +208,14 @@ class NightProcessor
                     "night ${target.date} evaluated: ${evaluation.status.name}, ${evaluation.deviating} outside",
                 )
                 val record = store(computed, final = false, count = 1, previous = null, notify = notify)
+                diagnostics.log("night ${target.date} evaluated and stored${if (record.notifiedAtMs != null) ", notified" else ""}")
                 return ProcessOutcome.Evaluated(target.date, evaluation.status, record.notifiedAtMs != null, reevaluated.toList())
             }
 
             private suspend fun judge(target: NightCandidate): CompletenessVerdict {
-                val data = reader.readNight(source, target.startMs, now)
+                // Read up to now for the morning's step records, but only the night's own records count as writes:
+                // the source keeps writing steps and all-day heart rate, which would never let the night look quiet.
+                val data = reader.readNight(source, target.startMs, now, writesBeforeMs = target.endMs + 1)
                 val night = target.withSamples(data.channels)
                 val cp = COMPLETENESS
                 val upFrom = target.endMs + (cp.upAfterEndMinutes * MIN_MS).toLong()
@@ -193,7 +233,24 @@ class NightProcessor
                                 }?.timeMs,
                         lastWriteMs = data.lastModifiedMs ?: target.endMs,
                     )
-                return Completeness.judge(input, cp)
+                return Completeness.judge(input, cp).also { traceVerdict(target, input, it) }
+            }
+
+            private fun traceVerdict(
+                target: NightCandidate,
+                input: CompletenessInput,
+                verdict: CompletenessVerdict,
+            ) {
+                val up = if (input.sourceWritesSteps) "up ${hm(input.firstBriskStepAfterEndMs)}" else "no step records"
+                val channels =
+                    listOf(ChannelId.HEART_RATE, ChannelId.RESPIRATORY_RATE, ChannelId.SPO2)
+                        .filter { it in input.providedChannels }
+                        .joinToString { "${it.key} ${hm(input.lastSampleMs[it])}" }
+                val reasons = if (verdict.reasons.isEmpty()) "" else " (${verdict.reasons.joinToString { it.name }})"
+                diagnostics.log(
+                    "night ${target.date} end ${hm(target.endMs)}: $up, $channels, last night write ${hm(input.lastWriteMs)}" +
+                        " -> ${verdict.readiness.name}$reasons",
+                )
             }
 
             private suspend fun retry(
@@ -203,6 +260,7 @@ class NightProcessor
                 val capAt = target.endMs + capMs()
                 val at = maxOf(now + MIN_RETRY_MS, minOf(now + WAIT_STEP_MS, capAt))
                 runLog.log(RunLogKind.WAITING, "night ${target.date} not complete: ${verdict.reasons.joinToString { it.name }}")
+                diagnostics.log("night ${target.date} waits: next check ${hm(at)}")
                 return ProcessOutcome.Retry(at, verdict.reasons, target.date)
             }
 
@@ -211,8 +269,10 @@ class NightProcessor
                 val localTime = Instant.ofEpochMilli(now).atZone(zone.zone()).toLocalTime()
                 val waiting = (candidates.lastOrNull()?.date ?: "") < today && localTime < NO_NIGHT_WAIT_UNTIL
                 return if (waiting) {
+                    diagnostics.log("no new night yet: next check ${hm(now + NO_NIGHT_RETRY_MS)}")
                     ProcessOutcome.Retry(now + NO_NIGHT_RETRY_MS, emptyList(), date = null)
                 } else {
+                    diagnostics.log("nothing new: next check at the daily time")
                     ProcessOutcome.NothingNew(reevaluated.toList())
                 }
             }
@@ -269,6 +329,9 @@ class NightProcessor
                     .toString()
         }
 
+        /** Local `HH:mm` of [ms] for the diagnostics ("none" when null). */
+        private fun hm(ms: Long?): String = ms?.let { Instant.ofEpochMilli(it).atZone(zone.zone()).format(HH_MM) } ?: "none"
+
         /** A summary with its evaluation. */
         private data class Computed(
             val summary: NightSummary,
@@ -302,6 +365,8 @@ class NightProcessor
 
             internal const val MIN_MS = 60_000.0
             internal const val HOUR_MS = 3_600_000.0
+
+            private val HH_MM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         }
     }
 

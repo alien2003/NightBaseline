@@ -47,7 +47,8 @@ respiratory rate about half an hour after the measurement). The night is evaluat
   without step records: the night ended at least 3 h ago);
 - heart rate reaches the end of the night minus 5 min, respiratory rate minus 30 min, SpO2 minus 60 min (only for
   measurements the source writes at all);
-- the source has written nothing new for 15 min;
+- the source has written nothing new for the night for 15 min (records with data inside the night: its sessions and
+  samples; the day's step records and daytime heart rate do not count);
 
 or **12 h** have passed since the end; then the night is evaluated with what is there. The app checks again later
 while it waits. One re-evaluation is allowed after the source's next-morning rewrite; a second notification is sent

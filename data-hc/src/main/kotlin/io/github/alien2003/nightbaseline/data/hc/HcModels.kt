@@ -92,6 +92,9 @@ data class NightData(
     val channels: Map<ChannelId, List<Sample>>,
     /** Step records as (start, steps per minute); empty without READ_STEPS. */
     val steps: List<Sample>,
-    /** Newest `lastModifiedTime` of any record read for the range, epoch ms; null when nothing was read. */
+    /**
+     * Newest `lastModifiedTime` of the records with data before the read's `writesBeforeMs` (by default the whole
+     * range), epoch ms; null when there is none.
+     */
     val lastModifiedMs: Long?,
 )

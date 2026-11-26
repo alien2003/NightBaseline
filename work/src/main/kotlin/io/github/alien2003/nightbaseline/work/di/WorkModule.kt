@@ -8,6 +8,8 @@ import io.github.alien2003.nightbaseline.work.notify.AndroidNightNotifier
 import io.github.alien2003.nightbaseline.work.notify.AndroidProblemNotifier
 import io.github.alien2003.nightbaseline.work.notify.NightNotifier
 import io.github.alien2003.nightbaseline.work.notify.ProblemNotifier
+import io.github.alien2003.nightbaseline.work.process.LogcatNightDiagnostics
+import io.github.alien2003.nightbaseline.work.process.NightDiagnostics
 import io.github.alien2003.nightbaseline.work.schedule.NightScheduler
 import io.github.alien2003.nightbaseline.work.schedule.WorkManagerNightScheduler
 
@@ -25,6 +27,10 @@ abstract class WorkModule {
     /** Android data-access problem notifications. */
     @Binds
     abstract fun bindProblemNotifier(implementation: AndroidProblemNotifier): ProblemNotifier
+
+    /** Night check decisions to logcat. */
+    @Binds
+    abstract fun bindDiagnostics(implementation: LogcatNightDiagnostics): NightDiagnostics
 
     /** WorkManager scheduling. */
     @Binds

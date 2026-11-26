@@ -34,8 +34,11 @@ Live project state. A new session starts here. Updated after every step. Last fu
 ## In progress
 - BUG (found 2026-11-26 10:15 −03): the night 25→26 Nov is in Health Connect and complete (session 01:57–08:20,
   written 08:32, all channels to the end, steps at 08:25) but NightBaseline keeps showing "Last night isn't in yet"
-  even after "Check now". An agent reproduces it locally with the exported dataset and fixes it (+ synthetic regression
-  test, value-free logcat diagnostics).
+  even after "Check now". Reproduced locally with the exported dataset; cause: the "source still writing" rule
+  counted every record of the source written since the night started (the morning's step records, all-day heart
+  rate), so a check within 15 min of any daytime sync waited, up to the 12 h cap. Fixed: only the night's own records
+  count (`readNight(writesBeforeMs)`), synthetic regression test `DaytimeWritesTest`, logcat diagnostics (tag
+  `NightBaseline`, docs/development.md). Not yet confirmed on the phone.
 - On-device e2e suite (instrumentation, single write+delete of a year-2000 tagged record, before/after snapshots).
 
 ## Next

@@ -48,11 +48,17 @@ interface HealthDataReader {
         endMs: Long,
     ): List<SleepSession>
 
-    /** Sessions, channel samples, step records and the newest write time of [origin] for the range. */
+    /**
+     * Sessions, channel samples and step records of [origin] for the range, and the newest write time of the records
+     * that have data in `[startMs, writesBeforeMs)`: a check that reads past the night (to see the step records of the
+     * morning) passes the night's end there, so the source's daytime writes (steps, all-day heart rate) do not count
+     * as "still writing the night".
+     */
     suspend fun readNight(
         origin: String,
         startMs: Long,
         endMs: Long,
+        writesBeforeMs: Long = endMs,
     ): NightData
 }
 
@@ -146,10 +152,11 @@ class HealthConnectReader(
         origin: String,
         startMs: Long,
         endMs: Long,
+        writesBeforeMs: Long,
     ): NightData {
         requireReadable(HcPermissions.REQUIRED)
         val sessions = sessionsOf(origin, startMs, endMs)
-        var lastModified = sessions.maxOfOrNull { it.lastModifiedMs }
+        var lastModified = sessions.filter { it.startMs < writesBeforeMs }.maxOfOrNull { it.lastModifiedMs }
         val channels = LinkedHashMap<ChannelId, List<Sample>>()
         var steps = emptyList<Sample>()
         if (origin !in excludedOrigins && startMs < endMs) {
@@ -157,7 +164,10 @@ class HealthConnectReader(
                 val from = if (ch.series) startMs - SERIES_LEFT_PADDING_MS else startMs
                 val records = guarded { gateway.readChannel(ch, from, endMs, origin) }
                 val used = records.filter { r -> r.samples.any { it.timeMs in startMs until endMs } }
-                used.maxOfOrNull { it.lastModifiedMs }?.let { m -> lastModified = maxOf(lastModified ?: m, m) }
+                used
+                    .filter { r -> r.samples.any { it.timeMs in startMs until writesBeforeMs } }
+                    .maxOfOrNull { it.lastModifiedMs }
+                    ?.let { m -> lastModified = maxOf(lastModified ?: m, m) }
                 val samples = used.flatMap { it.samples }.filter { it.timeMs in startMs until endMs }.sortedBy { it.timeMs }
                 if (ch.id == HcChannels.STEPS_ID) steps = samples else channels[ch.id] = samples
             }

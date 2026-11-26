@@ -13,7 +13,8 @@ import kotlinx.serialization.Serializable
  *    to "ended at least [CompletenessParams.fallbackEndedMinutes] ago";
  * 2. heart rate reaches `end − hrLag`, respiratory rate `end − rrLag`, SpO2 `end − spo2Lag` (only channels the source
  *    writes at all);
- * 3. nothing new was written by the source for [CompletenessParams.quietMinutes];
+ * 3. nothing new was written by the source for the night (records with data inside it) for
+ *    [CompletenessParams.quietMinutes]; the source's daytime writes after the night do not count;
  * or the hard cap [CompletenessParams.capHours] after the end has passed (evaluate with what is there).
  */
 object Completeness {
@@ -67,7 +68,7 @@ data class CompletenessInput(
     val sourceWritesSteps: Boolean,
     /** Start of the first step record after the night end at or above the brisk threshold, if any. */
     val firstBriskStepAfterEndMs: Long?,
-    /** Newest lastModified of any record of the source within the night window. */
+    /** Newest lastModified of the source's records with data inside the night (not its later daytime records). */
     val lastWriteMs: Long,
 )
 

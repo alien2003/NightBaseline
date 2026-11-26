@@ -105,6 +105,27 @@ class HealthConnectReaderTest {
         }
 
     @Test
+    fun writesAfterTheNightDoNotCountAsWritesOfTheNight() =
+        runTest {
+            val start = 30 * H
+            val end = 38 * H
+            val now = 41 * H
+            gateway.sessions += session("night", ORIGIN, start, end)
+            gateway.add(ChannelId.HEART_RATE, ORIGIN, HcPointRecord(start, end + 10, listOf(Sample(start, 50.0), Sample(end - 1, 52.0))))
+            // The morning: step records and all-day heart rate written up to a minute before now, a later nap session.
+            gateway.add(HcChannels.STEPS_ID, ORIGIN, HcPointRecord(end + H, now - 1, listOf(Sample(end + H, 30.0))))
+            gateway.add(ChannelId.HEART_RATE, ORIGIN, HcPointRecord(end + 2 * H, now - 1, listOf(Sample(end + 2 * H, 80.0))))
+            gateway.sessions += HcSession("nap", ORIGIN, end + 2 * H, end + 2 * H + 15 * 60_000, 0, now - 1)
+
+            val night = reader.readNight(ORIGIN, start, now, writesBeforeMs = end + 1)
+            assertEquals(end + 10, night.lastModifiedMs)
+            // The step records after the night are still read (the "person is up" check needs them).
+            assertEquals(listOf(Sample(end + H, 30.0)), night.steps)
+            // Without the limit every record of the range counts.
+            assertEquals(now - 1, reader.readNight(ORIGIN, start, now).lastModifiedMs)
+        }
+
+    @Test
     fun syntheticNightsRoundTripThroughTheReader() =
         runTest {
             val nights = SyntheticNights(SyntheticNights.Config(seed = 5, nights = 3)).generate()
