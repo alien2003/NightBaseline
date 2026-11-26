@@ -41,8 +41,12 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import io.github.alien2003.nightbaseline.ui.components.CARD_TAG
 import io.github.alien2003.nightbaseline.ui.components.CalendarCell
+import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
+import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
+import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
+import io.github.alien2003.nightbaseline.ui.components.TOP_BAR_TITLE_TAG
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.history.HistorySamples
 import io.github.alien2003.nightbaseline.ui.history.HistoryScreen
@@ -235,6 +239,69 @@ class ShellLayoutTest {
     }
 
     @Test
+    @Config(qualifiers = "en-rUS-w360dp-h1040dp-port-xhdpi")
+    fun historyCalendarAtFont2CollapsesTheLargeTitleFullyWhenItBarelyOverflows() = assertCalendarCollapses(1040f)
+
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h1300dp-port-xhdpi")
+    fun historyCalendarAtFont2CollapsesTheLargeTitleFullyWhenItFits() = assertCalendarCollapses(1300f)
+
+    /** A month grid shorter than the window must still scroll the whole large title away into the toolbar title. */
+    private fun assertCalendarCollapses(height: Float) {
+        val layout = resolveLayout(LayoutInputs(FOLD_W, height, fontScale = 2f))
+        assertEquals(LayoutMode.Compact, layout.mode)
+        val list = LazyListState()
+        show(fontScale = 2f) { HistoryScreen(HistorySamples.calendar(), layout, listState = list) }
+        val title = compose.onNodeWithTag(TOP_BAR_TITLE_TAG)
+        assertTrue("the large title shows at rest", title.getBoundsInRoot().let { it.bottom - it.top } > 0.dp)
+        compose.runOnIdle { runBlocking { list.scrollBy(px(FAR_DP).toFloat()) } }
+        compose.waitForIdle()
+        assertEquals(
+            "the large title has collapsed fully at the end of the scroll",
+            0.dp,
+            title.getBoundsInRoot().let { it.bottom - it.top },
+        )
+    }
+
+    @Test
+    fun toolbarTitleAtFont2KeepsAGapAboveAndBelow() {
+        var toolbar = 0.dp
+        show(fontScale = 2f) {
+            ShellTopBar(title = "Last night", onToolbarHeight = { toolbar = it }, modifier = Modifier.testTag(CONTENT))
+        }
+        val text = compose.onNodeWithTag(TOP_BAR_TITLE_TAG, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val bar = compose.onNodeWithTag(CONTENT).getUnclippedBoundsInRoot()
+        val gap = (bar.top + toolbar) - text.bottom
+        assertTrue("the collapsed title ends $gap above the toolbar's bottom edge", gap >= 8.dp)
+    }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w851dp-h393dp-land-xhdpi")
+    fun topBarActionsStayClearOfANavigationBarAtTheEnd() {
+        show {
+            ShellTopBar(title = "History", actions = {
+                ShellRoundButton(NbIcons.MoreVertical, contentDescription = "More", onClick = {}, modifier = Modifier.testTag(CELL))
+            })
+        }
+        val rightBar =
+            WindowInsetsCompat
+                .Builder()
+                .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, px(THREE_BUTTON_DP), 0))
+                .build()
+        dispatchInsets(rightBar)
+        val button = compose.onNodeWithTag(CELL).fetchSemanticsNode().boundsInRoot
+        val width =
+            compose
+                .onRoot()
+                .fetchSemanticsNode()
+                .boundsInRoot.right
+        assertTrue(
+            "the action ends at ${button.right} px, left of the bar at ${width - px(THREE_BUTTON_DP)} px",
+            button.right <= width - px(THREE_BUTTON_DP),
+        )
+    }
+
+    @Test
     fun settingsValueLeavesTheTitleAColumnInATinyWindow() {
         show {
             Box(Modifier.width(TINY_DP.dp)) {
@@ -300,6 +367,8 @@ class ShellLayoutTest {
         const val WIDTH = 393f
         const val HEIGHT = 851f
         const val NARROW_W = 320f
+        const val FOLD_W = 360f
+        const val FAR_DP = 4000
         const val WIDE_SHORT_W = 900f
         const val WIDE_SHORT_H = 400f
         const val THREE_BUTTON_DP = 48

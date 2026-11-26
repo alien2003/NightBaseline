@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -106,6 +107,7 @@ fun HistoryScreen(
     val density = LocalDensity.current
     val arrangement = HistoryArrangement.of(layout)
     var barHeight by remember { mutableStateOf(0.dp) }
+    var toolbarHeight by remember { mutableStateOf(0.dp) }
     AppScaffold(
         layout = layout,
         selected = TopLevel.History,
@@ -128,6 +130,7 @@ fun HistoryScreen(
                             if (atRest || barHeight == 0.dp) barHeight = with(density) { size.height.toDp() }
                         },
                     actions.onView,
+                    onToolbarHeight = { toolbarHeight = it },
                     column =
                         if (arrangement.twoPanes) {
                             TitleColumn.atStart(arrangement.listGutter)
@@ -163,7 +166,7 @@ fun HistoryScreen(
                         listState,
                     )
                 } else {
-                    SinglePaneHistory(content, layout, padding, barHeight, listState)
+                    SinglePaneHistory(content, layout, padding, barHeight, toolbarHeight, listState)
                 }
             }
         }
@@ -239,6 +242,7 @@ private fun HistoryTopBar(
     listState: LazyListState,
     modifier: Modifier,
     onView: (HistoryView) -> Unit,
+    onToolbarHeight: (Dp) -> Unit,
     column: TitleColumn,
 ) {
     val density = LocalDensity.current
@@ -256,6 +260,7 @@ private fun HistoryTopBar(
             height = shellToolbarHeight(short, large),
             scrollOffset = scrolled,
             column = column,
+            onToolbarHeight = onToolbarHeight,
             actions = {
                 if (arrangement.toggleInBar && !state.empty && !state.loading) {
                     HistoryViewButton(state.view, onView)
@@ -280,7 +285,7 @@ private class HistoryContent(
     /** The selection is drawn where the selected night is also shown in place. */
     private val showSelection: Boolean get() = arrangement.selectsInPlace
 
-    fun LazyListScope.items() {
+    fun LazyListScope.items(calendarMinHeight: Dp = 0.dp) {
         state.access?.let { access ->
             item(key = "banner") { HistoryAccessBanner(access, onAction = { actions.onFixAccess(access) }, Modifier.padding(top = GAP)) }
         }
@@ -300,7 +305,7 @@ private class HistoryContent(
             }
 
             else -> {
-                calendarItems()
+                calendarItems(calendarMinHeight)
             }
         }
     }
@@ -358,29 +363,33 @@ private class HistoryContent(
         }
     }
 
-    private fun LazyListScope.calendarItems() {
+    /**
+     * The calendar, its legend and the preview as one block of at least [minHeight]: a month grid is short, and the
+     * list must still scroll far enough for the large title to collapse fully into the toolbar title.
+     */
+    private fun LazyListScope.calendarItems(minHeight: Dp) {
         controlRow(filters = false)
         item(key = "calendar") {
-            HistoryCalendar(
-                month = state.month,
-                nights = state.byDate,
-                today = state.today,
-                onDay = ::dayTap,
-                onMonth = actions.onMonth,
-                selected = state.selectedNight?.wakeDate?.takeIf { showSelection || arrangement.previewBelowCalendar },
-                firstMonth = state.firstMonth,
-                modifier = Modifier.padding(top = GAP),
-            )
-        }
-        item(key = "legend") {
-            HistoryLegend(
-                threshold = state.nights.firstOrNull()?.threshold ?: 2,
-                Modifier.widthIn(max = NbDimens.textMax).padding(top = GAP),
-            )
-        }
-        val night = state.selectedNight
-        if (arrangement.previewBelowCalendar && night != null) {
-            item(key = "preview") { Box(Modifier.padding(top = GAP)) { nightPreview(night, true) } }
+            Column(Modifier.heightIn(min = minHeight), horizontalAlignment = Alignment.CenterHorizontally) {
+                HistoryCalendar(
+                    month = state.month,
+                    nights = state.byDate,
+                    today = state.today,
+                    onDay = ::dayTap,
+                    onMonth = actions.onMonth,
+                    selected = state.selectedNight?.wakeDate?.takeIf { showSelection || arrangement.previewBelowCalendar },
+                    firstMonth = state.firstMonth,
+                    modifier = Modifier.padding(top = GAP),
+                )
+                HistoryLegend(
+                    threshold = state.nights.firstOrNull()?.threshold ?: 2,
+                    Modifier.widthIn(max = NbDimens.textMax).padding(top = GAP),
+                )
+                val night = state.selectedNight
+                if (arrangement.previewBelowCalendar && night != null) {
+                    Box(Modifier.padding(top = GAP)) { nightPreview(night, true) }
+                }
+            }
         }
     }
 }
@@ -400,6 +409,7 @@ private fun HistoryList(
     listState: LazyListState,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
+    calendarMinHeight: Dp = 0.dp,
 ) {
     LazyColumn(
         modifier = modifier,
@@ -408,7 +418,7 @@ private fun HistoryList(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // No list spacing: night rows join into one card per month; other items carry their own top gap.
-        with(content) { items() }
+        with(content) { items(calendarMinHeight) }
     }
 }
 
@@ -418,13 +428,15 @@ private fun SinglePaneHistory(
     layout: LayoutSpec,
     padding: PaddingValues,
     barHeight: Dp,
+    toolbarHeight: Dp,
     listState: LazyListState,
 ) {
     // The list starts below the collapsed bar (status bar + toolbar, the edge where month headers stick); the large
     // title block below the toolbar is content padding, so the list scrolls up 1:1 with the collapsing title
-    // (`coloros-conformance.md` C4) instead of keeping the resting bar height as an empty band with a hard cut.
+    // (`coloros-conformance.md` C4) instead of keeping the resting bar height as an empty band with a hard cut. The
+    // toolbar is its measured height: it grows with the font scale.
     val short = layout.mode == LayoutMode.CompactShort || layout.mode == LayoutMode.WideShort
-    val toolbar = if (short) ShellDimens.toolbarShort else ShellDimens.toolbar
+    val toolbar = maxOf(toolbarHeight, if (short) ShellDimens.toolbarShort else ShellDimens.toolbar)
     val statusBars = WindowInsets.statusBars
     val density = LocalDensity.current
     val bottom = padding.calculateBottomPadding() + NbSpace.s5
@@ -432,6 +444,10 @@ private fun SinglePaneHistory(
         remember(layout.gutter, bottom, barHeight, toolbar, statusBars, density) {
             BelowToolbarPadding(layout.gutter, bottom, barHeight - toolbar + NbSpace.s3, statusBars, density)
         }
+    // With the large title (Compact) the calendar block is tall enough for the list to scroll by the whole title
+    // block: scroll range = top + content + bottom - viewport >= top - 8 dp when content >= viewport - bottom - 8 dp.
+    var viewport by remember { mutableStateOf(0.dp) }
+    val calendarMinHeight = if (layout.mode == LayoutMode.Compact) (viewport - bottom - NbSpace.s3).coerceAtLeast(0.dp) else 0.dp
     HistoryList(
         content,
         listState,
@@ -440,7 +456,9 @@ private fun SinglePaneHistory(
             .fillMaxSize()
             .padding(start = padding.calculateLeftPadding(LayoutDirection.Ltr), end = padding.calculateRightPadding(LayoutDirection.Ltr))
             .windowInsetsPadding(statusBars.only(WindowInsetsSides.Top))
-            .padding(top = toolbar),
+            .padding(top = toolbar)
+            .onSizeChanged { viewport = with(density) { it.height.toDp() } },
+        calendarMinHeight,
     )
 }
 

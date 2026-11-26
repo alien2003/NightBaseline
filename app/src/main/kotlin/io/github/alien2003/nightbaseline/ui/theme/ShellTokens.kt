@@ -247,6 +247,9 @@ object ShellDimens {
     /** Gap between the back button and the toolbar title (title starts at 66 dp). */
     val toolbarTitleGap: Dp = 10.dp
 
+    /** Space above and below the toolbar title at a font scale above 1.0, where the title would fill the toolbar. */
+    val toolbarTitleLargeFontGap: Dp = 8.dp
+
     /** Space below the large title block before the first card (the page adds 8 dp more). */
     val largeTitleBottom: Dp = 12.dp
 

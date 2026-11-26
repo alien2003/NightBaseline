@@ -21,12 +21,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -114,6 +117,8 @@ private val TitleEasing = CubicBezierEasing(0.33f, 0f, 0.67f, 1f)
  * @param scrollOffset the scroll offset as a function, read only where it is used (the small title's layer, the large
  *   title's layout, the derived material target), so scrolling never recomposes the bar; takes precedence over
  *   [scroll] and [scrolledUnder].
+ * @param onToolbarHeight receives the measured height of the toolbar row (it grows with the font scale), so a list
+ *   can start right below it.
  * @param column the page's card column: the leading element (title or back button) starts at its start edge instead
  *   of the 16 dp toolbar margin (wide single-pane and two-pane pages, review round 4 container rule).
  */
@@ -130,6 +135,7 @@ fun ShellTopBar(
     scroll: Dp? = null,
     scrollOffset: (() -> Dp)? = null,
     column: TitleColumn? = null,
+    onToolbarHeight: (Dp) -> Unit = {},
     actions: @Composable () -> Unit = {},
 ) {
     val motion = NbTheme.motion
@@ -180,7 +186,12 @@ fun ShellTopBar(
             Column(Modifier.alignStartToColumn(column)) {
                 Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
                 Row(
-                    Modifier.fillMaxWidth().heightIn(min = toolbar),
+                    Modifier
+                        .fillMaxWidth()
+                        // The actions stay clear of a 3-button navigation bar or a cutout at the end side (landscape).
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
+                        .heightIn(min = toolbar)
+                        .onSizeChanged { onToolbarHeight(with(density) { it.height.toDp() }) },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (onBack != null) {
@@ -219,10 +230,13 @@ private fun RowScope.ToolbarTitle(
 ) {
     val colors = NbTheme.colors
     val type = ShellTokens.type
+    // At a large font the title fills the toolbar: it keeps a gap above and below, so the bar grows instead of the
+    // collapsed title touching the content under it. At font 1.0 the 52 dp toolbar is unchanged.
+    val vertical = if (LocalDensity.current.fontScale > 1f) ShellDimens.toolbarTitleLargeFontGap else NbDimens.focusRingWidth
     Column(
         Modifier
             .weight(1f)
-            .padding(vertical = NbDimens.focusRingWidth)
+            .padding(vertical = vertical)
             .graphicsLayer { this.alpha = alpha() }
             // On large-title pages the large title is the heading; the toolbar copy is decorative.
             .then(if (large) Modifier.clearAndSetSemantics {} else Modifier),
