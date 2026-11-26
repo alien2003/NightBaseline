@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -153,8 +152,8 @@ fun NightRow(
         ) {
             NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), background = colors.surface1)
             Column(Modifier.weight(1f).clearAndSetSemantics {}, verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap)) {
-                Text(label, style = NbControlType.itemTitle, color = controls.title)
-                Text(status, style = NbControlType.summary, color = controls.summary)
+                NbText(label, style = NbControlType.itemTitle, color = controls.title)
+                NbText(status, style = NbControlType.summary, color = controls.summary)
             }
             FlowRow(
                 Modifier.widthIn(max = 72.dp).clearAndSetSemantics {},
@@ -215,7 +214,7 @@ fun CalendarCell(
                 .then(if (selected) Modifier.background(controls.fillTop, NbShapes.circle) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
+            NbText(
                 text.int(date.dayOfMonth),
                 style =
                     NbTheme.typography.numericAxis.copy(
@@ -266,20 +265,20 @@ fun MonthCalendar(
         verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            NbRoundIconButton(NbIcons.Back, stringResource(R.string.a11y_prev_month), onPrevious)
-            Text(
+            ShellRoundButton(NbIcons.Back, stringResource(R.string.a11y_prev_month), onPrevious)
+            NbText(
                 text.month(month.atDay(1)),
                 style = NbControlType.itemTitle,
                 color = controls.title,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
-            NbRoundIconButton(NbIcons.Chevron, stringResource(R.string.a11y_next_month), onNext)
+            ShellRoundButton(NbIcons.Chevron, stringResource(R.string.a11y_next_month), onNext)
         }
         Row(Modifier.fillMaxWidth().clearAndSetSemantics {}) {
             repeat(DAYS) { i ->
                 val day = firstDay.plus(i.toLong())
-                Text(
+                NbText(
                     // Any week works for the letters; the first cell of the month row starts at [firstDay].
                     text.weekdayLetter(month.atDay(1).with(TemporalAdjusters.nextOrSame(day))),
                     style = NbTheme.typography.caption,
@@ -347,7 +346,7 @@ fun HistoryStrip(
             Modifier.fillMaxWidth().sizeIn(minHeight = NbDimens.targetMin),
             verticalAlignment = Alignment.Bottom,
         ) {
-            Text(
+            NbText(
                 when {
                     nights.size > DAYS -> stringResource(R.string.home_strip_title_14)
 
@@ -403,7 +402,7 @@ fun HistoryStrip(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
                 ) {
-                    Text(text.weekdayLetter(night.wakeDate), style = NbTheme.typography.caption, color = controls.summary)
+                    NbText(text.weekdayLetter(night.wakeDate), style = NbTheme.typography.caption, color = controls.summary)
                     NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), size = 20.dp)
                 }
             }
@@ -420,7 +419,7 @@ fun SectionHeader(
     title: String,
     modifier: Modifier = Modifier,
 ) {
-    Text(
+    NbText(
         title,
         style = NbControlType.sectionHeader,
         color = NbTheme.controls.sectionHeader,
@@ -444,7 +443,7 @@ fun SectionFooter(
     text: String,
     modifier: Modifier = Modifier,
 ) {
-    Text(
+    NbText(
         text,
         style = NbTheme.typography.caption,
         color = NbTheme.controls.sectionHeader,
@@ -573,8 +572,8 @@ fun SettingsRow(
             horizontalArrangement = Arrangement.spacedBy(NbControlDimens.rowTrailingGap),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap)) {
-                Text(title, style = NbControlType.itemTitle, color = if (enabled) controls.title else colors.textTertiary)
-                summary?.let { Text(it, style = NbControlType.summary, color = controls.summary) }
+                NbText(title, style = NbControlType.itemTitle, color = if (enabled) controls.title else colors.textTertiary)
+                summary?.let { NbText(it, style = NbControlType.summary, color = controls.summary) }
             }
             when (trailing) {
                 SettingsTrailing.Chevron -> {
@@ -583,7 +582,7 @@ fun SettingsRow(
 
                 is SettingsTrailing.Value -> {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-                        Text(
+                        NbText(
                             trailing.text,
                             style = NbTheme.typography.bodySmall,
                             color = controls.summary,

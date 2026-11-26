@@ -77,10 +77,10 @@ lighter (dark) or darker (light) than `surface.3`.
 | `color.chevron` | `#BDBDBD` | `#5F5F5F` | disclosure chevron (decorative: the row title carries the meaning) |
 | `color.control.track` | `#EBEBEB` | `#333333` | slider and range band track |
 | `color.control.switchOff` | `#D6D6D6` | `#505050` | switch track when off (2.16:1, recorded canon exception: the white knob position carries the state) |
-| `color.control.convexTop` | `#FFFFFF` | `#1F1F1F` | convex round shell button, gradient top |
-| `color.control.convexBottom` | `#F2F2F4` | `#2A2A2A` | convex round shell button, gradient bottom |
-| `color.control.convexRimTop` | `#FFFFFF @ 80%` | `#333333` | convex button rim, 0.5 dp top |
-| `color.control.convexRimBottom` | `#000000 @ 8%` | `#3E3E3E` | convex button rim, 1 dp bottom |
+| `color.control.convexTop` | `#FAFAFB` | `#1F1F1F` | convex round shell button, gradient top |
+| `color.control.convexBottom` | `#F3F4F5` | `#2A2A2A` | convex round shell button, gradient bottom |
+| `color.control.convexRimTop` | `#FFFFFF` | `#333333` | convex button rim, 0.5 dp top |
+| `color.control.convexRimBottom` | `#FCFCFC` | `#3E3E3E` | convex button rim, 1 dp bottom |
 
 ### 2.2 Accent
 
@@ -128,7 +128,7 @@ against the card (3.36 / 3.27). No edge lines, no median tick. Markers get a 2 d
 | `color.band.fill` | `#8C8C8C` | `#6B6B6B` | usual-range segment on the 16 dp `control.track` pill |
 | `color.band.learningOutline` | `= color.outline` | `= color.outline` | dotted outline where the band will be (learning) |
 | `color.marker.within` | `#FFFFFF` | `#FFFFFF` | value marker inside the range (slider-thumb idiom) |
-| `color.marker.withinRim` | `#CCCCCC` | `#FFFFFF` | 1 px rim of the white marker (light; dark has none) |
+| `color.marker.withinRim` | `#8C8C8C` | `#FFFFFF` | 1 px rim of the white marker (light only: the dark marker draws no rim) |
 | `color.marker.halo` | `= color.surface.1` | `= color.surface.1` | 2 dp ring around every value marker |
 | `color.chart.point` | `#4A4A4A` | `#E9E9E9` | chart points inside the range; learning points are hollow `status.neutral` |
 | `color.chart.grid` | `#000000 @ 6%` | `#FFFFFF @ 8%` | 1 px horizontal grid lines (decorative; values are in labels and the text summary) |
@@ -152,7 +152,7 @@ hairline, no refraction, no specular motion (`docs/research/coloros17-glass.md` 
 | `color.glass.topBar` | `#F0F1F2 @ 82%` | `#000000 @ 72%` | top bar tint under the small title once it is visible (the row that carries text) |
 | `color.glass.topBarDim` | `#F0F1F2 @ 35%` | `#000000 @ 35%` | top stop of the progressive darkening (0.35 -> 0) where no text sits [measured x0.65-0.75] |
 | `color.glass.sheet` | `#F5F5F8 @ 92%` | `#171717 @ 92%` | bottom sheet tint |
-| `color.glass.dialog` | `#FFFFFF @ 94%` | `#232323 @ 94%` | dialog tint |
+| `color.glass.dialog` | `#FFFFFF @ 96%` | `#232323 @ 96%` | dialog tint (96 % keeps grey message text >= 4.5:1 over any backdrop) |
 | `color.glass.rimTop` | `#FFFFFF @ 80%` | `#FFFFFF @ 13%` | rim, 0.5 dp top highlight |
 | `color.glass.rimBottom` | `#000000 @ 8%` | `#FFFFFF @ 16%` | rim, 1 dp bottom stroke and 2 dp bottom reflection band (band at half this alpha) |
 | `color.onGlass.primary` | `#1A1A1A` | `#E9E9E9` | titles, labels, selected icons and labels on glass |
@@ -214,27 +214,13 @@ labels keep their colour; elements also shrink (section 9.5). Material's ripple 
 | `state.dragged` | `text.primary` at 16 % | chart scrub handle, sheet handle |
 | `state.disabled` | labels stay `text.tertiary` (>= 4.5:1); only control graphics (switch, radio) may use the canon #5F5F5F; filled buttons at alpha 0.3 with a reason text | disabled controls |
 
-### 2.9 Retired tokens
+### 2.9 Retired tokens (deleted)
 
-Retired by the conformance plan and kept only until the last caller is migrated (the sweep deletes them); each is
-an alias of its neutral replacement, so un-migrated components already look canonical. `color.glass.rimOuter` is
-gone already (transparent in code).
-
-| token | light | dark | replacement |
-|---|---|---|---|
-| `color.primaryContainer` | `= color.surface.3` | `= color.surface.3` | no tonal containers: neutral selection, icon fill and weight |
-| `color.onPrimaryContainer` | `= color.text.primary` | `= color.text.primary` | |
-| `color.accent` | `= color.primary` | `= color.primary` | single accent |
-| `color.status.within.container` | `= color.surface.1` | `= color.surface.1` | no status containers: glyph and label on the card |
-| `color.status.within.onContainer` | `= color.status.within` | `= color.status.within` | |
-| `color.status.moved.container` | `= color.surface.1` | `= color.surface.1` | |
-| `color.status.moved.onContainer` | `= color.status.moved` | `= color.status.moved` | |
-| `color.status.neutral.container` | `= color.surface.1` | `= color.surface.1` | |
-| `color.status.neutral.onContainer` | `= color.status.neutral` | `= color.status.neutral` | |
-| `color.status.info.container` | `= color.surface.1` | `= color.surface.1` | |
-| `color.status.info.onContainer` | `= color.status.info` | `= color.status.info` | |
-| `color.band.edge` | `= color.band.fill` | `= color.band.fill` | no band edges or median tick (drawn invisible until removed) |
-| `color.glass.rimMid` | `= color.glass.rimTop` | `= color.glass.rimTop` | two-part rim |
+The integration sweep deleted the tokens the conformance plan retired; no code or pair refers to them any more:
+`color.primaryContainer` / `onPrimaryContainer` (no tonal containers: neutral selection, icon fill and weight),
+`color.accent` (single blue accent, `primary`), the `color.status.*.container` / `onContainer` pairs (glyph and label
+sit on the card), `color.band.edge` (no band edges or median tick), `color.glass.rimMid` / `rimOuter` (two-part rim,
+no outer hairline).
 
 ### 2.10 Contrast pairs (machine-checked)
 
@@ -269,7 +255,6 @@ Format (parsed by `tools/design/contrast_check.py`):
 | text.primaryText.surface3 | color.primaryText | color.surface.3 | both | 4.5 |
 | text.primaryText.elevated | color.primaryText | color.surface.elevated | both | 4.5 |
 | text.onPrimary | color.onPrimary | color.primaryFill | both | 4.5 |
-| text.onPrimaryContainer | color.onPrimaryContainer | color.primaryContainer | both | 4.5 |
 | text.status.within.surface1 | color.status.within | color.surface.1 | both | 4.5 |
 | text.status.within.surface2 | color.status.within | color.surface.2 | both | 4.5 |
 | text.status.moved.surface1 | color.status.moved | color.surface.1 | both | 4.5 |
@@ -284,10 +269,6 @@ Format (parsed by `tools/design/contrast_check.py`):
 | text.status.info.surface3 | color.status.info | color.surface.3 | both | 4.5 |
 | text.status.within.background | color.status.within | color.background | both | 4.5 |
 | text.status.moved.background | color.status.moved | color.background | both | 4.5 |
-| text.status.within.onContainer | color.status.within.onContainer | color.status.within.container | both | 4.5 |
-| text.status.moved.onContainer | color.status.moved.onContainer | color.status.moved.container | both | 4.5 |
-| text.status.neutral.onContainer | color.status.neutral.onContainer | color.status.neutral.container | both | 4.5 |
-| text.status.info.onContainer | color.status.info.onContainer | color.status.info.container | both | 4.5 |
 | text.onGlass.primary.bar | color.onGlass.primary | color.glass.bar | both | 4.5 |
 | text.onGlass.secondary.bar | color.onGlass.secondary | color.glass.bar | both | 4.5 |
 | text.onGlass.primary.topBar | color.onGlass.primary | color.glass.topBar | both | 4.5 |
@@ -311,12 +292,7 @@ Format (parsed by `tools/design/contrast_check.py`):
 | text.status.within.tooltip | color.status.within | color.solid.tooltip | both | 4.5 |
 | text.status.moved.tooltip | color.status.moved | color.solid.tooltip | both | 4.5 |
 | text.status.neutral.tooltip | color.status.neutral | color.solid.tooltip | both | 4.5 |
-| text.navSelected | color.onPrimaryContainer | color.primaryContainer | both | 4.5 |
 | large.value.surface1 | color.text.primary | color.surface.1 | both | 4.5 |
-| graphic.status.within.container | color.status.within | color.status.within.container | both | 3.0 |
-| graphic.status.moved.container | color.status.moved | color.status.moved.container | both | 3.0 |
-| graphic.status.neutral.container | color.status.neutral | color.status.neutral.container | both | 3.0 |
-| graphic.status.info.container | color.status.info | color.status.info.container | both | 3.0 |
 | graphic.band.fill.surface1 | color.band.fill | color.surface.1 | both | 3.0 |
 | graphic.marker.within.fill | color.marker.within | color.band.fill | both | 3.0 |
 | graphic.marker.within.surface1 | color.status.within | color.surface.1 | both | 3.0 |
@@ -328,7 +304,6 @@ Format (parsed by `tools/design/contrast_check.py`):
 | graphic.outline.surface1 | color.outline | color.surface.1 | both | 3.0 |
 | graphic.outline.surface2 | color.outline | color.surface.2 | both | 3.0 |
 | graphic.outline.background | color.outline | color.background | both | 3.0 |
-| graphic.accent.surface1 | color.accent | color.surface.1 | both | 3.0 |
 | graphic.primary.surface1 | color.primary | color.surface.1 | both | 3.0 |
 | graphic.primary.background | color.primary | color.background | both | 3.0 |
 | graphic.navIcon.bar | color.onGlass.secondary | color.glass.bar | both | 3.0 |
@@ -341,7 +316,6 @@ Format (parsed by `tools/design/contrast_check.py`):
 | focus.ring.glassSheet | color.focus.ring | color.glass.sheet | both | 3.0 |
 | focus.ring.glassDialog | color.focus.ring | color.glass.dialog | both | 3.0 |
 | focus.ring.solidBarBottom | color.focus.ring | color.solid.barBottom | both | 3.0 |
-| focus.ring.primaryContainer | color.focus.ring | color.primaryContainer | both | 3.0 |
 
 Not in the table on purpose: `separator`, `chevron`, `chart.grid`, `chart.bandArea`, `glass.rim*`,
 `control.switchOff` (canon exception, section 2.1), `control.convex*`, `accentGlow`, `glow.neutral`, `state.*`,
@@ -437,6 +411,15 @@ Semantic spacing (window-level gutters and pane widths are owned by `layouts.md`
 Shell geometry (bar 56 dp, items 70 x 48 dp, offset 16 dp, rail 56 dp, toolbar 52 dp, title start 66 / 16 dp,
 sheet header 56 dp, dialog 392 dp / 24 dp padding) is specified in `coloros-conformance.md` 4.3 and applied with
 the shell components (`ShellTokens.kt`).
+
+Component token files [decision, integration sweep]: `NbColors`, `NbTypography`, `NbShapes` and `NbDimens` are the
+single source for every value listed in this document. The component files `ShellTokens.kt` (shell),
+`ControlTokens.kt` (controls, lists, buttons) and `DataTokens.kt` (cards, band, chart, period selector) keep only
+component-specific values (for example the nav label colours, the radio ring, the period thumb gradient); every value
+they share with this document is read from the foundations, never repeated as a literal. The dialog confirm pill and
+`PrimaryButton` use the same accent gradient (`primaryFill` -> a darker bottom, white label >= 4.5:1). The app has no
+Material dependency: text and icons are `NbText` / `NbIcon` on Compose foundation, and the theme provides
+`LocalIndication` (no ripple) and `LocalOverscrollFactory` itself.
 
 ## 5. Shapes
 

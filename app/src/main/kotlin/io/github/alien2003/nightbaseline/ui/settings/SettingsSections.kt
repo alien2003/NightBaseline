@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.NbChoiceRow
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.SectionFooter
 import io.github.alien2003.nightbaseline.ui.components.SettingsGroup
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
@@ -150,7 +150,7 @@ internal fun SensitivityContent(
     val controls = NbTheme.controls
     Column(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax)) {
         if (title) PaneHeading(stringResource(R.string.settings_group_sensitivity), Modifier.padding(top = NbSpace.s5, bottom = NbSpace.s4))
-        Text(
+        NbText(
             stringResource(R.string.setup_sens_intro),
             style = NbTheme.typography.body,
             color = controls.summary,
@@ -278,8 +278,8 @@ internal fun InfoRow(
                 .padding(horizontal = NbControlDimens.rowPaddingHorizontal, vertical = NbControlDimens.rowPaddingVertical),
             verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap, Alignment.CenterVertically),
         ) {
-            Text(title, style = NbControlType.itemTitle, color = controls.title)
-            summary?.let { Text(it, style = NbControlType.summary, color = controls.summary) }
+            NbText(title, style = NbControlType.itemTitle, color = controls.title)
+            summary?.let { NbText(it, style = NbControlType.summary, color = controls.summary) }
         }
     }
 }

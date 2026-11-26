@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +32,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.material.solidCard
@@ -110,7 +110,7 @@ private fun Title(
     style: TextStyle = NbTheme.typography.largeTitle,
     modifier: Modifier = Modifier,
 ) {
-    Text(stepTitle(state), style = style, color = NbTheme.colors.textPrimary, modifier = modifier.semantics { heading() })
+    NbText(stepTitle(state), style = style, color = NbTheme.colors.textPrimary, modifier = modifier.semantics { heading() })
 }
 
 /** Title (unless the start column already shows it), body and the action row, for the end column of wide modes. */

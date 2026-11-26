@@ -14,8 +14,8 @@ import androidx.compose.ui.unit.sp
 
 /**
  * Tokens of the cards, status and data-visualisation package (`docs/design/coloros-conformance.md` section 6, WP4)
- * that do not exist in `tokens.md` yet, with the values of conformance section 4. After the packages merge, the
- * foundations follow-up folds them into [NbColors], [NbDimens] and [NbTypography] (rename only).
+ * with the values of conformance section 4. Values shared with the foundations come from [NbColors] (one source of
+ * truth); the rest are data-only.
  *
  * ColorOS 17 canon: neutral R = G = B greys, one blue accent, no tonal containers; the usual range is a neutral solid
  * segment on a slider-like track, the chart is neutral with only the status shapes in colour.
@@ -67,45 +67,45 @@ private fun tint(
 /** Light values (light references `.data/design-refs/unfolded-light/`: white cards on light grey, grey controls). */
 val LightNbDataColors: NbDataColors =
     NbDataColors(
-        primaryText = Color(0xFF0068E0),
-        bandTrack = Color(0xFFEBEBEB),
-        bandRange = Color(0xFF8C8C8C),
-        markerWithin = Color(0xFFFFFFFF),
-        markerRim = Color(0xFF8C8C8C),
+        primaryText = LightNbColors.primaryText,
+        bandTrack = LightNbColors.controlTrack,
+        bandRange = LightNbColors.bandFill,
+        markerWithin = LightNbColors.markerWithin,
+        markerRim = LightNbColors.markerWithinRim,
         learningOutline = Color(0xFF8C8C8C),
-        chartGrid = tint(0x000000, 6),
-        chartBandArea = tint(0x000000, 8),
-        chartPoint = Color(0xFF4A4A4A),
+        chartGrid = LightNbColors.chartGrid,
+        chartBandArea = LightNbColors.chartBandArea,
+        chartPoint = LightNbColors.chartPoint,
         chartGuide = tint(0x000000, 30),
-        tooltip = Color(0xFFFFFFFF),
+        tooltip = LightNbColors.solidTooltip,
         segmentTrack = Color(0xFFE3E4E6),
         segmentThumbTop = Color(0xFFFFFFFF),
         segmentThumbBottom = Color(0xFFF7F7F9),
         segmentThumbRim = tint(0xFFFFFF, 80),
         progressPending = Color(0xFFD6D6D6),
-        selected = tint(0x000000, 6),
+        selected = LightNbColors.stateSelected,
     )
 
 /** Dark values (measured ColorOS 17 dark references: true black window, #1A1A1A cards, slider track #333333). */
 val DarkNbDataColors: NbDataColors =
     NbDataColors(
-        primaryText = Color(0xFF5C9DFF),
-        bandTrack = Color(0xFF333333),
-        bandRange = Color(0xFF6B6B6B),
-        markerWithin = Color(0xFFFFFFFF),
+        primaryText = DarkNbColors.primaryText,
+        bandTrack = DarkNbColors.controlTrack,
+        bandRange = DarkNbColors.bandFill,
+        markerWithin = DarkNbColors.markerWithin,
         markerRim = Color(0x00000000),
         learningOutline = Color(0xFF6B6B6B),
-        chartGrid = tint(0xFFFFFF, 8),
-        chartBandArea = tint(0xFFFFFF, 12),
-        chartPoint = Color(0xFFE9E9E9),
+        chartGrid = DarkNbColors.chartGrid,
+        chartBandArea = DarkNbColors.chartBandArea,
+        chartPoint = DarkNbColors.chartPoint,
         chartGuide = tint(0xFFFFFF, 30),
-        tooltip = Color(0xFF2B2B2B),
+        tooltip = DarkNbColors.solidTooltip,
         segmentTrack = Color(0xFF242424),
         segmentThumbTop = Color(0xFF3D3D3D),
         segmentThumbBottom = Color(0xFF333333),
         segmentThumbRim = tint(0xFFFFFF, 12),
         progressPending = Color(0xFF484848),
-        selected = tint(0xFFFFFF, 10),
+        selected = DarkNbColors.stateSelected,
     )
 
 /** The data tokens of this theme. */

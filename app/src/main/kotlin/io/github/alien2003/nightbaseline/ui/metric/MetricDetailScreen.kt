@@ -21,12 +21,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,11 +54,13 @@ import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.OverlayHost
 import io.github.alien2003.nightbaseline.ui.components.PeriodSelector
 import io.github.alien2003.nightbaseline.ui.components.RangeBand
+import io.github.alien2003.nightbaseline.ui.components.SecondaryButton
+import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
-import io.github.alien2003.nightbaseline.ui.components.TonalButton
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.chartPoint
 import io.github.alien2003.nightbaseline.ui.components.chartSummary
@@ -75,6 +77,7 @@ import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.ShellTokens
 import io.github.alien2003.nightbaseline.ui.theme.dataType
 
 /** Test tag of the top bar (screenshot stitching keeps it once at the top). */
@@ -127,13 +130,7 @@ fun MetricDetailScreen(
                         scrolledUnder = with(density) { scroll.value.toDp() },
                         onBack = actions.onBack,
                         actions = {
-                            NbIconButton(
-                                NbIcons.Info,
-                                text.string(R.string.a11y_range_info),
-                                onClick = actions.onOpenExplainer,
-                                tint = NbTheme.colors.onGlassPrimary,
-                                onGlass = true,
-                            )
+                            ShellRoundButton(NbIcons.Info, text.string(R.string.a11y_range_info), onClick = actions.onOpenExplainer)
                         },
                     )
                 }
@@ -253,7 +250,7 @@ fun MetricDetailPane(
     val text = rememberUiText()
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
         Row(Modifier.widthIn(max = NbDimens.chartMax).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
+            NbText(
                 text.name(state.metric.metric),
                 style = NbTheme.dataType.title,
                 color = NbTheme.colors.textPrimary,
@@ -462,9 +459,9 @@ private fun TabletopDetail(
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
             Row(Modifier.fillMaxWidth().widthIn(max = NbDimens.chartMax), verticalAlignment = Alignment.CenterVertically) {
-                NbIconButton(NbIcons.Back, text.string(R.string.a11y_back), onClick = actions.onBack)
+                ShellRoundButton(NbIcons.ArrowBack, text.string(R.string.a11y_back), onClick = actions.onBack)
                 Box(Modifier.weight(1f).padding(horizontal = NbSpace.s3)) { Period(state, actions) }
-                NbIconButton(NbIcons.Info, text.string(R.string.a11y_range_info), onClick = actions.onOpenExplainer)
+                ShellRoundButton(NbIcons.Info, text.string(R.string.a11y_range_info), onClick = actions.onOpenExplainer)
             }
             if (state.hasChart && !state.loading) {
                 val last = state.shownPoints.lastIndex
@@ -475,8 +472,8 @@ private fun TabletopDetail(
                     verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
                     itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TonalButton(text.string(R.string.a11y_prev_night), onClick = { actions.onSelect((current - 1).coerceIn(0, last)) })
-                    TonalButton(text.string(R.string.a11y_next_night), onClick = { actions.onSelect((current + 1).coerceIn(0, last)) })
+                    SecondaryButton(text.string(R.string.a11y_prev_night), onClick = { actions.onSelect((current - 1).coerceIn(0, last)) })
+                    SecondaryButton(text.string(R.string.a11y_next_night), onClick = { actions.onSelect((current + 1).coerceIn(0, last)) })
                 }
             }
             if (state.loading) return@Column
@@ -513,11 +510,11 @@ private fun TabletopLabel(state: MetricDetailState) {
         verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text.name(metric.metric), style = NbTheme.dataType.title, color = colors.textPrimary)
-        Text(text.value(metric)?.text ?: DASH, style = NbTheme.dataType.title, color = colors.textPrimary)
+        NbText(text.name(metric.metric), style = NbTheme.dataType.title, color = colors.textPrimary)
+        NbText(text.value(metric)?.text ?: DASH, style = NbTheme.dataType.title, color = colors.textPrimary)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
             MetricGlyphIcon(metric.state.glyph, colors.tone(metric.state.tone), size = NbDimens.iconInline)
-            Text(text.status(metric, state.source), style = NbTheme.dataType.title, color = colors.textPrimary)
+            NbText(text.status(metric, state.source), style = NbTheme.dataType.title, color = colors.textPrimary)
         }
     }
 }
@@ -527,7 +524,7 @@ private fun TabletopLabel(state: MetricDetailState) {
 private fun SelectedNightLine(state: MetricDetailState) {
     val text = rememberUiText()
     val point = state.selected?.let { state.shownPoints.getOrNull(it) } ?: return
-    Text(
+    NbText(
         text.chartPoint(state.metric.metric, point, state.source),
         style = NbTheme.dataType.itemTitle,
         color = NbTheme.colors.textPrimary,
@@ -618,17 +615,17 @@ private fun GlanceDetail(
         verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            NbIconButton(NbIcons.Back, text.string(R.string.a11y_back), onClick = actions.onBack)
-            Text(
+            ShellRoundButton(NbIcons.ArrowBack, text.string(R.string.a11y_back), onClick = actions.onBack)
+            NbText(
                 text.name(metric.metric),
                 style = NbTheme.dataType.itemTitle,
                 color = colors.textPrimary,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
-            NbIconButton(NbIcons.Info, text.string(R.string.a11y_range_info), onClick = actions.onOpenExplainer)
+            ShellRoundButton(NbIcons.Info, text.string(R.string.a11y_range_info), onClick = actions.onOpenExplainer)
         }
         if (state.loading) {
-            Text(text.string(R.string.state_loading_body), style = NbTheme.typography.body, color = colors.textSecondary)
+            NbText(text.string(R.string.state_loading_body), style = NbTheme.typography.body, color = colors.textSecondary)
             return@Column
         }
         val description = text.tileDescription(metric, state.source)
@@ -644,13 +641,13 @@ private fun GlanceDetail(
                 if (metric.state != MetricState.NotProvided && metric.state != MetricState.AccessOff) HeaderValue(metric, large = false)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
                     MetricGlyphIcon(metric.state.glyph, colors.tone(metric.state.tone))
-                    Text(text.status(metric, state.source), style = NbTheme.dataType.segment, color = colors.textPrimary)
+                    NbText(text.status(metric, state.source), style = NbTheme.dataType.segment, color = colors.textPrimary)
                 }
             }
             if (metric.range != null && metric.value != null) RangeBand(metric.range, metric.value, metric.state, height = 10.dp)
-            text.usualRange(metric)?.let { Text(it, style = NbTheme.typography.bodySmall, color = colors.textSecondary) }
+            text.usualRange(metric)?.let { NbText(it, style = NbTheme.typography.bodySmall, color = colors.textSecondary) }
             if (!metric.state.compared) {
-                Text(text.headerSentence(metric, state.source), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+                NbText(text.headerSentence(metric, state.source), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
             }
         }
         NoticeLine(state)
@@ -660,7 +657,7 @@ private fun GlanceDetail(
             ?.takeIf { it.points.isNotEmpty() }
             ?.let { week ->
                 val summary = text.chartSummary(week, state.source)
-                Text(
+                NbText(
                     summary,
                     style = NbTheme.typography.bodySmall,
                     color = colors.textSecondary,
@@ -682,7 +679,7 @@ private fun NoticeLine(state: MetricDetailState) {
             MetricNotice.HealthConnectUpdate -> text.string(R.string.state_hc_update_title)
             null -> null
         } ?: return
-    Text(line, style = NbTheme.typography.body, color = NbTheme.colors.textPrimary)
+    NbText(line, style = NbTheme.typography.body, color = NbTheme.colors.textPrimary)
 }
 
 /**
@@ -779,20 +776,16 @@ private fun InfoDialog(
             .padding(NbSpace.s7),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s4),
     ) {
+        // Centred dialog title (conformance H1 / T7) with the round close button; the leading spacer keeps it centred.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
+            Spacer(Modifier.size(NbDimens.targetMin))
+            NbText(
                 title,
-                style = NbTheme.dataType.title,
+                style = ShellTokens.type.dialogTitle,
                 color = colors.onGlassPrimary,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
-            NbIconButton(
-                NbIcons.Close,
-                text.string(R.string.a11y_close),
-                onClick = onClose,
-                tint = colors.onGlassPrimary,
-                onGlass = true,
-            )
+            ShellRoundButton(NbIcons.Close, text.string(R.string.a11y_close), onClick = onClose)
         }
         body(Modifier.weight(1f, fill = false))
     }
@@ -807,7 +800,7 @@ fun InfoParagraphs(
     val colors = NbTheme.colors
     Column(modifier.verticalScroll(rememberScrollState())) {
         NbCard(Modifier.fillMaxWidth()) {
-            paragraphs.forEach { Text(it, style = NbTheme.typography.body, color = colors.textPrimary) }
+            paragraphs.forEach { NbText(it, style = NbTheme.typography.body, color = colors.textPrimary) }
         }
     }
 }
@@ -827,16 +820,16 @@ private fun ExplainerBody(
                 text.string(R.string.explainer_learning),
                 text.string(R.string.explainer_outside),
                 sideLine,
-            ).forEach { Text(it, style = NbTheme.typography.body, color = colors.textPrimary) }
-            Text(
+            ).forEach { NbText(it, style = NbTheme.typography.body, color = colors.textPrimary) }
+            NbText(
                 text.string(R.string.explainer_meaning_title),
                 style = NbTheme.dataType.itemTitle,
                 color = colors.textPrimary,
                 modifier = Modifier.semantics { heading() },
             )
-            Text(text.string(R.string.explainer_meaning), style = NbTheme.typography.body, color = colors.textPrimary)
-            Text(text.string(R.string.explainer_care), style = NbTheme.typography.body, color = colors.textPrimary)
-            Text(text.string(R.string.disclaimer_full), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+            NbText(text.string(R.string.explainer_meaning), style = NbTheme.typography.body, color = colors.textPrimary)
+            NbText(text.string(R.string.explainer_care), style = NbTheme.typography.body, color = colors.textPrimary)
+            NbText(text.string(R.string.disclaimer_full), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
         }
     }
 }

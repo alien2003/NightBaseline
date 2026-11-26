@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -119,7 +117,7 @@ fun LearningProgress(
                 }
             }
         }
-        Text(
+        NbText(
             text.string(R.string.learning_progress, text.int(n)),
             style = NbTheme.dataType.statusCalm,
             color = colors.textSecondary,
@@ -143,16 +141,16 @@ fun LearningCard(
     val colors = NbTheme.colors
     val type = NbTheme.dataType
     NbCard(modifier.fillMaxWidth()) {
-        Text(
+        NbText(
             text.nightTitle(night, source),
             style = type.headline,
             color = colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )
         LearningProgress(night.historyNights, skipped = if (lastNightShort) 1 else 0)
-        Text(text.nightBody(night, source), style = type.summary, color = colors.textSecondary)
+        NbText(text.nightBody(night, source), style = type.summary, color = colors.textSecondary)
         if (lastNightShort) {
-            Text(stringResource(R.string.state_learning_short_note), style = type.summary, color = colors.textSecondary)
+            NbText(stringResource(R.string.state_learning_short_note), style = type.summary, color = colors.textSecondary)
         }
         // Pulled back by the button's inner padding so its label lines up with the text above.
         NbTextButton(
@@ -187,8 +185,8 @@ fun StateCard(
     NbCard(modifier.fillMaxWidth()) {
         NightGlyphBadge(glyph, tone, container = NbDataDimens.stateIcon, glyphSize = NbDataDimens.stateIcon)
         Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-            Text(title, style = type.title, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
-            Text(body, style = type.summary, color = colors.textSecondary)
+            NbText(title, style = type.title, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
+            NbText(body, style = type.summary, color = colors.textSecondary)
         }
         if (primaryAction != null || secondaryAction != null) {
             FlowRow(
@@ -299,13 +297,13 @@ fun InlineBanner(
         Box(Modifier.padding(top = NbSpace.s1)) {
             val icon = kind.icon()
             if (icon != null) {
-                Icon(icon, contentDescription = null, tint = colors.data.primaryText, modifier = Modifier.size(NbDataDimens.stateIcon))
+                NbIcon(icon, contentDescription = null, tint = colors.data.primaryText, modifier = Modifier.size(NbDataDimens.stateIcon))
             } else {
                 NightGlyphIcon(NightGlyph.DottedRing, colors.statusWithin)
             }
         }
         Column(Modifier.weight(1f).padding(top = NbSpace.s1)) {
-            Text(text.banner(kind, source, quietDays), style = NbTheme.dataType.summary, color = colors.textPrimary)
+            NbText(text.banner(kind, source, quietDays), style = NbTheme.dataType.summary, color = colors.textPrimary)
             action?.let { label ->
                 // Pulled back by the button's inner padding so the action lines up with the text.
                 NbTextButton(label, onClick = onAction, color = colors.data.primaryText, modifier = Modifier.offset(x = -NbSpace.s4))

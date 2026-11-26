@@ -379,7 +379,7 @@ with a dotted band outline and the label "Learning, {n} of 7" (`screens.md` 7.6)
 ### 5.2 Metric detail
 
 Blocks (order and copy in `screens.md` 7.3): title (metric name), **header card** (last night's value, unit,
-status chip, usual range, one `detail_*` sentence; the morph target of the tile), **period selector** (7 / 30 / 90
+status label, usual range, one `detail_*` sentence; the morph target of the tile), **period selector** (7 / 30 / 90
 nights, segmented, each segment >= 48 dp), **chart** (nightly values as points over a solid surface, never a line
 across missing nights; range band as a filled corridor; out-of-range nights marked with a shape, not only color; a
 text summary below for TalkBack and everyone), **stats row**, **explanation** ("How your usual range is computed",

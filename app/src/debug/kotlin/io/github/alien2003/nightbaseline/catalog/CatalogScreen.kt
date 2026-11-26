@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -33,8 +32,10 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.ui.components.NbChipTab
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.material.EffectsDecision
 import io.github.alien2003.nightbaseline.ui.material.grayscale
 import io.github.alien2003.nightbaseline.ui.material.nbClickable
@@ -88,7 +89,7 @@ fun CatalogScreen(onClose: () -> Unit) {
         ) {
             Column(Modifier.padding(NbDimens.gutterCompact), verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
                 NbIconButton(NbIcons.Back, stringResource(R.string.a11y_back), onClose)
-                Text(stringResource(R.string.catalog_title), style = NbTheme.typography.largeTitle, color = NbTheme.colors.textPrimary)
+                NbText(stringResource(R.string.catalog_title), style = NbTheme.typography.largeTitle, color = NbTheme.colors.textPrimary)
                 Control(stringResource(R.string.catalog_page), CatalogPage.entries, page, { it.title }) { page = it }
                 Control(stringResource(R.string.catalog_theme), listOf(false, true), dark, { if (it) "Dark" else "Light" }) { dark = it }
                 val glassLabel = stringResource(R.string.catalog_glass)
@@ -126,26 +127,10 @@ private fun <T> Control(
     onSelect: (T) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-        Text(label, style = NbTheme.typography.labelSmall, color = NbTheme.colors.textTertiary)
+        NbText(label, style = NbTheme.typography.labelSmall, color = NbTheme.colors.textTertiary)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(NbSpace.s2), verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
             options.forEach { option ->
-                val isSelected = option == selected
-                val colors = NbTheme.colors
-                Box(
-                    Modifier
-                        .sizeIn(minHeight = NbDimens.targetMin, minWidth = NbDimens.targetMin)
-                        .background(if (isSelected) colors.primaryContainer else colors.surface3, NbShapes.pill)
-                        .nbClickable(onClick = { onSelect(option) }, shape = NbShapes.pill, role = Role.RadioButton)
-                        .semantics { this.selected = isSelected }
-                        .padding(horizontal = NbSpace.s4),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        name(option),
-                        style = NbTheme.typography.label.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold),
-                        color = if (isSelected) colors.onPrimaryContainer else colors.textSecondary,
-                    )
-                }
+                NbChipTab(name(option), selected = option == selected, onClick = { onSelect(option) })
             }
         }
     }

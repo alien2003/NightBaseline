@@ -9,9 +9,6 @@ import androidx.compose.ui.graphics.Color
  * tokens (`#RRGGBB @ NN%`) carry their alpha. There is no dynamic colour and no error colour ([decision], tokens.md 0
  * and 2.3). Neutrals are hue-free (R = G = B) as measured on the ColorOS 17 system apps; there is one blue accent.
  * `ColorTokensTest` keeps these values identical to the Markdown tables and `ContrastTest` checks the pairs.
- *
- * Tokens marked deprecated are retired by the ColorOS conformance plan (`docs/design/coloros-conformance.md` 4.1);
- * they are aliases of their neutral replacements until the last caller is migrated, then they are deleted.
  */
 @Immutable
 data class NbColors(
@@ -147,62 +144,6 @@ data class NbColors(
 
     /** `color.solid.tooltip` = [surfaceElevated]. */
     val solidTooltip: Color get() = surfaceElevated
-
-    /** `color.primaryContainer` (retired: no tonal containers) = [surface3]. */
-    @Deprecated("No tonal containers in ColorOS: use surface3 / stateSelected", ReplaceWith("surface3"))
-    val primaryContainer: Color get() = surface3
-
-    /** `color.onPrimaryContainer` (retired) = [textPrimary]. */
-    @Deprecated("No tonal containers in ColorOS: use textPrimary", ReplaceWith("textPrimary"))
-    val onPrimaryContainer: Color get() = textPrimary
-
-    /** `color.accent` (retired: single blue accent) = [primary]. */
-    @Deprecated("Single accent: use primary", ReplaceWith("primary"))
-    val accent: Color get() = primary
-
-    /** `color.status.within.container` (retired: no status containers) = [surface1]. */
-    @Deprecated("No status containers: draw the glyph on the card", ReplaceWith("surface1"))
-    val statusWithinContainer: Color get() = surface1
-
-    /** `color.status.within.onContainer` (retired) = [statusWithin]. */
-    @Deprecated("No status containers", ReplaceWith("statusWithin"))
-    val statusWithinOnContainer: Color get() = statusWithin
-
-    /** `color.status.moved.container` (retired) = [surface1]. */
-    @Deprecated("No status containers: draw the glyph on the card", ReplaceWith("surface1"))
-    val statusMovedContainer: Color get() = surface1
-
-    /** `color.status.moved.onContainer` (retired) = [statusMoved]. */
-    @Deprecated("No status containers", ReplaceWith("statusMoved"))
-    val statusMovedOnContainer: Color get() = statusMoved
-
-    /** `color.status.neutral.container` (retired) = [surface1]. */
-    @Deprecated("No status containers: draw the glyph on the card", ReplaceWith("surface1"))
-    val statusNeutralContainer: Color get() = surface1
-
-    /** `color.status.neutral.onContainer` (retired) = [statusNeutral]. */
-    @Deprecated("No status containers", ReplaceWith("statusNeutral"))
-    val statusNeutralOnContainer: Color get() = statusNeutral
-
-    /** `color.status.info.container` (retired) = [surface1]. */
-    @Deprecated("No status containers: draw the glyph on the card", ReplaceWith("surface1"))
-    val statusInfoContainer: Color get() = surface1
-
-    /** `color.status.info.onContainer` (retired) = [statusInfo]. */
-    @Deprecated("No status containers", ReplaceWith("statusInfo"))
-    val statusInfoOnContainer: Color get() = statusInfo
-
-    /** `color.band.edge` (retired: no band edge lines or median tick) = [bandFill], so the edges disappear. */
-    @Deprecated("The usual range is a solid segment without edges", ReplaceWith("bandFill"))
-    val bandEdge: Color get() = bandFill
-
-    /** `color.glass.rimMid` (retired: two-stop rim) = [glassRimTop]. */
-    @Deprecated("Rim is top highlight + bottom band only", ReplaceWith("glassRimTop"))
-    val glassRimMid: Color get() = glassRimTop
-
-    /** `color.glass.rimOuter` (retired: no outer hairline) = transparent. */
-    @Deprecated("No outer hairline on shell surfaces", ReplaceWith("Color.Transparent"))
-    val glassRimOuter: Color get() = Color.Transparent
 }
 
 /** `#RRGGBB @ NN%` from tokens.md. */
@@ -227,10 +168,10 @@ val LightNbColors: NbColors =
         chevron = Color(0xFFBDBDBD),
         controlTrack = Color(0xFFEBEBEB),
         controlSwitchOff = Color(0xFFD6D6D6),
-        controlConvexTop = Color(0xFFFFFFFF),
-        controlConvexBottom = Color(0xFFF2F2F4),
-        controlConvexRimTop = tint(0xFFFFFF, 80f),
-        controlConvexRimBottom = tint(0x000000, 8f),
+        controlConvexTop = Color(0xFFFAFAFB),
+        controlConvexBottom = Color(0xFFF3F4F5),
+        controlConvexRimTop = Color(0xFFFFFFFF),
+        controlConvexRimBottom = Color(0xFFFCFCFC),
         primary = Color(0xFF0068E0),
         primaryText = Color(0xFF0062D6),
         primaryFill = Color(0xFF0068E0),
@@ -242,7 +183,7 @@ val LightNbColors: NbColors =
         statusNeutral = Color(0xFF666666),
         bandFill = Color(0xFF8C8C8C),
         markerWithin = Color(0xFFFFFFFF),
-        markerWithinRim = Color(0xFFCCCCCC),
+        markerWithinRim = Color(0xFF8C8C8C),
         chartPoint = Color(0xFF4A4A4A),
         chartGrid = tint(0x000000, 6f),
         chartBandArea = tint(0x000000, 8f),
@@ -250,7 +191,7 @@ val LightNbColors: NbColors =
         glassTopBar = tint(0xF0F1F2, 82f),
         glassTopBarDim = tint(0xF0F1F2, 35f),
         glassSheet = tint(0xF5F5F8, 92f),
-        glassDialog = tint(0xFFFFFF, 94f),
+        glassDialog = tint(0xFFFFFF, 96f),
         glassRimTop = tint(0xFFFFFF, 80f),
         glassRimBottom = tint(0x000000, 8f),
         onGlassPrimary = Color(0xFF1A1A1A),
@@ -306,7 +247,7 @@ val DarkNbColors: NbColors =
         glassTopBar = tint(0x000000, 72f),
         glassTopBarDim = tint(0x000000, 35f),
         glassSheet = tint(0x171717, 92f),
-        glassDialog = tint(0x232323, 94f),
+        glassDialog = tint(0x232323, 96f),
         glassRimTop = tint(0xFFFFFF, 13f),
         glassRimBottom = tint(0xFFFFFF, 16f),
         onGlassPrimary = Color(0xFFE9E9E9),
@@ -332,7 +273,6 @@ fun NbColors.byTokenName(name: String): Color? = tokenAccessors[name]?.invoke(th
 /** Every colour token name of tokens.md section 2 mapped to its value. */
 val NbColorTokenNames: Set<String> get() = tokenAccessors.keys
 
-@Suppress("DEPRECATION") // The retired tokens stay in tokens.md (and checked) until they are deleted.
 private val tokenAccessors: Map<String, (NbColors) -> Color> =
     mapOf(
         "color.background" to { it.background },
@@ -395,18 +335,4 @@ private val tokenAccessors: Map<String, (NbColors) -> Color> =
         "color.focus.ring" to { it.focusRing },
         "color.state.pressed" to { it.statePressed },
         "color.state.selected" to { it.stateSelected },
-        // Retired (coloros-conformance.md 4.1): aliases of their replacements until the sweep deletes them.
-        "color.primaryContainer" to { it.primaryContainer },
-        "color.onPrimaryContainer" to { it.onPrimaryContainer },
-        "color.accent" to { it.accent },
-        "color.status.within.container" to { it.statusWithinContainer },
-        "color.status.within.onContainer" to { it.statusWithinOnContainer },
-        "color.status.moved.container" to { it.statusMovedContainer },
-        "color.status.moved.onContainer" to { it.statusMovedOnContainer },
-        "color.status.neutral.container" to { it.statusNeutralContainer },
-        "color.status.neutral.onContainer" to { it.statusNeutralOnContainer },
-        "color.status.info.container" to { it.statusInfoContainer },
-        "color.status.info.onContainer" to { it.statusInfoOnContainer },
-        "color.band.edge" to { it.bandEdge },
-        "color.glass.rimMid" to { it.glassRimMid },
     )

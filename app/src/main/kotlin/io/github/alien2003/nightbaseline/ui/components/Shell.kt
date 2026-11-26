@@ -34,7 +34,6 @@ import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -106,10 +105,8 @@ private val TitleEasing = CubicBezierEasing(0.33f, 0f, 0.67f, 1f)
  * toolbar and move up with the content, 1:1 with the scroll, until they have passed under the toolbar; the small
  * title fades into the toolbar over scroll 40 -> 72 dp. Text sizes never animate.
  *
- * @param scroll scroll offset of the page's main column. When null it is reconstructed from [collapse] and
- *   [scrolledUnder] as earlier callers computed them.
+ * @param scroll scroll offset of the page's main column. When null, [scrolledUnder] is used.
  * @param scrolledUnder how far content has moved under the bar's bottom edge (0 at rest).
- * @param collapse earlier callers' 0..1 collapse of the large variant (used only when [scroll] is null).
  * @param height the toolbar height of the layout mode; values below 52 dp give the short toolbar.
  */
 @Suppress("CyclomaticComplexMethod") // Derives the scroll-driven states of tokens C4 / C5 in one place.
@@ -120,7 +117,6 @@ fun ShellTopBar(
     subtitle: String? = null,
     scrolledUnder: Dp = 0.dp,
     large: Boolean = false,
-    collapse: Float = 0f,
     height: Dp = NbDimens.topBarCollapsed,
     onBack: (() -> Unit)? = null,
     scroll: Dp? = null,
@@ -128,7 +124,7 @@ fun ShellTopBar(
 ) {
     val motion = NbTheme.motion
     val density = LocalDensity.current
-    val total: Dp = scroll ?: ((NbDimens.topBarLarge - NbDimens.topBarCollapsed) * collapse + scrolledUnder)
+    val total: Dp = scroll ?: scrolledUnder
     var blockHeight by remember { mutableStateOf(0.dp) }
     // Any pane that scrolls on its own (second pane, supporting pane) also counts as content under the bar.
     val paneScroll = with(density) { (LocalPaneScrolls.current?.maxScroll ?: 0).toDp() }
@@ -217,8 +213,8 @@ private fun RowScope.ToolbarTitle(
             // On large-title pages the large title is the heading; the toolbar copy is decorative.
             .then(if (large) Modifier.clearAndSetSemantics {} else Modifier),
     ) {
-        Text(title, style = type.topBarTitle, color = colors.onGlassPrimary, modifier = Modifier.semantics { heading() })
-        subtitle?.let { Text(it, style = type.subtitleSmall, color = colors.textTertiary) }
+        NbText(title, style = type.topBarTitle, color = colors.onGlassPrimary, modifier = Modifier.semantics { heading() })
+        subtitle?.let { NbText(it, style = type.subtitleSmall, color = colors.textTertiary) }
     }
 }
 
@@ -243,8 +239,13 @@ private fun LargeTitleBlock(
                     .onSizeChanged { onHeight(with(density) { it.height.toDp() }) },
                 verticalArrangement = Arrangement.spacedBy(NbDimens.focusRingWidth),
             ) {
-                Text(title, style = NbTheme.typography.largeTitle, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
-                subtitle?.let { Text(it, style = ShellTokens.type.subtitleSmall, color = colors.textTertiary) }
+                NbText(
+                    title,
+                    style = NbTheme.typography.largeTitle,
+                    color = colors.textPrimary,
+                    modifier = Modifier.semantics { heading() },
+                )
+                subtitle?.let { NbText(it, style = ShellTokens.type.subtitleSmall, color = colors.textTertiary) }
             }
         },
         modifier = Modifier.fillMaxWidth().clipToBounds(),
@@ -397,7 +398,7 @@ fun GlassSheet(
                     .padding(horizontal = ShellDimens.toolbarMargin - TargetInset),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
+                NbText(
                     title,
                     style = ShellTokens.type.dialogTitle,
                     color = colors.onGlassPrimary,
@@ -482,9 +483,9 @@ fun GlassDialog(
             ),
     ) {
         val textPadding = Modifier.fillMaxWidth().padding(horizontal = ShellDimens.dialogPadding - ShellDimens.dialogButtonInset)
-        Text(title, style = type.dialogTitle, color = colors.textPrimary, modifier = textPadding.semantics { heading() })
+        NbText(title, style = type.dialogTitle, color = colors.textPrimary, modifier = textPadding.semantics { heading() })
         Spacer(Modifier.height(ShellDimens.dialogTitleGap))
-        Text(body, style = type.dialogMessage, color = colors.textSecondary, modifier = textPadding)
+        NbText(body, style = type.dialogMessage, color = colors.textSecondary, modifier = textPadding)
         Spacer(Modifier.height(ShellDimens.dialogButtonsGap))
         Row(
             Modifier.fillMaxWidth(),
@@ -544,7 +545,7 @@ private fun DialogButton(
                 .then(fill)
                 .shellPressGlow(press, NbShapes.pill),
         )
-        Text(
+        NbText(
             text,
             style = ShellTokens.type.button,
             color = if (primary) Color.White else colors.textPrimary,

@@ -15,13 +15,13 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.NbHairline
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
 import io.github.alien2003.nightbaseline.ui.theme.NbControlDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbControlType
@@ -53,18 +53,18 @@ class PermissionsRationaleActivity : ComponentActivity() {
                     verticalArrangement = Arrangement.spacedBy(NbSpace.s5),
                 ) {
                     val text = NbTheme.colors.textPrimary
-                    Text(
+                    NbText(
                         stringResource(R.string.onb_perm_title),
                         style = NbTheme.typography.headline,
                         color = text,
                         modifier = Modifier.semantics { heading() },
                     )
-                    Text(stringResource(R.string.onb_perm_body), style = NbTheme.typography.body, color = text)
+                    NbText(stringResource(R.string.onb_perm_body), style = NbTheme.typography.body, color = text)
                     // What is read, as one grouped list card with inset hairlines (ColorOS settings pattern).
                     GroupCard {
                         PERMISSION_LINES.forEachIndexed { i, line ->
                             if (i > 0) NbHairline()
-                            Text(
+                            NbText(
                                 stringResource(line),
                                 style = NbControlType.summary,
                                 color = NbTheme.colors.textPrimary,
@@ -79,8 +79,8 @@ class PermissionsRationaleActivity : ComponentActivity() {
                             )
                         }
                     }
-                    Text(stringResource(R.string.about_local), style = NbTheme.typography.body, color = text)
-                    Text(
+                    NbText(stringResource(R.string.about_local), style = NbTheme.typography.body, color = text)
+                    NbText(
                         stringResource(R.string.disclaimer_full),
                         style = NbTheme.typography.bodySmall,
                         color = NbTheme.colors.textSecondary,

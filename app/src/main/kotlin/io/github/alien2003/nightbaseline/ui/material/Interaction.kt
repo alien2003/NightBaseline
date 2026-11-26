@@ -56,15 +56,6 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-/** Retired `state.hover` alpha of `text.primary` (kept for the callers until the sweep); hover is 2/3 of `state.pressed`. */
-const val STATE_HOVER_ALPHA: Float = 0.08f
-
-/** Retired `state.pressed` alpha over content (kept for the callers until the sweep); see `color.state.pressed`. */
-const val STATE_PRESSED_ALPHA: Float = 0.12f
-
-/** `state.dragged` alpha. */
-const val STATE_DRAGGED_ALPHA: Float = 0.16f
-
 /** Hover highlight strength relative to the pressed highlight. */
 private const val HOVER_FRACTION: Float = 2f / 3f
 

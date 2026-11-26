@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -99,18 +97,14 @@ fun FloatingNavBar(
  * of the same material with the same icons and selection (filled icon + bold label, no indicator), items 48 x 56 dp
  * 8 dp apart, labels under the icons (icons only in `WideShort`, the label then being the content description). It
  * grows with the labels at large font. The caller places it 16 dp from the start edge, centred vertically.
- *
- * @param wide kept for source compatibility; the labelled wide rail was removed (labels sit under the icons in
- *   every size class).
+ * The labelled wide rail of earlier designs is gone: labels sit under the icons in every size class.
  */
-@Suppress("UnusedParameter") // `wide` is kept so callers compile until the sweep removes it.
 @Composable
 fun FloatingNavRail(
     selected: TopLevel,
     onSelect: (TopLevel) -> Unit,
     modifier: Modifier = Modifier,
     showLabels: Boolean = true,
-    wide: Boolean = false,
     forced: Pair<TopLevel, ForcedInteraction>? = null,
 ) {
     val press = rememberShellPressState()
@@ -183,7 +177,7 @@ private fun NavItem(
             animationSpec = if (motion.reduced) snap() else tween(NbDurations.MICRO, easing = NbEasing.Standard),
             label = "navIcon",
         ) { filled ->
-            Icon(
+            NbIcon(
                 if (filled) destination.selectedIcon else destination.icon,
                 contentDescription = null,
                 tint = color,
@@ -193,7 +187,7 @@ private fun NavItem(
         if (showLabel) {
             Spacer(Modifier.height(ShellDimens.navLabelGap))
             // No line limit: at large font the label wraps and the bar or rail grows (layouts.md 4.1, never cut).
-            Text(label, style = style, color = color, modifier = Modifier.padding(horizontal = NbSpaceHalf))
+            NbText(label, style = style, color = color, modifier = Modifier.padding(horizontal = NbSpaceHalf))
             Spacer(Modifier.height(ShellDimens.barItemTop))
         }
     }

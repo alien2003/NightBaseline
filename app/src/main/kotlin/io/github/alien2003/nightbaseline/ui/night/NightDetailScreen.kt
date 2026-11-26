@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -51,8 +50,10 @@ import io.github.alien2003.nightbaseline.ui.components.InlineBanner
 import io.github.alien2003.nightbaseline.ui.components.LearningProgress
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
-import io.github.alien2003.nightbaseline.ui.components.TonalButton
+import io.github.alien2003.nightbaseline.ui.components.SecondaryButton
+import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.history.CompactNightSummary
 import io.github.alien2003.nightbaseline.ui.home.BlockHeading
@@ -159,36 +160,27 @@ fun ColumnScope.NightDetailContent(
     NightBlocks(state, actions, columns, if (columns > 1) NbDimens.chartMax else NbDimens.textMax)
 }
 
-/** The chevrons in the top bar: 48 dp each; a missing neighbour keeps its slot so the other does not move. */
+/** The chevrons in the top bar: round buttons in 48 dp targets; a missing neighbour keeps its slot so the other does not move. */
 @Composable
 private fun PrevNextIcons(
     state: NightDetailState,
     actions: NightDetailActions,
 ) {
-    val tint = NbTheme.colors.onGlassPrimary
     val previous = state.previous
     val next = state.next
     // The chevron points forward; mirrored it points back (and both follow the layout direction).
     if (previous != null) {
-        NbIconButton(
+        ShellRoundButton(
             NbIcons.Chevron,
             stringResource(R.string.a11y_prev_night),
             onClick = { actions.onPrevious(previous) },
             modifier = Modifier.graphicsLayer { scaleX = -1f },
-            tint = tint,
-            onGlass = true,
         )
     } else {
         Spacer(Modifier.size(NbDimens.targetMin))
     }
     if (next != null) {
-        NbIconButton(
-            NbIcons.Chevron,
-            stringResource(R.string.a11y_next_night),
-            onClick = { actions.onNext(next) },
-            tint = tint,
-            onGlass = true,
-        )
+        ShellRoundButton(NbIcons.Chevron, stringResource(R.string.a11y_next_night), onClick = { actions.onNext(next) })
     } else {
         Spacer(Modifier.size(NbDimens.targetMin))
     }
@@ -209,8 +201,8 @@ private fun PrevNextButtons(
         horizontalArrangement = Arrangement.spacedBy(NbSpace.s3),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
     ) {
-        previous?.let { TonalButton(stringResource(R.string.a11y_prev_night), onClick = { actions.onPrevious(it) }) }
-        next?.let { TonalButton(stringResource(R.string.a11y_next_night), onClick = { actions.onNext(it) }) }
+        previous?.let { SecondaryButton(stringResource(R.string.a11y_prev_night), onClick = { actions.onPrevious(it) }) }
+        next?.let { SecondaryButton(stringResource(R.string.a11y_next_night), onClick = { actions.onNext(it) }) }
     }
 }
 
@@ -315,7 +307,7 @@ private fun MeasurementBlocks(
     val night = state.night
     BlockHeading(stringResource(R.string.night_measurements), Modifier.widthIn(max = maxWidth))
     if (night.windowNights > 0 && night.state != NightState.Learning) {
-        Text(
+        NbText(
             text.plural(R.plurals.night_range_window, night.windowNights, text.int(night.windowNights)),
             style = NbTheme.typography.bodySmall,
             color = NbTheme.colors.textSecondary,
@@ -499,7 +491,7 @@ private fun GlanceNight(
         padding = padding,
         widthDp = layout.widthDp,
         actions = homeActions,
-        leading = { NbIconButton(NbIcons.Back, stringResource(R.string.a11y_back), onClick = actions.onBack) },
+        leading = { ShellRoundButton(NbIcons.ArrowBack, stringResource(R.string.a11y_back), onClick = actions.onBack) },
         trailing = { PrevNextButtons(state, actions, Modifier.padding(top = NbSpace.s3)) },
         scroll = scroll,
     )

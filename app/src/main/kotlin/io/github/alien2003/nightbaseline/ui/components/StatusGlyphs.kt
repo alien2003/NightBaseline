@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -295,7 +293,7 @@ private fun VectorGlyph(
     modifier: Modifier,
     size: Dp,
 ) {
-    Icon(vector, contentDescription = null, tint = color, modifier = modifier.size(size))
+    NbIcon(vector, contentDescription = null, tint = color, modifier = modifier.size(size))
 }
 
 /**
@@ -322,7 +320,7 @@ fun StatusLabel(
         Box(Modifier.size(STATUS_GLYPH_BOX), contentAlignment = Alignment.Center) {
             MetricGlyphIcon(glyph, colors.statusGlyph(tone), size = glyph.statusBox())
         }
-        Text(
+        NbText(
             label,
             style = if (moved) type.statusMoved else type.statusCalm,
             color =

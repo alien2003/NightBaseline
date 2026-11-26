@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,7 +47,8 @@ import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.CalendarCell
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
-import io.github.alien2003.nightbaseline.ui.components.NbRoundIconButton
+import io.github.alien2003.nightbaseline.ui.components.NbText
+import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
@@ -209,11 +209,11 @@ private fun MonthTitle(
     val colors = NbTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (onPrevious != null) {
-            NbRoundIconButton(NbIcons.Back, stringResource(R.string.a11y_prev_month), onPrevious, tint = colors.textPrimary)
+            ShellRoundButton(NbIcons.Back, stringResource(R.string.a11y_prev_month), onPrevious)
         } else {
             Spacer(Modifier.size(NbDimens.targetMin))
         }
-        Text(
+        NbText(
             title,
             style = NbControlType.itemTitle,
             color = colors.textPrimary,
@@ -221,7 +221,7 @@ private fun MonthTitle(
             modifier = Modifier.weight(1f).semantics { heading() },
         )
         if (onNext != null) {
-            NbRoundIconButton(NbIcons.Chevron, stringResource(R.string.a11y_next_month), onNext, tint = colors.textPrimary)
+            ShellRoundButton(NbIcons.Chevron, stringResource(R.string.a11y_next_month), onNext)
         } else {
             Spacer(Modifier.size(NbDimens.targetMin))
         }
@@ -307,7 +307,7 @@ private fun FutureDay(
     Box(modifier.heightIn(min = NbDimens.targetMin).clearAndSetSemantics {}, contentAlignment = Alignment.TopCenter) {
         // Same 32 dp number box as a CalendarCell, so future days line up with past ones.
         Box(Modifier.padding(top = NbSpace.s1).heightIn(min = FUTURE_DISC), contentAlignment = Alignment.Center) {
-            Text(
+            NbText(
                 day,
                 style = NbTheme.typography.numericAxis.copy(fontSize = NbTheme.typography.body.fontSize),
                 color = NbTheme.colors.textTertiary,
@@ -322,7 +322,7 @@ private fun WeekdayLetter(
     modifier: Modifier,
 ) {
     Box(modifier, contentAlignment = Alignment.Center) {
-        Text(letter, style = NbTheme.typography.caption, color = NbTheme.controls.summary, textAlign = TextAlign.Center)
+        NbText(letter, style = NbTheme.typography.caption, color = NbTheme.controls.summary, textAlign = TextAlign.Center)
     }
 }
 

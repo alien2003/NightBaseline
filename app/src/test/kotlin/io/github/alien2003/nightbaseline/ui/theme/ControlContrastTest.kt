@@ -28,6 +28,8 @@ class ControlContrastTest {
         val failures =
             themes.flatMap { (theme, c, s) ->
                 val selected = c.selectedRow.compositeOver(s.card)
+                // The one segmented control is the period selector (Chart.kt); its track and thumb are data tokens.
+                val data = if (theme == "dark") DarkNbDataColors else LightNbDataColors
                 listOf(
                     Check("item title on card", c.title, s.card, TEXT),
                     Check("summary on card", c.summary, s.card, TEXT),
@@ -44,8 +46,9 @@ class ControlContrastTest {
                     Check("tab unselected on window", c.tabUnselected, s.window, TEXT),
                     Check("chip label", c.summary, c.chip.compositeOver(s.window), TEXT),
                     Check("chip selected label", c.chipSelectedLabel, c.chipSelected.compositeOver(s.window), TEXT),
-                    Check("segment label", c.summary, c.segmentTrack.compositeOver(s.card), TEXT),
-                    Check("segment selected label", c.title, c.segmentThumbBottom, TEXT),
+                    Check("segment label", c.summary, data.segmentTrack.compositeOver(s.card), TEXT),
+                    Check("segment label on window", c.summary, data.segmentTrack.compositeOver(s.window), TEXT),
+                    Check("segment selected label", c.title, data.segmentThumbBottom, TEXT),
                     Check("switch on track", c.accent, s.card, GRAPHIC),
                     Check("checked radio", c.accent, s.card, GRAPHIC),
                     Check("unchecked radio ring", c.radioRing, s.card, GRAPHIC),

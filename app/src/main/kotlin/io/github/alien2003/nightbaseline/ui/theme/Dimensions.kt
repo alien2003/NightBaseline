@@ -122,32 +122,8 @@ object NbDimens {
     /** `focus.ring` offset outside the element's shape. */
     val focusRingOffset: Dp = 2.dp
 
-    /** Floating bottom bar minimum height at font 1.0 (`layouts.md` 4.1). */
-    val barHeight: Dp = 64.dp
-
-    /** Bar offset above the navigation bar inset. */
-    val barOffset: Dp = 12.dp
-
-    /** Minimum width of one bar item. */
-    val barItemMinWidth: Dp = 80.dp
-
-    /** Bar inner padding. */
-    val barInnerPadding: Dp = 8.dp
-
-    /** Floating rail width (`layouts.md` 4.2). */
-    val railWidth: Dp = 72.dp
-
-    /** Labelled rail width in `Large` / `ExtraLarge`. */
-    val railWidthLabelled: Dp = 180.dp
-
-    /** Rail offset from the start edge. */
-    val railOffset: Dp = 12.dp
-
     /** Space the rail takes from the content (`railArea`). */
     val railArea: Dp = 96.dp
-
-    /** Retired: the large title scrolls with the content now (`coloros-conformance.md` C4); removed in the sweep. */
-    val topBarLarge: Dp = 112.dp
 
     /** Compact collapsed top bar height (measured 52.1 dp). */
     val topBarCollapsed: Dp = 52.dp

@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,10 +37,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.GlassDialog
+import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.OverlayHost
+import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
@@ -242,7 +244,7 @@ private fun listPaneWidth(): Dp {
     return (LIST_PANE_MIN * scale).coerceAtMost(LIST_PANE_MAX).dp
 }
 
-/** The section rows of the two-pane list. */
+/** The section rows of the two-pane list, in one grouped card. */
 @Composable
 private fun SectionList(
     state: SettingsState,
@@ -250,13 +252,17 @@ private fun SectionList(
 ) {
     val text = rememberUiText()
     val selected = state.page.section ?: state.section
-    SettingsSection.entries.forEach { section ->
-        SectionRow(
-            title = stringResource(section.title),
-            summary = text.sectionSummary(section, state),
-            selected = section == selected,
-            onClick = { actions.onSelectSection(section) },
-        )
+    // One grouped card (conformance S3), like the single-pane list.
+    GroupCard {
+        SettingsSection.entries.forEachIndexed { i, section ->
+            SectionRow(
+                title = stringResource(section.title),
+                summary = text.sectionSummary(section, state),
+                selected = section == selected,
+                onClick = { actions.onSelectSection(section) },
+                showDivider = i > 0,
+            )
+        }
     }
 }
 
@@ -311,7 +317,7 @@ private fun BackRow(
     onBack: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax), verticalAlignment = Alignment.CenterVertically) {
-        NbIconButton(NbIcons.Back, stringResource(R.string.a11y_back), onClick = onBack)
+        ShellRoundButton(NbIcons.ArrowBack, stringResource(R.string.a11y_back), onClick = onBack)
         PaneHeading(title, Modifier.weight(1f).padding(start = NbSpace.s2))
     }
 }
@@ -345,16 +351,20 @@ private fun TabletopSettings(
             verticalArrangement = Arrangement.spacedBy(NbSpace.s4, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
+            NbText(
                 stringResource(R.string.settings_title),
                 style = NbTheme.typography.largeTitle,
                 color = NbTheme.colors.textPrimary,
                 modifier = Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth().semantics { heading() },
             )
             NbCard(Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth()) {
-                Text(stringResource(R.string.settings_source), style = NbTheme.typography.labelSmall, color = NbTheme.colors.textSecondary)
-                Text(state.sourceLabel, style = NbTheme.typography.headline, color = NbTheme.colors.textPrimary)
-                Text(lastReadSummary(state), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
+                NbText(
+                    stringResource(R.string.settings_source),
+                    style = NbTheme.typography.labelSmall,
+                    color = NbTheme.colors.textSecondary,
+                )
+                NbText(state.sourceLabel, style = NbTheme.typography.headline, color = NbTheme.colors.textPrimary)
+                NbText(lastReadSummary(state), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
             }
         }
         Spacer(Modifier.height(NbDimens.hingeClearance * 2))
@@ -392,14 +402,18 @@ private fun GlanceSettings(
         verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (state.page != SettingsPage.Main) NbIconButton(NbIcons.Back, stringResource(R.string.a11y_back), onClick = actions.onBack)
-            Text(
+            if (state.page !=
+                SettingsPage.Main
+            ) {
+                ShellRoundButton(NbIcons.ArrowBack, stringResource(R.string.a11y_back), onClick = actions.onBack)
+            }
+            NbText(
                 stringResource(pageTitle(state.page)),
                 style = NbTheme.typography.title,
                 color = NbTheme.colors.textPrimary,
                 modifier = Modifier.weight(1f).padding(start = NbSpace.s2).semantics { heading() },
             )
-            NbIconButton(NbIcons.More, stringResource(R.string.action_more), onClick = onMore)
+            ShellRoundButton(NbIcons.MoreVertical, stringResource(R.string.action_more), onClick = onMore)
         }
         when (state.page) {
             SettingsPage.Main -> {

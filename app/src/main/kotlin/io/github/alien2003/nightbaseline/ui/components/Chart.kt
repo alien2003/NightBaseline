@@ -4,7 +4,10 @@
 package io.github.alien2003.nightbaseline.ui.components
 
 import android.view.HapticFeedbackConstants
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -22,12 +25,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -102,6 +107,9 @@ import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
+/** The leading edge of the period thumb runs this much stiffer than `spring.selection` (247): a stretch toward the target. */
+private const val THUMB_LEAD_STIFFNESS = 600f
+
 /**
  * The 7 / 30 / 90 nights segmented control (`screens.md` 4, conformance K3): a solid neutral pill track (40 dp visual
  * inside 48 dp targets) with a solid convex thumb (gradient, top rim, soft shadow) that slides with `spring.selection`;
@@ -136,8 +144,22 @@ fun PeriodSelector(
         )
         val current = bounds[selected]
         if (current != null) {
-            val x by animateFloatAsState(current.first, motion.selection(), label = "periodX")
-            val w by animateFloatAsState(current.second, motion.selection(), label = "periodW")
+            // The edge toward the new choice runs on a stiffer spring than the trailing one, so the thumb stretches
+            // toward its target while it moves and settles without overshoot (coloros17-glass.md 4.2).
+            val start = current.first
+            val end = current.first + current.second
+            var forward by remember { mutableStateOf(true) }
+            var lastStart by remember { mutableFloatStateOf(start) }
+            if (start != lastStart) {
+                forward = start > lastStart
+                lastStart = start
+            }
+            val lead: FiniteAnimationSpec<Float> = if (motion.reduced) snap() else spring(stiffness = THUMB_LEAD_STIFFNESS)
+            val trail = motion.selection<Float>()
+            val left by animateFloatAsState(start, if (forward) trail else lead, label = "periodStart")
+            val right by animateFloatAsState(end, if (forward) lead else trail, label = "periodEnd")
+            val x = left
+            val w = (right - left).coerceAtLeast(0f)
             Canvas(Modifier.matchParentSize()) {
                 val top = (trackInset + inset).toPx()
                 val h = size.height - 2 * top
@@ -190,7 +212,7 @@ fun PeriodSelector(
                         }.padding(horizontal = if (fill) NbSpace.s3 else NbSpace.s5, vertical = NbSpace.s4),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
+                    NbText(
                         label,
                         textAlign = TextAlign.Center,
                         style = NbTheme.dataType.segment,
@@ -437,7 +459,7 @@ fun TrendChart(
             }
         }
         if (showSummary) {
-            Text(
+            NbText(
                 summary,
                 style = NbTheme.typography.bodySmall,
                 color = colors.textSecondary,
@@ -477,9 +499,9 @@ fun ChartTooltip(
             .clearAndSetSemantics {},
         verticalArrangement = Arrangement.spacedBy(NbSpace.s1),
     ) {
-        Text(text.dateShort(point.date), style = NbTheme.typography.caption, color = colors.textSecondary)
+        NbText(text.dateShort(point.date), style = NbTheme.typography.caption, color = colors.textSecondary)
         val value = point.value?.let { text.value(metric, it).text }
-        Text(value ?: text.string(R.string.status_no_value), style = NbTheme.dataType.tooltipValue, color = colors.textPrimary)
+        NbText(value ?: text.string(R.string.status_no_value), style = NbTheme.dataType.tooltipValue, color = colors.textPrimary)
         if (point.value != null) {
             StatusLabel(
                 text.status(MetricUi(metric, point.state, point.value, point.range), source),
@@ -582,13 +604,13 @@ private fun ReadoutRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
+        NbText(
             label,
             style = NbTheme.dataType.summary,
             color = colors.textSecondary,
             modifier = Modifier.weight(LABEL_SHARE, fill = false).padding(end = NbSpace.s4),
         )
-        Text(
+        NbText(
             value,
             style = NbTheme.dataType.readoutValue,
             color = colors.textPrimary,

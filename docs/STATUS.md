@@ -61,6 +61,12 @@ Live project state. A new session starts here. Updated after every step.
   Uploaded as repo secrets NIGHTBASELINE_KEYSTORE_BASE64 / _KEYSTORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD.
   **The owner must back it up: without it no update can be installed over the released app.**
 
+## ColorOS 17 restyle (2026-11-26)
+- WP1-WP4 of `docs/design/coloros-conformance.md` merged into worktree-dev, then the integration sweep: no Material
+  dependency (NbText / NbIcon, own theme locals), retired tokens deleted, package token files read shared values from
+  NbColors, one round button (ShellRoundButton) and one segmented control (period selector), README screenshots
+  re-recorded. Not verified on the phone yet: blur strength, page dim, overscroll feel (ask the owner first).
+
 ## In progress (2026-11-25 evening)
 - Screens workflow: 4 agents in isolated worktrees (home+night, metric, history, setup) → merge into worktree-dev.
 - CI workflows agent (.github only).

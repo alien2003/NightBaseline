@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -27,6 +26,7 @@ import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.algo.MetricId
 import io.github.alien2003.nightbaseline.ui.components.MetricRangeTile
 import io.github.alien2003.nightbaseline.ui.components.NbCard
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.model.MetricUi
 import io.github.alien2003.nightbaseline.ui.theme.NbDataDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
@@ -92,7 +92,7 @@ internal fun LoadingCard(modifier: Modifier = Modifier) {
                 SkeletonLine(SKELETON_TITLE)
             }
         }
-        Text(body, style = NbTheme.dataType.summary, color = colors.textSecondary)
+        NbText(body, style = NbTheme.dataType.summary, color = colors.textSecondary)
     }
 }
 

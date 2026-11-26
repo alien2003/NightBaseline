@@ -41,9 +41,6 @@ object NbDurations {
     /** `motion.duration.glowOut`: touch light fades after release. */
     const val GLOW_OUT: Int = 480
 
-    /** Retired sheet exit tween; sheets now hide with [NbSprings.SheetHide] (kept for the callers until the sweep). */
-    const val SHEET_EXIT: Int = 200
-
     /** `motion.overscroll` return to rest after a pull or a fling throw. */
     const val OVERSCROLL_RETURN: Int = 700
 
@@ -116,9 +113,6 @@ object NbSprings {
      */
     val PressOut: NbSpring = NbSpring(0.8f, 380f)
 
-    /** Retired single press spring (kept for the callers until the sweep): use [PressIn] / [PressOut]. */
-    val Press: NbSpring = PressOut
-
     /** `motion.spring.highlightIn`: pressed highlight of buttons and tiles appearing. */
     val HighlightIn: NbSpring = NbSpring(1.0f, 1755f)
 
@@ -161,9 +155,6 @@ const val NB_PRESS_SCALE_SMALL: Float = 0.96f
 
 /** Press scale of the largest elements: bar, tiles, full-width buttons, sheet handle. */
 const val NB_PRESS_SCALE_LARGE: Float = 0.98f
-
-/** Retired fixed press scale (kept for the callers until the sweep): the scale is size-dependent now. */
-const val NB_PRESS_SCALE: Float = 0.97f
 
 /** `motion.page.dim`: black dim over the covered page at the end of a push (and the start of a pop) [estimate]. */
 const val NB_PAGE_DIM: Float = 0.3f

@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -73,7 +72,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-/** `spring.selection` of the conformance plan: critically damped, 247 (tab underline, segment thumb). */
+/** `spring.selection` of the conformance plan: critically damped, 247 (tab underline). */
 private const val SELECTION_STIFFNESS = 247f
 
 /** `spring.switch`: the knob overshoots a little (0.7 / 247). */
@@ -93,9 +92,6 @@ private const val DISABLED_KNOB_ALPHA = 0.6f
 private const val RADIO_FILL_MS = 300
 private const val RADIO_PULSE_MS = 200
 private const val RADIO_PULSE = 1.08f
-
-/** The leading edge of the segment thumb moves this much stiffer than the trailing edge (stretch toward the target). */
-private const val THUMB_LEAD_STIFFNESS = 600f
 
 /**
  * A ColorOS-style switch (`coloros-conformance.md` L1): a 44 x 24 dp pill, an 18 dp white knob 3 dp inside, no
@@ -307,7 +303,7 @@ fun NbTabRow(
                     .padding(horizontal = NbControlDimens.tabPadding),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
+                NbText(
                     label,
                     style = NbControlType.label.copy(fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal),
                     color = if (isSelected) controls.tabSelected else controls.tabUnselected,
@@ -377,99 +373,12 @@ fun NbChipTab(
                 .padding(horizontal = NbControlDimens.chipPadding, vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
+            NbText(
                 label,
                 style = NbControlType.label.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium),
                 color = if (selected) controls.chipSelectedLabel else controls.summary,
                 textAlign = TextAlign.Center,
             )
-        }
-    }
-}
-
-/**
- * A ColorOS segmented control with a solid sliding thumb (`coloros17-glass.md` 4.2, `coloros-conformance.md` K3): a
- * solid 40 dp track (content layer, never glass) inside a 48 dp target row, segments >= 52 dp; the selected segment
- * sits on a solid convex thumb (vertical gradient + 1 dp rim) inset 4 dp, concentric with the track. The thumb slides
- * on `spring.selection`; its leading edge runs on a stiffer spring than the trailing edge, so it stretches toward the
- * target while moving and settles without overshoot. Labels 14/500, selected `text.primary`, others secondary;
- * selection is also carried by `selected` semantics and the thumb shape. Snaps under reduced motion.
- */
-@Composable
-fun NbSegmentedControl(
-    labels: List<String>,
-    selected: Int,
-    onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val controls = NbTheme.controls
-    val reduced = NbTheme.motion.reduced
-    BoxWithConstraints(modifier.sizeIn(minHeight = NbDimens.targetMin), contentAlignment = Alignment.Center) {
-        val count = labels.size.coerceAtLeast(1)
-        val inset = NbControlDimens.segmentInset
-        val trackWidth = maxWidth
-        val segment = (trackWidth - inset * 2) / count
-        val previous = remember { Animatable(selected.toFloat()) }
-        val lead = if (selected.toFloat() >= previous.value) 1 else -1
-        val fast: FiniteAnimationSpec<Float> = if (reduced) snap() else spring(stiffness = THUMB_LEAD_STIFFNESS)
-        val slow: FiniteAnimationSpec<Float> = if (reduced) snap() else spring(stiffness = SELECTION_STIFFNESS)
-        val startEdge by animateFloatAsState(selected.toFloat(), if (lead > 0) slow else fast, label = "thumbStart")
-        val endEdge by animateFloatAsState(selected + 1f, if (lead > 0) fast else slow, label = "thumbEnd")
-        LaunchedEffect(selected) { previous.snapTo(selected.toFloat()) }
-        val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(NbControlDimens.segmentHeight)
-                .background(controls.segmentTrack, NbShapes.pill)
-                .drawBehind {
-                    val pad = inset.toPx()
-                    val seg = segment.toPx()
-                    var x0 = pad + min(startEdge, endEdge) * seg
-                    var x1 = pad + max(startEdge, endEdge) * seg
-                    if (rtl) {
-                        val a = size.width - x1
-                        x1 = size.width - x0
-                        x0 = a
-                    }
-                    val h = size.height - 2 * pad
-                    val r = CornerRadius(h / 2)
-                    drawRoundRect(
-                        Brush.verticalGradient(listOf(controls.segmentThumbTop, controls.segmentThumbBottom)),
-                        topLeft = Offset(x0, pad),
-                        size = Size(abs(x1 - x0), h),
-                        cornerRadius = r,
-                    )
-                    val rim = 1.dp.toPx()
-                    drawRoundRect(
-                        controls.segmentThumbRim,
-                        topLeft = Offset(x0 + rim / 2, pad + rim / 2),
-                        size = Size(abs(x1 - x0) - rim, h - rim),
-                        cornerRadius = r,
-                        style = Stroke(rim),
-                    )
-                },
-        )
-        Row(Modifier.fillMaxWidth().padding(horizontal = inset).selectableGroup(), horizontalArrangement = Arrangement.Center) {
-            labels.forEachIndexed { i, label ->
-                val isSelected = i == selected
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .sizeIn(minWidth = NbControlDimens.segmentMinWidth, minHeight = NbDimens.targetMin)
-                        .nbClickable(onClick = { onSelect(i) }, shape = NbShapes.pill, role = Role.Tab)
-                        .semantics { this.selected = isSelected }
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        label,
-                        style = NbControlType.label,
-                        color = if (isSelected) controls.title else controls.summary,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
         }
     }
 }
@@ -524,7 +433,7 @@ fun NbChoiceRow(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Box(Modifier.clearAndSetSemantics {}) { art(i) }
-                    Text(
+                    NbText(
                         label,
                         style = NbControlType.label.copy(fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal),
                         color = if (isSelected) controls.accentText else controls.title,

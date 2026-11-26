@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -50,6 +49,7 @@ import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.MetricRangeTile
 import io.github.alien2003.nightbaseline.ui.components.MonthCalendar
 import io.github.alien2003.nightbaseline.ui.components.NbCard
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.NightRow
@@ -58,13 +58,13 @@ import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.PeriodSelector
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
 import io.github.alien2003.nightbaseline.ui.components.RangeBand
+import io.github.alien2003.nightbaseline.ui.components.SecondaryButton
 import io.github.alien2003.nightbaseline.ui.components.SettingsGroup
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
 import io.github.alien2003.nightbaseline.ui.components.StatsRow
 import io.github.alien2003.nightbaseline.ui.components.StatusLabel
-import io.github.alien2003.nightbaseline.ui.components.TonalButton
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.TrendChart
 import io.github.alien2003.nightbaseline.ui.components.tone
@@ -99,7 +99,7 @@ fun CatalogPageContent(
         modifier.fillMaxWidth().padding(NbDimens.gutterCompact),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s6),
     ) {
-        Text(page.title, style = NbTheme.typography.largeTitle, color = NbTheme.colors.textPrimary)
+        NbText(page.title, style = NbTheme.typography.largeTitle, color = NbTheme.colors.textPrimary)
         when (page) {
             CatalogPage.Foundations -> FoundationsPage()
             CatalogPage.Shell -> ShellPage()
@@ -120,7 +120,7 @@ private fun Section(
     content: @Composable (entryWidth: Dp) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s4)) {
-        Text(title, style = NbTheme.typography.title, color = NbTheme.colors.textPrimary)
+        NbText(title, style = NbTheme.typography.title, color = NbTheme.colors.textPrimary)
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val gap = NbSpace.s5
             val columns = ((maxWidth + gap) / (minEntry + gap)).toInt().coerceAtLeast(1)
@@ -140,7 +140,7 @@ private fun Entry(
     content: @Composable () -> Unit,
 ) {
     Column(Modifier.width(width), verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-        Text(label, style = NbTheme.typography.caption, color = NbTheme.colors.textTertiary)
+        NbText(label, style = NbTheme.typography.caption, color = NbTheme.colors.textTertiary)
         content()
     }
 }
@@ -161,14 +161,13 @@ private fun FoundationsPage() {
             "text.tertiary" to colors.textTertiary,
             "outline" to colors.outline,
             "primary" to colors.primary,
-            "primaryContainer" to colors.primaryContainer,
-            "accent" to colors.accent,
+            "primaryText" to colors.primaryText,
+            "primaryFill" to colors.primaryFill,
             "status.within" to colors.statusWithin,
             "status.moved" to colors.statusMoved,
             "status.neutral" to colors.statusNeutral,
             "status.info" to colors.statusInfo,
             "band.fill" to colors.bandFill,
-            "band.edge" to colors.bandEdge,
             "chart.point" to colors.chartPoint,
             "focus.ring" to colors.focusRing,
         )
@@ -204,7 +203,7 @@ private fun FoundationsPage() {
             "numeric.axis 12/16 tnum" to t.numericAxis,
         ).forEach { (name, style) ->
             Entry(name, width) {
-                Text(if (name.startsWith("numeric")) "1234567890" else "Last night 1110", style = style, color = colors.textPrimary)
+                NbText(if (name.startsWith("numeric")) "1234567890" else "Last night 1110", style = style, color = colors.textPrimary)
             }
         }
     }
@@ -245,7 +244,7 @@ private fun ContrastSection() {
     Section("Contrast (${if (colors.isDark) "dark" else "light"}): ${rows.size} pairs, ${fails.size} fail", minEntry = 300.dp) { width ->
         (fails + rows.filter { it !in fails }).forEach { (pair, ratio) ->
             Entry(pair.name, width) {
-                Text(
+                NbText(
                     "%.2f : 1 (min %.1f) %s".format(ratio, pair.min, if (ratio >= pair.min) "pass" else "FAIL"),
                     style = NbTheme.typography.numericAxis,
                     color = colors.textSecondary,
@@ -279,7 +278,7 @@ private fun OverBackdrop(
         ) {
             Canvas(Modifier.fillMaxSize()) {
                 val stripe = 18.dp.toPx()
-                val palette = listOf(colors.statusMoved, colors.primary, colors.statusWithin, colors.accent, colors.textPrimary)
+                val palette = listOf(colors.statusMoved, colors.primary, colors.statusWithin, colors.primaryText, colors.textPrimary)
                 var x = -size.height
                 var i = 0
                 while (x < size.width) {
@@ -294,7 +293,7 @@ private fun OverBackdrop(
                         Offset(size.width * 0.3f, size.height * 0.4f),
                 )
             }
-            Text(
+            NbText(
                 "Backdrop text 52–61 bpm. ".repeat(12),
                 style = NbTheme.typography.body,
                 color = colors.textPrimary,
@@ -325,9 +324,6 @@ private fun ShellPage() {
         Entry("icons only (WideShort)", width) {
             OverBackdrop(300.dp) { FloatingNavRail(TopLevel.Home, onSelect = {}, showLabels = false) }
         }
-        Entry("labelled wide (Large)", width) {
-            OverBackdrop(300.dp) { FloatingNavRail(TopLevel.Settings, onSelect = {}, wide = true) }
-        }
         Entry("focus on Settings", width) {
             OverBackdrop(300.dp) { FloatingNavRail(TopLevel.Home, onSelect = {}, forced = TopLevel.Settings to ForcedInteraction.Focus) }
         }
@@ -338,7 +334,7 @@ private fun ShellPage() {
         }
         Entry("collapsed, content under it (glass)", width) {
             OverBackdrop(150.dp) {
-                ShellTopBar("Last night", large = true, collapse = 1f, scrolledUnder = 40.dp, onBack = {})
+                ShellTopBar("Last night", large = true, scroll = 200.dp, onBack = {})
             }
         }
     }
@@ -348,7 +344,7 @@ private fun ShellPage() {
                 Box(Modifier.fillMaxWidth().heightIn(min = 380.dp), contentAlignment = Alignment.BottomCenter) {
                     GlassSheet(title = rememberUiText().string(R.string.explainer_title), onClose = {}) {
                         NbCard(Modifier.fillMaxWidth()) {
-                            Text(
+                            NbText(
                                 rememberUiText().string(R.string.explainer_range),
                                 style = NbTheme.typography.body,
                                 color = NbTheme.colors.textPrimary,
@@ -605,7 +601,7 @@ private fun ListsPage() {
             width,
         ) { PrimaryButton(text.string(R.string.action_check_now), onClick = {}, forced = ForcedInteraction.Focus) }
         Entry("primary disabled", width) { PrimaryButton(text.string(R.string.action_check_now), onClick = {}, enabled = false) }
-        Entry("tonal", width) { TonalButton(text.string(R.string.action_see_history), onClick = {}) }
+        Entry("secondary", width) { SecondaryButton(text.string(R.string.action_see_history), onClick = {}) }
         Entry("text", width) { NbTextButton(text.string(R.string.action_learn_more), onClick = {}) }
         Entry("tones", width) {
             Row(horizontalArrangement = Arrangement.spacedBy(NbSpace.s3)) {

@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,7 +38,9 @@ import io.github.alien2003.nightbaseline.ui.components.DASH
 import io.github.alien2003.nightbaseline.ui.components.LearningProgress
 import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.NbCard
+import io.github.alien2003.nightbaseline.ui.components.NbIcon
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
 import io.github.alien2003.nightbaseline.ui.components.RangeBand
@@ -103,14 +103,14 @@ internal fun HeaderValue(
     val colors = NbTheme.colors
     val value = text.value(metric)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(NbSpace.s2), verticalArrangement = Arrangement.Bottom) {
-        Text(
+        NbText(
             value?.number ?: DASH,
             style = if (large) NbTheme.typography.numericDisplay else NbTheme.typography.numericValue,
             color = if (value == null) colors.textSecondary else colors.textPrimary,
             modifier = Modifier.alignByBaseline(),
         )
         value?.unit?.let {
-            Text(it, style = NbTheme.typography.unit, color = colors.textSecondary, modifier = Modifier.alignByBaseline())
+            NbText(it, style = NbTheme.typography.unit, color = colors.textSecondary, modifier = Modifier.alignByBaseline())
         }
     }
 }
@@ -136,34 +136,34 @@ internal fun HeaderCard(
             Modifier.clearAndSetSemantics { contentDescription = description },
             verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
         ) {
-            Text(text.nightLabelOf(state), style = NbTheme.dataType.statusCalm, color = colors.textSecondary)
+            NbText(text.nightLabelOf(state), style = NbTheme.dataType.statusCalm, color = colors.textSecondary)
             if (metric.state != MetricState.NotProvided && metric.state != MetricState.AccessOff) HeaderValue(metric)
             StatusLabel(text.status(metric, state.source), metric.state.glyph, metric.state.tone)
             if (metric.range != null && metric.value != null) {
                 RangeBand(metric.range, metric.value, metric.state)
             }
             text.usualRange(metric)?.takeIf { !state.learning }?.let {
-                Text(it, style = NbTheme.typography.body, color = colors.textPrimary)
+                NbText(it, style = NbTheme.typography.body, color = colors.textPrimary)
             }
         }
         when (metric.state) {
             MetricState.Learning -> {
                 LearningProgress(metric.learnedNights)
-                Text(text.headerSentence(metric, state.source), style = NbTheme.typography.body, color = colors.textSecondary)
+                NbText(text.headerSentence(metric, state.source), style = NbTheme.typography.body, color = colors.textSecondary)
                 NbTextButton(text.string(R.string.action_how_it_works), onClick = actions.onOpenExplainer)
             }
 
             MetricState.NotProvided -> {
                 if (state.series != null) {
-                    Text(
+                    NbText(
                         text.string(R.string.detail_not_provided_title, state.source, text.name(metric.metric)),
                         style = NbTheme.dataType.itemTitle,
                         color = colors.textPrimary,
                         modifier = Modifier.semantics { heading() },
                     )
-                    Text(text.headerSentence(metric, state.source), style = NbTheme.typography.body, color = colors.textSecondary)
+                    NbText(text.headerSentence(metric, state.source), style = NbTheme.typography.body, color = colors.textSecondary)
                     state.notProvidedSince?.let {
-                        Text(
+                        NbText(
                             text.string(R.string.detail_not_provided_since, text.dateShort(it)),
                             style = NbTheme.typography.body,
                             color = colors.textSecondary,
@@ -174,20 +174,25 @@ internal fun HeaderCard(
             }
 
             MetricState.AccessOff -> {
-                Text(text.headerSentence(metric, state.source), style = NbTheme.typography.body, color = colors.textSecondary)
+                NbText(text.headerSentence(metric, state.source), style = NbTheme.typography.body, color = colors.textSecondary)
                 PrimaryButton(text.string(R.string.action_open_hc_permissions), onClick = actions.onOpenPermissions)
             }
 
             else -> {
                 if (state.notice != MetricNotice.SourceGone) {
-                    Text(text.headerSentence(metric, state.source), style = NbTheme.typography.body, color = colors.textSecondary)
+                    NbText(text.headerSentence(metric, state.source), style = NbTheme.typography.body, color = colors.textSecondary)
                 }
             }
         }
         if (state.notice == MetricNotice.WaitingSync) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
-                Icon(NbIcons.CloudClock, contentDescription = null, tint = colors.statusInfo, modifier = Modifier.sizeIn(maxWidth = 20.dp))
-                Text(
+                NbIcon(
+                    NbIcons.CloudClock,
+                    contentDescription = null,
+                    tint = colors.statusInfo,
+                    modifier = Modifier.sizeIn(maxWidth = 20.dp),
+                )
+                NbText(
                     text.string(R.string.detail_waiting_sync, state.source),
                     style = NbTheme.typography.body,
                     color = colors.textPrimary,
@@ -306,14 +311,14 @@ internal fun ChartNotes(state: MetricDetailState) {
     val text = rememberUiText()
     val colors = NbTheme.colors
     if (state.periodShort) {
-        Text(
+        NbText(
             text.plural(R.plurals.detail_period_short, state.storedNights, text.int(state.storedNights)),
             style = NbTheme.typography.bodySmall,
             color = colors.textSecondary,
         )
     }
     state.bandShiftDate?.let {
-        Text(
+        NbText(
             text.string(R.string.detail_band_changed, text.dateShort(it)),
             style = NbTheme.typography.bodySmall,
             color = colors.textSecondary,
@@ -361,7 +366,7 @@ internal fun EmptyChart(
                 style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))),
             )
         }
-        Text(message, style = NbTheme.typography.body, color = colors.textSecondary)
+        NbText(message, style = NbTheme.typography.body, color = colors.textSecondary)
     }
 }
 
@@ -393,7 +398,7 @@ internal fun LoadingBlocks(
                 .height(chartHeight)
                 .solidCard(NbShapes.l),
         )
-        Text(loading, style = NbTheme.typography.body, color = colors.textSecondary)
+        NbText(loading, style = NbTheme.typography.body, color = colors.textSecondary)
     }
 }
 
@@ -416,7 +421,7 @@ internal fun SummaryText(state: MetricDetailState) {
     val text = rememberUiText()
     val series = state.shownSeries ?: return
     if (series.points.isEmpty()) return
-    Text(
+    NbText(
         text.chartSummary(series, state.source),
         style = NbTheme.typography.body,
         color = NbTheme.colors.textSecondary,
@@ -432,7 +437,7 @@ internal fun StatsBlock(state: MetricDetailState) {
     if (series.points.none { it.state.compared }) return
     Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s3), modifier = Modifier.widthIn(max = NbDimens.chartMax)) {
         // A ColorOS section header outside the readout card (conformance K2).
-        Text(
+        NbText(
             text.string(R.string.metric_stats_title),
             style = NbTheme.dataType.sectionHeader,
             color = NbTheme.colors.textTertiary,
@@ -489,10 +494,10 @@ private fun ExplainerCard(
 ) {
     val colors = NbTheme.colors
     NbCard(modifier.fillMaxWidth()) {
-        Text(title, style = NbTheme.dataType.itemTitle, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
-        paragraphs.forEach { Text(it, style = NbTheme.dataType.summary, color = colors.textSecondary) }
+        NbText(title, style = NbTheme.dataType.itemTitle, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
+        paragraphs.forEach { NbText(it, style = NbTheme.dataType.summary, color = colors.textSecondary) }
         emphasis?.let {
-            Text(it, style = NbTheme.dataType.summary.copy(fontWeight = FontWeight.Medium), color = colors.textPrimary)
+            NbText(it, style = NbTheme.dataType.summary.copy(fontWeight = FontWeight.Medium), color = colors.textPrimary)
         }
     }
 }
@@ -507,7 +512,7 @@ internal fun SourceLine(
     val line =
         state.lastSync?.let { text.string(R.string.detail_source_line, state.source, it) }
             ?: text.string(R.string.metric_source_line_no_sync, state.source)
-    Text(
+    NbText(
         line,
         style = NbTheme.typography.bodySmall,
         color = NbTheme.colors.textSecondary,
@@ -537,7 +542,7 @@ internal fun GlanceNights(state: MetricDetailState) {
     ) {
         points.forEach { p ->
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-                Text(text.weekdayLetter(p.date), style = NbTheme.typography.caption, color = colors.textSecondary)
+                NbText(text.weekdayLetter(p.date), style = NbTheme.typography.caption, color = colors.textSecondary)
                 Box(Modifier.width(20.dp).height(20.dp), contentAlignment = Alignment.Center) {
                     MetricGlyphIcon(p.state.glyph, colors.markerColor(p.state))
                 }

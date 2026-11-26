@@ -19,8 +19,9 @@ import androidx.compose.ui.unit.sp
  * Colours of the shell (bar, rail, top bar, round buttons, sheets, dialogs) that `NbColors` does not have yet
  * (`coloros-conformance.md` 4.1, WP2). Dark values are measured on the owner's phone (`reference-analysis.md` 2, 4.1);
  * light values come from the light captures of Clock and Settings (bar #FAFBFB with a white top rim and a white
- * bottom band, round button #F6F7F8 with a soft grey shadow on #F0F1F2). After all work packages merge, the sweep
- * folds these into `NbColors` under the same names.
+ * bottom band, round button #F6F7F8 with a soft grey shadow on #F0F1F2). Values shared with the foundations
+ * (convex button, sheet and dialog tints, sheet handle) come from `NbColors`, the accent pill from the control
+ * colours, so the dialog confirm pill and `PrimaryButton` are the same blue.
  */
 @Immutable
 data class ShellColors(
@@ -101,23 +102,23 @@ val DarkShellColors: ShellColors =
         rimTopWidth = 0.5.dp,
         rimBottom = Color.White.copy(alpha = 0.16f),
         rimBottomWidth = 2.dp,
-        convexTop = Color(0xFF1F1F1F),
-        convexBottom = Color(0xFF2A2A2A),
-        convexRimTop = Color(0xFF333333),
-        convexRimBottom = Color(0xFF3E3E3E),
+        convexTop = DarkNbColors.controlConvexTop,
+        convexBottom = DarkNbColors.controlConvexBottom,
+        convexRimTop = DarkNbColors.controlConvexRimTop,
+        convexRimBottom = DarkNbColors.controlConvexRimBottom,
         convexGlyph = Color(0xFFE9E9E9),
         glow = Color.White.copy(alpha = 0.135f),
-        sheetTint = Color(0xFF171717).copy(alpha = 0.92f),
-        sheetSolid = Color(0xFF171717),
+        sheetTint = DarkNbColors.glassSheet,
+        sheetSolid = DarkNbColors.solidSheet,
         sheetHighlight = Color.White.copy(alpha = 0.10f),
-        dialogTint = Color(0xFF232323).copy(alpha = 0.96f),
-        dialogSolid = Color(0xFF232323),
-        sheetHandle = Color.White.copy(alpha = 0.30f),
-        secondaryFill = Color.White.copy(alpha = 0.10f),
-        primaryFillTop = Color(0xFF2E70E4),
-        primaryFillBottom = Color(0xFF2563D6),
-        primaryGloss = Color.White.copy(alpha = 0.16f),
-        primaryGlow = Color(0xFF428AF7).copy(alpha = 0.35f),
+        dialogTint = DarkNbColors.glassDialog,
+        dialogSolid = DarkNbColors.solidDialog,
+        sheetHandle = DarkNbColors.sheetHandle,
+        secondaryFill = DarkNbControlColors.secondaryFill,
+        primaryFillTop = DarkNbControlColors.fillTop,
+        primaryFillBottom = DarkNbControlColors.fillBottom,
+        primaryGloss = DarkNbControlColors.gloss,
+        primaryGlow = DarkNbControlColors.accentGlow,
         topBarDim = 0.35f,
         shellShadow = NbShadow(4.dp, 10.dp, 0.35f),
         controlShadow = NbShadow(3.dp, 8.dp, 0.20f),
@@ -137,23 +138,23 @@ val LightShellColors: ShellColors =
         rimTopWidth = 1.dp,
         rimBottom = Color.White,
         rimBottomWidth = 2.dp,
-        convexTop = Color(0xFFFAFAFB),
-        convexBottom = Color(0xFFF3F4F5),
-        convexRimTop = Color.White,
-        convexRimBottom = Color(0xFFFCFCFC),
+        convexTop = LightNbColors.controlConvexTop,
+        convexBottom = LightNbColors.controlConvexBottom,
+        convexRimTop = LightNbColors.controlConvexRimTop,
+        convexRimBottom = LightNbColors.controlConvexRimBottom,
         convexGlyph = Color(0xFF181818),
         glow = Color.Black.copy(alpha = 0.06f),
-        sheetTint = Color(0xFFF5F5F8).copy(alpha = 0.92f),
-        sheetSolid = Color(0xFFF5F5F8),
+        sheetTint = LightNbColors.glassSheet,
+        sheetSolid = LightNbColors.solidSheet,
         sheetHighlight = Color.White,
-        dialogTint = Color.White.copy(alpha = 0.96f),
-        dialogSolid = Color.White,
-        sheetHandle = Color.Black.copy(alpha = 0.26f),
-        secondaryFill = Color.Black.copy(alpha = 0.06f),
-        primaryFillTop = Color(0xFF0A72E8),
-        primaryFillBottom = Color(0xFF0060D0),
-        primaryGloss = Color.White.copy(alpha = 0.18f),
-        primaryGlow = Color(0xFF0068E0).copy(alpha = 0.25f),
+        dialogTint = LightNbColors.glassDialog,
+        dialogSolid = LightNbColors.solidDialog,
+        sheetHandle = LightNbColors.sheetHandle,
+        secondaryFill = LightNbControlColors.secondaryFill,
+        primaryFillTop = LightNbControlColors.fillTop,
+        primaryFillBottom = LightNbControlColors.fillBottom,
+        primaryGloss = LightNbControlColors.gloss,
+        primaryGlow = LightNbControlColors.accentGlow,
         topBarDim = 0.55f,
         shellShadow = NbShadow(4.dp, 12.dp, 0.10f),
         controlShadow = NbShadow(2.dp, 10.dp, 0.10f),
@@ -358,30 +359,18 @@ object ShellTokens {
         @Composable @ReadOnlyComposable
         get() = if (NbTheme.colors.isDark) DarkShellColors else LightShellColors
 
-    /** Shell text styles, derived from the current type scale. */
+    /** Shell text styles: the `NbTypography` styles with the shell's alignment. */
     val type: ShellType
         @Composable @ReadOnlyComposable
         get() {
-            val base = NbTheme.typography.body
+            val t = NbTheme.typography
             return ShellType(
-                topBarTitle = base.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold),
-                dialogTitle = base.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
-                dialogMessage =
-                    base.copy(
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        fontWeight = FontWeight.Normal,
-                        textAlign = TextAlign.Center,
-                    ),
-                navLabel =
-                    base.copy(
-                        fontSize = 11.sp,
-                        lineHeight = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                    ),
-                subtitleSmall = base.copy(fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.Normal),
-                button = base.copy(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center),
+                topBarTitle = t.topBarTitle,
+                dialogTitle = t.dialogTitle.copy(textAlign = TextAlign.Center),
+                dialogMessage = t.bodySmall.copy(textAlign = TextAlign.Center),
+                navLabel = t.navLabel.copy(textAlign = TextAlign.Center),
+                subtitleSmall = t.subtitleSmall,
+                button = t.button.copy(textAlign = TextAlign.Center),
             )
         }
 }

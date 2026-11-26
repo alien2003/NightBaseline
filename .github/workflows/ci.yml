@@ -47,6 +47,9 @@ jobs:
       - name: Contrast of the design tokens
         run: python3 tools/design/contrast_check.py docs/design/tokens.md
 
+      - name: No Material ripple (ColorOS press feedback only)
+        run: bash tools/check-ripple.sh
+
   build:
     name: Lint, test and assemble
     runs-on: ubuntu-latest

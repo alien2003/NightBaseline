@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,11 +34,13 @@ import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NightGlyphBadge
 import io.github.alien2003.nightbaseline.ui.components.NightRow
 import io.github.alien2003.nightbaseline.ui.components.PeriodSelector
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
 import io.github.alien2003.nightbaseline.ui.components.RangeBand
+import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.StatsRow
 import io.github.alien2003.nightbaseline.ui.components.TrendChart
 import io.github.alien2003.nightbaseline.ui.components.statusGlyph
@@ -105,13 +106,13 @@ internal fun GlanceHome(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             leading?.invoke()
-            Text(
+            NbText(
                 if (night.state == NightState.HealthConnectNone) stringResource(R.string.home_title) else text.nightLabel(night),
                 style = NbTheme.dataType.statusCalm,
                 color = colors.textSecondary,
                 modifier = Modifier.weight(1f).padding(start = if (leading == null) NbSpace.s1 else 0.dp),
             )
-            NbIconButton(NbIcons.More, stringResource(R.string.action_more), onClick = actions.onMore)
+            ShellRoundButton(NbIcons.MoreVertical, stringResource(R.string.action_more), onClick = actions.onMore)
         }
         banner?.let {
             InlineBanner(
@@ -154,10 +155,10 @@ private fun GlanceNightText(
             },
     ) {
         if (night.state != NightState.Loading) NightGlyphBadge(night.state.glyph, night.state.tone, container = 36.dp, glyphSize = 28.dp)
-        Text(title.ifEmpty { body }, style = NbTheme.dataType.headline, color = colors.textPrimary, modifier = Modifier.weight(1f))
+        NbText(title.ifEmpty { body }, style = NbTheme.dataType.headline, color = colors.textPrimary, modifier = Modifier.weight(1f))
     }
     if (night.state.hasSummary || night.state == NightState.Loading) return
-    Text(body, style = NbTheme.typography.bodySmall, color = colors.textSecondary, modifier = Modifier.clearAndSetSemantics {})
+    NbText(body, style = NbTheme.typography.bodySmall, color = colors.textSecondary, modifier = Modifier.clearAndSetSemantics {})
     val label = text.nightAction(night, source) ?: return
     val learning = night.state == NightState.Learning || night.state == NightState.LearningStart
     PrimaryButton(label, onClick = { if (learning) actions.onHowItWorks() else actions.onStateAction(night.state) })
@@ -187,15 +188,15 @@ private fun GlanceMetricLine(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
             MetricGlyphIcon(metric.state.glyph, colors.statusGlyph(metric.state.tone))
             Column(Modifier.weight(1f)) {
-                Text(text.shortName(metric.metric), style = NbTheme.dataType.itemTitle, color = colors.textPrimary)
-                Text(
+                NbText(text.shortName(metric.metric), style = NbTheme.dataType.itemTitle, color = colors.textPrimary)
+                NbText(
                     status,
                     style = NbTheme.typography.caption,
                     color = if (metric.state.moved) colors.statusMoved else colors.textSecondary,
                 )
             }
             if (metric.state != MetricState.NotProvided) {
-                Text(value, style = NbTheme.typography.numericSmall, color = colors.textPrimary)
+                NbText(value, style = NbTheme.typography.numericSmall, color = colors.textPrimary)
             }
         }
         if (band && metric.state != MetricState.NotProvided && metric.state != MetricState.AccessOff) {

@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,11 +37,13 @@ import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.LearningProgress
 import io.github.alien2003.nightbaseline.ui.components.NbCard
+import io.github.alien2003.nightbaseline.ui.components.NbIcon
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
-import io.github.alien2003.nightbaseline.ui.components.NbRoundIconButton
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
+import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.tone
 import io.github.alien2003.nightbaseline.ui.components.triangle
 import io.github.alien2003.nightbaseline.ui.material.solidCard
@@ -235,7 +235,7 @@ internal fun StepBody(
 
 @Composable
 private fun BodyText(text: String) {
-    Text(text, style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
+    NbText(text, style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
 }
 
 @Composable
@@ -249,13 +249,13 @@ private fun WelcomeBody() {
     // The disclaimer is its own card (ColorOS has no tinted boxes nested inside cards).
     NbCard(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-            Text(
+            NbText(
                 stringResource(R.string.setup_about_disclaimer_title),
                 style = NbControlType.itemTitle,
                 color = NbTheme.colors.textPrimary,
                 modifier = Modifier.semantics { heading() },
             )
-            Text(stringResource(R.string.disclaimer_full), style = NbControlType.summary, color = NbTheme.colors.textSecondary)
+            NbText(stringResource(R.string.disclaimer_full), style = NbControlType.summary, color = NbTheme.colors.textSecondary)
         }
     }
 }
@@ -268,8 +268,8 @@ private fun Point(
     style: TextStyle = NbTheme.typography.body,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(NbSpace.s4), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = NbTheme.controls.accent, modifier = Modifier.size(NbDimens.iconInline))
-        Text(text, style = style, color = NbTheme.colors.textPrimary, modifier = Modifier.weight(1f))
+        NbIcon(icon, contentDescription = null, tint = NbTheme.controls.accent, modifier = Modifier.size(NbDimens.iconInline))
+        NbText(text, style = style, color = NbTheme.colors.textPrimary, modifier = Modifier.weight(1f))
     }
 }
 
@@ -352,7 +352,7 @@ private fun Note(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         NightGlyphIcon(glyph, NbTheme.colors.tone(tone), modifier = Modifier.clearAndSetSemantics {})
-        Text(text, style = NbTheme.typography.bodySmall, color = NbTheme.colors.textPrimary, modifier = Modifier.weight(1f))
+        NbText(text, style = NbTheme.typography.bodySmall, color = NbTheme.colors.textPrimary, modifier = Modifier.weight(1f))
     }
 }
 
@@ -395,7 +395,7 @@ private fun PermissionBody(state: OnboardingState) {
 
 @Composable
 private fun PermissionHeading(text: String) {
-    Text(text, style = NbControlType.sectionHeader, color = NbTheme.colors.textSecondary, modifier = Modifier.semantics { heading() })
+    NbText(text, style = NbControlType.sectionHeader, color = NbTheme.colors.textSecondary, modifier = Modifier.semantics { heading() })
 }
 
 @Composable
@@ -416,7 +416,7 @@ private fun ReadyBody(state: OnboardingState) {
         NbCard(Modifier.fillMaxWidth()) {
             // The progress already says "n of 7 nights"; the body explains what happens next instead of repeating it.
             LearningProgress(state.pastNights)
-            Text(
+            NbText(
                 stringResource(R.string.home_expect_body),
                 style = NbTheme.typography.body,
                 color = NbTheme.colors.textSecondary,
@@ -465,10 +465,10 @@ internal fun StepIndicator(
     val controls = NbTheme.controls
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
         if (onBack != null) {
-            NbRoundIconButton(NbIcons.Back, stringResource(R.string.setup_action_back), onBack, Modifier.offset(x = -NbSpace.s2))
+            ShellRoundButton(NbIcons.ArrowBack, stringResource(R.string.setup_action_back), onBack, Modifier.offset(x = -NbSpace.s2))
         }
         Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
-            Text(
+            NbText(
                 text.string(R.string.onb_step, text.int(step.number)),
                 style = NbControlType.label,
                 color = colors.textSecondary,

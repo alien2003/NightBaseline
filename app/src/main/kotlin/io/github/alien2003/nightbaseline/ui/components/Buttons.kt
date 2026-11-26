@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -117,7 +115,7 @@ fun PrimaryButton(
                 }.padding(horizontal = NbControlDimens.buttonPaddingHorizontal, vertical = NbSpace.s4),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = NbControlType.button, color = controls.onFill, textAlign = TextAlign.Center)
+        NbText(text, style = NbControlType.button, color = controls.onFill, textAlign = TextAlign.Center)
     }
 }
 
@@ -178,22 +176,8 @@ fun SecondaryButton(
                 .padding(horizontal = NbControlDimens.buttonPaddingHorizontal, vertical = NbSpace.s4),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = NbControlType.button, color = controls.title, textAlign = TextAlign.Center)
+        NbText(text, style = NbControlType.button, color = controls.title, textAlign = TextAlign.Center)
     }
-}
-
-/**
- * Former tonal button; ColorOS has no tonal containers, so it is the neutral [SecondaryButton] (kept under this name
- * until the screens owned by other work packages switch).
- */
-@Composable
-fun TonalButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    forced: ForcedInteraction? = null,
-) {
-    SecondaryButton(text, onClick, modifier, forced = forced)
 }
 
 /**
@@ -216,7 +200,7 @@ fun NbTextButton(
                 .padding(horizontal = NbSpace.s4, vertical = NbSpace.s3),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = NbControlType.button, color = color, textAlign = TextAlign.Center)
+        NbText(text, style = NbControlType.button, color = color, textAlign = TextAlign.Center)
     }
 }
 
@@ -239,35 +223,6 @@ fun NbIconButton(
                 .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(NbDimens.icon))
+        NbIcon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(NbDimens.icon))
     }
 }
-
-/**
- * A 40 dp neutral round button inside a 48 dp target (calendar month arrows, onboarding back): a solid neutral disc
- * with a 20 dp glyph, in the spirit of the shell round buttons but on content (no glass, no shadow).
- */
-@Composable
-fun NbRoundIconButton(
-    icon: ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    tint: Color = NbTheme.colors.textPrimary,
-) {
-    val controls = NbTheme.controls
-    Box(
-        modifier =
-            modifier
-                .size(NbDimens.targetMin)
-                .nbClickable(onClick = onClick, shape = NbShapes.circle)
-                .semantics { this.contentDescription = contentDescription },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(Modifier.size(ROUND_BUTTON).background(controls.secondaryFill, NbShapes.circle), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(NbDimens.iconInline))
-        }
-    }
-}
-
-private val ROUND_BUTTON = 40.dp

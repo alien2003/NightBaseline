@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +34,9 @@ import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.LearningProgress
 import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.NbCard
+import io.github.alien2003.nightbaseline.ui.components.NbIcon
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.RangeBand
 import io.github.alien2003.nightbaseline.ui.material.nbClickable
 import io.github.alien2003.nightbaseline.ui.material.solidCard
@@ -64,7 +64,7 @@ internal fun LearningSummary(
 ) {
     val text = rememberUiText()
     NbCard(modifier.fillMaxWidth()) {
-        Text(
+        NbText(
             text.nightTitle(state.night, state.source),
             style = NbTheme.dataType.headline,
             color = NbTheme.colors.textPrimary,
@@ -72,7 +72,7 @@ internal fun LearningSummary(
         )
         LearningProgress(state.collected, skipped = if (state.lastNightShort) 1 else 0)
         if (body) {
-            Text(text.nightBody(state.night, state.source), style = NbTheme.dataType.summary, color = NbTheme.colors.textSecondary)
+            NbText(text.nightBody(state.night, state.source), style = NbTheme.dataType.summary, color = NbTheme.colors.textSecondary)
         }
     }
 }
@@ -96,7 +96,7 @@ internal fun AlreadyVisible(
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
         // A ColorOS section header outside the card, the intro as grey text under it (conformance K2).
-        Text(
+        NbText(
             stringResource(R.string.home_already_visible),
             style = NbTheme.dataType.sectionHeader,
             color = colors.textTertiary,
@@ -109,7 +109,7 @@ internal fun AlreadyVisible(
                     ).semantics { heading() },
         )
         val intro = if (state.nothingYet) R.string.setup_learning_visible_empty else R.string.setup_learning_visible_body
-        Text(
+        NbText(
             stringResource(intro),
             style = NbTheme.dataType.summary,
             color = colors.textSecondary,
@@ -165,11 +165,11 @@ private fun VisibleRow(
             horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-                Text(text.name(metric.metric), style = NbTheme.dataType.itemTitle, color = colors.textPrimary)
+                NbText(text.name(metric.metric), style = NbTheme.dataType.itemTitle, color = colors.textPrimary)
                 RangeBand(null, metric.value, metric.state, Modifier.widthIn(max = 160.dp))
             }
-            Text(text.value(metric)?.text ?: "–", style = NbTheme.typography.numericSmall, color = colors.textPrimary)
-            Icon(NbIcons.Chevron, contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(NbDimens.iconInline))
+            NbText(text.value(metric)?.text ?: "–", style = NbTheme.typography.numericSmall, color = colors.textPrimary)
+            NbIcon(NbIcons.Chevron, contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(NbDimens.iconInline))
         }
     }
 }
@@ -191,7 +191,7 @@ private val ExpectSteps =
 internal fun WhatToExpect(modifier: Modifier = Modifier) {
     val colors = NbTheme.colors
     NbCard(modifier.fillMaxWidth()) {
-        Text(
+        NbText(
             stringResource(R.string.home_expect_title),
             style = NbTheme.dataType.title,
             color = colors.textPrimary,
@@ -215,11 +215,15 @@ internal fun WhatToExpect(modifier: Modifier = Modifier) {
                         verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
                     ) {
                         if (now) NowLabel()
-                        Text(
+                        NbText(
                             line,
-                            style = NbTheme.dataType.summary,
+                            style =
+                                if (now) {
+                                    NbTheme.dataType.summary.copy(fontWeight = FontWeight.Medium)
+                                } else {
+                                    NbTheme.dataType.summary
+                                },
                             color = if (now) colors.textPrimary else colors.textSecondary,
-                            fontWeight = if (now) FontWeight.Medium else null,
                         )
                     }
                 }
@@ -255,7 +259,7 @@ private fun TimelineMarker(
 /** The "Now" marker of the current timeline step: plain accent text, no chip (conformance K8). */
 @Composable
 private fun NowLabel() {
-    Text(
+    NbText(
         stringResource(R.string.setup_expect_now),
         style = NbTheme.dataType.marker,
         color = NbTheme.colors.data.primaryText,
@@ -268,7 +272,7 @@ internal fun GlanceMetricLines(state: LearningState) {
     val text = rememberUiText()
     val colors = NbTheme.colors
     if (state.nothingYet) {
-        Text(stringResource(R.string.setup_learning_visible_empty), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+        NbText(stringResource(R.string.setup_learning_visible_empty), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
         return
     }
     state.night.metrics.forEach { metric ->
@@ -283,10 +287,10 @@ internal fun GlanceMetricLines(state: LearningState) {
         ) {
             MetricGlyphIcon(metric.state.glyph, colors.statusNeutral, Modifier.size(NbDimens.iconChip))
             Column(Modifier.weight(1f)) {
-                Text(text.shortName(metric.metric), style = NbTheme.dataType.itemTitle, color = colors.textPrimary)
-                Text(text.status(metric, state.source), style = NbTheme.typography.caption, color = colors.textSecondary)
+                NbText(text.shortName(metric.metric), style = NbTheme.dataType.itemTitle, color = colors.textPrimary)
+                NbText(text.status(metric, state.source), style = NbTheme.typography.caption, color = colors.textSecondary)
             }
-            Text(value, style = NbTheme.typography.numericSmall, color = colors.textPrimary)
+            NbText(value, style = NbTheme.typography.numericSmall, color = colors.textPrimary)
         }
     }
 }

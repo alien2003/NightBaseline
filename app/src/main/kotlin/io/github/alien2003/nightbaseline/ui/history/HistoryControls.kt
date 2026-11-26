@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,8 +36,10 @@ import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbChipTab
 import io.github.alien2003.nightbaseline.ui.components.NbHairline
+import io.github.alien2003.nightbaseline.ui.components.NbIcon
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NbTabRow
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.SectionHeader
@@ -140,7 +140,7 @@ fun HistoryAccessBanner(
     ) {
         NightGlyphIcon(glyph, NbTheme.controls.accentText)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
-            Text(stringResource(message), style = NbTheme.typography.bodySmall, color = colors.textPrimary)
+            NbText(stringResource(message), style = NbTheme.typography.bodySmall, color = colors.textPrimary)
             NbTextButton(stringResource(action), onClick = onAction, modifier = Modifier.offset(x = -NbSpace.s4))
         }
     }
@@ -184,7 +184,7 @@ fun HistoryLegend(
             NightState.NotEvaluated to text.string(R.string.history_status_few),
         )
     NbCard(modifier.fillMaxWidth()) {
-        Text(
+        NbText(
             stringResource(R.string.history_legend_title),
             style = NbControlType.itemTitle,
             color = colors.textPrimary,
@@ -197,7 +197,7 @@ fun HistoryLegend(
             entries.forEach { (state, label) ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
                     NightGlyphIcon(state.glyph, colors.tone(state.tone), size = LEGEND_GLYPH)
-                    Text(label, style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+                    NbText(label, style = NbTheme.typography.bodySmall, color = colors.textSecondary)
                 }
             }
         }
@@ -266,8 +266,8 @@ fun GlanceNightRow(
     ) {
         NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), size = NbDimens.iconInline)
         Column(Modifier.weight(1f)) {
-            Text(text.dateShort(night.wakeDate), style = NbControlType.itemTitle, color = colors.textPrimary)
-            Text(status, style = NbTheme.typography.caption, color = colors.textSecondary)
+            NbText(text.dateShort(night.wakeDate), style = NbControlType.itemTitle, color = colors.textPrimary)
+            NbText(status, style = NbTheme.typography.caption, color = colors.textSecondary)
         }
     }
 }
@@ -286,9 +286,9 @@ fun HistoryEmptyCard(
         // The dotted ring (nights still to come) only on H-EMPTY; a filter with no match is not a learning state.
         title?.let {
             NightGlyphIcon(NightGlyph.DottedRing, colors.tone(StatusTone.Neutral), size = EMPTY_GLYPH)
-            Text(it, style = NbTheme.typography.headline, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
+            NbText(it, style = NbTheme.typography.headline, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
         }
-        Text(body, style = NbTheme.typography.body, color = colors.textSecondary)
+        NbText(body, style = NbTheme.typography.body, color = colors.textSecondary)
         if (action != null) {
             NbTextButton(action, onClick = onAction)
         }

@@ -25,7 +25,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,7 +44,9 @@ import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.GroupPosition
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NightRow
+import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
@@ -57,6 +58,7 @@ import io.github.alien2003.nightbaseline.ui.shell.AppScaffold
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.shellToolbarHeight
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -110,7 +112,12 @@ fun HistoryScreen(
                     Modifier
                         .padding(start = padding.calculateLeftPadding(LayoutDirection.Ltr))
                         .then(if (arrangement.twoPanes) Modifier.width(arrangement.listPaneOuter) else Modifier)
-                        .onSizeChanged { barHeight = with(density) { it.height.toDp() } },
+                        .onSizeChanged { size ->
+                            // Measured at rest only: the large title scrolls with the content (conformance C4), so
+                            // the content inset must not shrink while it collapses.
+                            val atRest = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+                            if (atRest || barHeight == 0.dp) barHeight = with(density) { size.height.toDp() }
+                        },
                     actions.onView,
                 )
             }
@@ -215,22 +222,16 @@ private fun HistoryTopBar(
 ) {
     val density = LocalDensity.current
     val large = layout.mode == LayoutMode.Compact
-    val range = NbDimens.topBarLarge - NbDimens.topBarCollapsed
+    val short = layout.mode == LayoutMode.CompactShort || layout.mode == LayoutMode.WideShort
+    // Past the first item the exact offset is unknown; anything beyond the large title block reads as fully scrolled.
     val scrolled =
-        if (listState.firstVisibleItemIndex > 0) range * 2 else with(density) { listState.firstVisibleItemScrollOffset.toDp() }
-    val height =
-        when (layout.mode) {
-            LayoutMode.Compact -> NbDimens.topBarLarge
-            LayoutMode.CompactShort, LayoutMode.WideShort -> NbDimens.topBarShort
-            else -> NbDimens.topBarMedium
-        }
+        if (listState.firstVisibleItemIndex > 0) SCROLLED_PAST else with(density) { listState.firstVisibleItemScrollOffset.toDp() }
     Box(modifier) {
         ShellTopBar(
             title = stringResource(R.string.history_title),
             large = large,
-            collapse = if (large) (scrolled / range).coerceIn(0f, 1f) else 1f,
-            height = height,
-            scrolledUnder = if (large) (scrolled - range).coerceAtLeast(0.dp) else scrolled,
+            height = shellToolbarHeight(short, large),
+            scroll = scrolled,
             actions = {
                 if (arrangement.toggleInBar && !state.empty && !state.loading) {
                     HistoryViewToggle(state.view, onView, Modifier.padding(end = NbSpace.s3))
@@ -441,7 +442,7 @@ private fun TabletopHistory(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
         ) {
-            Text(
+            NbText(
                 stringResource(R.string.history_title),
                 style = NbTheme.typography.title,
                 color = colors.textPrimary,
@@ -475,13 +476,13 @@ private fun GlanceHistory(
     ) {
         item(key = "title") {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
+                NbText(
                     stringResource(R.string.history_title),
                     style = NbTheme.typography.title,
                     color = colors.textPrimary,
                     modifier = Modifier.weight(1f).semantics { heading() },
                 )
-                NbIconButton(NbIcons.More, stringResource(R.string.action_more), onClick = actions.onMore)
+                ShellRoundButton(NbIcons.MoreVertical, stringResource(R.string.action_more), onClick = actions.onMore)
             }
         }
         state.access?.let { access -> item(key = "banner") { HistoryAccessBanner(access, onAction = { actions.onFixAccess(access) }) } }
@@ -509,3 +510,6 @@ private val PANE_SPACER = 24.dp
 
 /** Gap above an item of the History list (rows of one month have none). */
 private val GAP = 12.dp
+
+/** A scroll offset beyond the large title block and the small-title fade (the first item has scrolled away). */
+private val SCROLLED_PAST = 400.dp

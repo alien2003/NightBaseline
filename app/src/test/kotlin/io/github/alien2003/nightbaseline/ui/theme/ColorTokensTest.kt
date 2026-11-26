@@ -73,17 +73,6 @@ class ColorTokensTest {
         assertEquals(Color.White, LightNbColors.surface1)
     }
 
-    @Suppress("DEPRECATION")
-    @Test
-    fun `retired tokens resolve to their neutral replacements`() {
-        themes.forEach { (theme, c) ->
-            assertEquals(c.primary, c.accent, "accent ($theme)")
-            assertEquals(c.surface3, c.primaryContainer, "primaryContainer ($theme)")
-            assertEquals(c.surface1, c.statusMovedContainer, "status container ($theme)")
-            assertEquals(Color.Transparent, c.glassRimOuter, "rimOuter ($theme)")
-        }
-    }
-
     @Test
     fun `shell glass is translucent and the solid fallbacks are opaque`() {
         themes.forEach { (theme, c) ->

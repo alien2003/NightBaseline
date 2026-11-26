@@ -37,6 +37,7 @@ import io.github.alien2003.nightbaseline.nav.rememberSystemActions
 import io.github.alien2003.nightbaseline.nav.rememberWindowLayoutInputs
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.layout.resolveLayout
 import io.github.alien2003.nightbaseline.ui.material.GlassPreference
 import io.github.alien2003.nightbaseline.ui.material.rememberPlatformEffectsInputs
@@ -117,12 +118,10 @@ class MainActivity : ComponentActivity() {
                 debugAction =
                     catalog?.let {
                         {
-                            NbIconButton(
-                                NbIcons.More,
+                            ShellRoundButton(
+                                NbIcons.MoreVertical,
                                 contentDescription = stringResource(R.string.settings_catalog),
                                 onClick = { showCatalog = true },
-                                tint = NbTheme.colors.onGlassPrimary,
-                                onGlass = true,
                             )
                         }
                     },

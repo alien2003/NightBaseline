@@ -24,7 +24,7 @@ import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 
 /**
  * Text on Compose foundation only (no Material): [style] defaults to `type.body` and [color] to `text.primary`. The
- * replacement for `material3.Text`; the sweep after the ColorOS conformance packages swaps every call site.
+ * app has no Material dependency: every text goes through this.
  */
 @Composable
 fun NbText(

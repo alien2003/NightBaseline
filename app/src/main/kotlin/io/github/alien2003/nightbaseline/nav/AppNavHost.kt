@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,8 +47,9 @@ import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.algo.MetricId
 import io.github.alien2003.nightbaseline.data.hc.HcPermissions
 import io.github.alien2003.nightbaseline.ui.components.GlassSheet
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.OverlayHost
-import io.github.alien2003.nightbaseline.ui.components.TonalButton
+import io.github.alien2003.nightbaseline.ui.components.SecondaryButton
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.history.HistoryAccess
 import io.github.alien2003.nightbaseline.ui.history.HistoryActions
@@ -672,7 +672,7 @@ private fun HistoryDestination(
                     )
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
                     // The pane's own title row (layouts.md 4.3): the night label, as the Night detail top bar shows it.
-                    Text(
+                    NbText(
                         rememberUiText().nightLabel(night),
                         style = NbTheme.typography.title,
                         color = NbTheme.colors.textPrimary,
@@ -798,7 +798,7 @@ private fun MoreSheet(
     OverlayHost(onDismiss = onClose, alignment = Alignment.BottomCenter) {
         GlassSheet(stringResource(R.string.action_more), onClose = onClose) {
             listOf(TopLevel.Home, TopLevel.History, TopLevel.Settings).forEach { tab ->
-                TonalButton(stringResource(tab.label), onClick = { onOpen(tab) }, modifier = Modifier.fillMaxWidth())
+                SecondaryButton(stringResource(tab.label), onClick = { onOpen(tab) }, modifier = Modifier.fillMaxWidth())
             }
         }
     }

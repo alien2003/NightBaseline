@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,6 +15,7 @@ import androidx.compose.ui.semantics.semantics
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.NbCard
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.SettingsGroup
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
@@ -39,7 +39,7 @@ internal fun SourcePickerContent(
         Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax),
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
-        Text(stringResource(R.string.onb_source_body), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
+        NbText(stringResource(R.string.onb_source_body), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
         GroupCard(Modifier.selectableGroup()) {
             state.sources.forEachIndexed { i, source ->
                 SourceOptionRow(
@@ -65,14 +65,14 @@ internal fun AboutContent(
     ) {
         NbCard(Modifier.fillMaxWidth()) {
             PaneHeading(stringResource(R.string.app_name))
-            Text(
+            NbText(
                 stringResource(R.string.about_version, state.version),
                 style = NbTheme.typography.bodySmall,
                 color = NbTheme.colors.textSecondary,
             )
             TextBlock(stringResource(R.string.setup_about_disclaimer_title), stringResource(R.string.disclaimer_full))
-            Text(stringResource(R.string.about_local), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
-            Text(stringResource(R.string.about_any_source), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
+            NbText(stringResource(R.string.about_local), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
+            NbText(stringResource(R.string.about_any_source), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
         }
         GroupCard {
             SettingsRow(stringResource(R.string.about_licenses), onClick = { actions.onOpenPage(SettingsPage.Licenses) })
@@ -93,11 +93,11 @@ internal fun LicensesContent(state: SettingsState) {
         Modifier.fillMaxWidth().widthIn(max = NbDimens.textMax),
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
-        Text(stringResource(R.string.setup_licenses_intro), style = NbTheme.typography.body, color = colors.textSecondary)
+        NbText(stringResource(R.string.setup_licenses_intro), style = NbTheme.typography.body, color = colors.textSecondary)
         GroupCard {
             state.licenses.forEachIndexed { i, entry -> InfoRow(entry.name, entry.license, divider = i > 0) }
         }
-        Text(stringResource(R.string.setup_licenses_app), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+        NbText(stringResource(R.string.setup_licenses_app), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
     }
 }
 

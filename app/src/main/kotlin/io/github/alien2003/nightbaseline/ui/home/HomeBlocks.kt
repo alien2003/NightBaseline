@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +29,7 @@ import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NbTextButton
 import io.github.alien2003.nightbaseline.ui.components.NightStateCard
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
@@ -131,7 +131,7 @@ internal fun NotRecordedRow(
         horizontalArrangement = Arrangement.spacedBy(NbSpace.s3),
     ) {
         MetricGlyphIcon(MetricState.NotProvided.glyph, colors.statusNeutral)
-        Text(
+        NbText(
             text.string(R.string.home_not_recorded_row, source, text.list(metrics.map { text.name(it) })),
             style = NbTheme.typography.bodySmall,
             color = colors.textSecondary,
@@ -151,7 +151,7 @@ internal fun BlockHeading(
     title: String,
     modifier: Modifier = Modifier,
 ) {
-    Text(
+    NbText(
         title,
         style = NbTheme.dataType.sectionHeader,
         color = NbTheme.colors.textTertiary,
@@ -170,13 +170,13 @@ internal fun BlockHeading(
 @Composable
 internal fun ExpectCard(modifier: Modifier = Modifier) {
     NbCard(modifier.fillMaxWidth()) {
-        Text(
+        NbText(
             stringResource(R.string.home_expect_title),
             style = NbTheme.dataType.itemTitle,
             color = NbTheme.colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )
-        Text(stringResource(R.string.home_expect_body), style = NbTheme.dataType.summary, color = NbTheme.colors.textSecondary)
+        NbText(stringResource(R.string.home_expect_body), style = NbTheme.dataType.summary, color = NbTheme.colors.textSecondary)
     }
 }
 
@@ -191,24 +191,24 @@ internal fun ExplainerCard(
 ) {
     val colors = NbTheme.colors
     NbCard(modifier.fillMaxWidth()) {
-        Text(
+        NbText(
             stringResource(R.string.explainer_title),
             style = NbTheme.dataType.itemTitle,
             color = colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )
         listOf(R.string.explainer_range, R.string.explainer_learning, R.string.explainer_outside).forEach {
-            Text(stringResource(it), style = NbTheme.dataType.summary, color = colors.textSecondary)
+            NbText(stringResource(it), style = NbTheme.dataType.summary, color = colors.textSecondary)
         }
         if (meaning) {
-            Text(
+            NbText(
                 stringResource(R.string.explainer_meaning_title),
                 style = NbTheme.dataType.itemTitle,
                 color = colors.textPrimary,
                 modifier = Modifier.semantics { heading() },
             )
-            Text(stringResource(R.string.explainer_meaning), style = NbTheme.dataType.summary, color = colors.textSecondary)
-            Text(stringResource(R.string.explainer_care), style = NbTheme.dataType.summary, color = colors.textSecondary)
+            NbText(stringResource(R.string.explainer_meaning), style = NbTheme.dataType.summary, color = colors.textSecondary)
+            NbText(stringResource(R.string.explainer_care), style = NbTheme.dataType.summary, color = colors.textSecondary)
         }
     }
 }

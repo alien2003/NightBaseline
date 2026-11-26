@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -112,9 +111,9 @@ fun NightSummaryCard(
                     Modifier.clearAndSetSemantics { contentDescription = description },
                     verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
                 ) {
-                    if (showLabel) Text(label, style = type.statusCalm, color = colors.textSecondary)
-                    Text(title, style = type.headline, color = colors.textPrimary)
-                    Text(body, style = type.summary, color = colors.textSecondary)
+                    if (showLabel) NbText(label, style = type.statusCalm, color = colors.textSecondary)
+                    NbText(title, style = type.headline, color = colors.textPrimary)
+                    NbText(body, style = type.summary, color = colors.textSecondary)
                 }
                 // Pulled back by the button's inner padding so its label lines up with the body text.
                 action?.let {
@@ -188,17 +187,17 @@ fun MetricRangeTile(
                 CollapsedTileContent(metric, source)
                 return@Column
             }
-            Text(text.name(metric.metric), style = type.itemTitle, color = colors.textPrimary)
+            NbText(text.name(metric.metric), style = type.itemTitle, color = colors.textPrimary)
             FlowRow(verticalArrangement = Arrangement.Bottom, horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
                 val value = text.value(metric)
-                Text(
+                NbText(
                     value?.number ?: DASH,
                     style = NbTheme.typography.numericValue,
                     color = if (value == null) colors.textSecondary else colors.textPrimary,
                     modifier = Modifier.alignByBaseline(),
                 )
                 value?.unit?.let {
-                    Text(it, style = NbTheme.typography.unit, color = colors.textSecondary, modifier = Modifier.alignByBaseline())
+                    NbText(it, style = NbTheme.typography.unit, color = colors.textSecondary, modifier = Modifier.alignByBaseline())
                 }
             }
             if (metric.state != MetricState.AccessOff) {
@@ -211,7 +210,7 @@ fun MetricRangeTile(
             ) {
                 StatusLabel(text.status(metric, source), metric.state.glyph, metric.state.tone)
                 metric.range?.takeIf { metric.state != MetricState.Learning }?.let { range ->
-                    Text(
+                    NbText(
                         text.string(
                             R.string.stats_range,
                             text.bare(metric.metric, range.low, text.decimals(metric)),
@@ -223,9 +222,9 @@ fun MetricRangeTile(
                 }
             }
             if (!metric.state.compared && metric.state != MetricState.Learning) {
-                Text(text.detail(metric, source), style = type.summary, color = colors.textSecondary)
+                NbText(text.detail(metric, source), style = type.summary, color = colors.textSecondary)
             }
-            explanation?.let { Text(it, style = type.summary, color = colors.textSecondary) }
+            explanation?.let { NbText(it, style = type.summary, color = colors.textSecondary) }
         }
     }
 }
@@ -240,8 +239,8 @@ private fun CollapsedTileContent(
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
         MetricGlyphIcon(metric.state.glyph, colors.statusNeutral, size = NbDimens.iconInline)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
-            Text(text.name(metric.metric), style = NbTheme.dataType.itemTitle, color = colors.textSecondary)
-            Text(text.status(metric, source), style = NbTheme.dataType.statusCalm, color = colors.textSecondary)
+            NbText(text.name(metric.metric), style = NbTheme.dataType.itemTitle, color = colors.textSecondary)
+            NbText(text.status(metric, source), style = NbTheme.dataType.statusCalm, color = colors.textSecondary)
         }
     }
 }
@@ -276,7 +275,7 @@ fun DisclaimerFooter(
         itemVerticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start,
     ) {
-        Text(
+        NbText(
             stringResource(R.string.disclaimer_short),
             style = NbTheme.typography.caption,
             color = NbTheme.colors.textTertiary,

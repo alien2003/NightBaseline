@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,7 +34,9 @@ import io.github.alien2003.nightbaseline.ui.components.LearningCard
 import io.github.alien2003.nightbaseline.ui.components.LearningProgress
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
-import io.github.alien2003.nightbaseline.ui.components.TonalButton
+import io.github.alien2003.nightbaseline.ui.components.NbText
+import io.github.alien2003.nightbaseline.ui.components.SecondaryButton
+import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
@@ -205,7 +206,7 @@ private fun TabletopLearning(
             verticalArrangement = Arrangement.spacedBy(NbSpace.s3, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
+            NbText(
                 rememberUiText().nightLabel(state.night),
                 style = NbTheme.dataType.segment,
                 color = NbTheme.colors.textSecondary,
@@ -225,14 +226,14 @@ private fun TabletopLearning(
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
             if (largeFont) {
-                Text(
+                NbText(
                     rememberUiText().nightBody(state.night, state.source),
                     style = NbTheme.typography.body,
                     color = NbTheme.colors.textSecondary,
                     modifier = Modifier.widthIn(max = NbDimens.textMax).fillMaxWidth(),
                 )
             }
-            TonalButton(stringResource(R.string.action_how_it_works), onClick = actions.onHowItWorks)
+            SecondaryButton(stringResource(R.string.action_how_it_works), onClick = actions.onHowItWorks)
             AlreadyVisible(state, columns = 1, actions)
             WhatToExpect(Modifier.widthIn(max = NbDimens.textMax))
             Strip(state, actions)
@@ -259,22 +260,22 @@ private fun GlanceLearning(
         verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
+            NbText(
                 text.nightLabel(state.night),
                 style = NbTheme.dataType.statusCalm,
                 color = colors.textSecondary,
                 modifier = Modifier.weight(1f),
             )
-            NbIconButton(NbIcons.More, stringResource(R.string.action_more), onClick = actions.onMore)
+            ShellRoundButton(NbIcons.MoreVertical, stringResource(R.string.action_more), onClick = actions.onMore)
         }
-        Text(
+        NbText(
             text.nightTitle(state.night, state.source),
             style = NbTheme.dataType.headline,
             color = colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )
         LearningProgress(state.collected, skipped = if (state.lastNightShort) 1 else 0, modifier = Modifier.fillMaxWidth())
-        Text(text.nightBody(state.night, state.source), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+        NbText(text.nightBody(state.night, state.source), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
         GlanceMetricLines(state)
     }
 }

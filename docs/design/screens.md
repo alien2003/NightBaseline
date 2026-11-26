@@ -123,14 +123,14 @@ Content (always solid):
 | Component | Purpose |
 |---|---|
 | `NightSummaryCard` | Hero card: night status glyph, headline (`state_*_title`), body (`state_*_body`, which carries the compared count, e.g. "4 measurements compared with your last 28 nights."), night label ("Night of Nov 24–25"). |
-| `MetricRangeTile` | One metric: name, last-night value + unit (largest text), `RangeBand`, status chip (glyph + label). Variants: within, higher, lower, learning (n of 7), no value tonight (reason), not recorded by source. Whole tile is one 48 dp+ touch target opening Metric detail. |
-| `RangeBand` | Horizontal track: personal range as a solid tonal band, median tick, value marker whose **shape** encodes status. Values beyond the visible track are clamped to the edge with a chevron. No band while learning: dotted outline of where it will be. |
-| `StatusChip` / `StatusGlyph` | Glyph + text label; see section 6. |
+| `MetricRangeTile` | One metric: name, last-night value + unit (largest text), `RangeBand`, `StatusLabel` (shape + words, no background). Variants: within, higher, lower, learning (n of 7), no value tonight (reason), not recorded by source. Whole tile is one 48 dp+ touch target opening Metric detail. |
+| `RangeBand` | Slider-like neutral track: personal range as a solid grey segment from low to high (no edge lines, no median tick), value marker whose **shape** encodes status (white dot with a ring inside, amber triangle outside, hollow ring while learning). Values beyond the visible track are clamped to the edge with a chevron. No band while learning: dotted outline of where it will be. |
+| `StatusLabel` / `StatusGlyph` | Small shape + words, 6 dp apart, no background or tonal chip: 8 dp dot and grey 13 sp "Usual" inside, 10 dp triangle and amber 14 sp medium label outside, grey ring / dash for learning / missing; see section 6. |
 | `HistoryStrip` | Last 7 nights as 7 columns (14 in Medium when width >= 720 dp) in one card: weekday letter (12/400 secondary), night status glyph. The title ("Last 7 nights") is a section header outside the card with "See all" at its end. Each night is a >= 48 dp target -> Night detail; when the strip is narrower than 7 x 48 dp (narrow list panes) or sits in a tabletop top half, the nights are not individually tappable and the whole strip is one target -> History. "See all" (`action_see_all`) -> History. |
 | `TrendChart` | Per-night points (no connecting line across missing nights) for 7/30/90 nights, personal range drawn as a band that follows the baseline as it was on each night (stepped area), gaps for nights without value, hollow points for learning nights, status shapes for points outside. Finger-following selection with `ChartTooltip`. |
-| `PeriodSelector` | Segmented control 7 / 30 / 90 nights (`NbSegmentedControl`, `Controls.kt`): a solid 40 dp track (content layer, never glass) in a 48 dp target row, segments >= 52 dp; the selected segment sits on a solid convex thumb (vertical gradient + 1 dp rim, inset 4 dp, concentric) that slides on `spring.selection` (1.0 / 247), its leading edge on a stiffer spring so it stretches toward the target while moving; no tonal capsule. Snaps under reduced motion. |
+| `PeriodSelector` | Segmented control 7 / 30 / 90 nights (`Chart.kt`, the app's one segmented control): a solid 40 dp track (content layer, never glass) in a 48 dp target row, segments >= 52 dp; the selected segment sits on a solid convex thumb (vertical gradient + 1 dp top rim + soft shadow, inset 4 dp, concentric) that slides on `spring.selection` (1.0 / 247), its leading edge on a stiffer spring so it stretches toward the target while moving; no tonal capsule. Snaps under reduced motion. |
 | `ChartSummary` | Visible text under every chart, also used as the chart's content description (section 8). |
-| `StatsRow` | 2–3 small figures: nights inside the range (k of N), usual range, median. |
+| `StatsRow` (readout card) | One card of 48 dp readout rows split by hairlines: grey label at the start, value at the end; nights inside the range (k of N), usual range, median. |
 | `ExplainerCard` | Title + paragraphs + optional "Learn more" (opens `range-explainer`). |
 | `LearningProgress` | 7 segments filling in, "N of 7 nights" label, segment shape differs for counted / skipped (short night) / pending. |
 | `StateCard` | Shared pattern for every data problem: icon, title, body, primary action button, optional secondary text button. Used inline on Home/Night detail/Metric detail and full-screen when nothing else can be shown. |
@@ -288,7 +288,7 @@ Purpose: how this measurement behaves over time, where the personal range comes 
 Compact, top to bottom:
 1. `ShellTopBar`: back, metric name, action "How the range works" (info icon) -> `range-explainer` sheet.
 2. Header card (solid; shared-element target of the tile): value for the anchor night (default last night), unit,
-   `StatusChip`, usual range "52–61 bpm", one sentence from the `detail_*` keys (`states.md` 4), e.g. "6 bpm above
+   `StatusLabel`, usual range "52–61 bpm", one sentence from the `detail_*` keys (`states.md` 4), e.g. "6 bpm above
    your usual range." or "Inside your usual range.". State variants: learning (progress), no value (reason), not
    recorded by source, access off.
 3. `PeriodSelector`: 7 / 30 / 90 nights (default 30; 7 while fewer than 30 nights exist; periods longer than the
@@ -533,7 +533,7 @@ Pruning rules (which combinations are exhaustive and which sampled) are in `layo
 | `NightSummaryCard` | one merged node, `a11y_summary` | none (text) | glyph decorative (meaning is in the text) |
 | `MetricRangeTile` | one merged node, `a11y_tile*` | button, `selected` in list-detail | band and marker decorative; the range is in the text |
 | `RangeBand` alone (Metric detail header) | cleared semantics | - | the header text carries value, status and range |
-| `StatusChip` / `StatusGlyph` | merged into the parent | - | never announced as a color |
+| `StatusLabel` / `StatusGlyph` | merged into the parent | - | never announced as a color |
 | `HistoryStrip` | one node per night `a11y_history_day`, or `a11y_history_strip` when it is a single target | button | |
 | `TrendChart` | one node, content description = `ChartSummary` text | custom actions `a11y_prev_night` / `a11y_next_night`; selection announced with `a11y_chart_point` | section 8 |
 | `PeriodSelector` | one node per segment `a11y_period` "{n} nights" | tab, `selected` | |

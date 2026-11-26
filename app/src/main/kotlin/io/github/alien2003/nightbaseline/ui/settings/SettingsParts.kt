@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -33,6 +32,7 @@ import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.NbChevron
 import io.github.alien2003.nightbaseline.ui.components.NbHairline
 import io.github.alien2003.nightbaseline.ui.components.NbRadio
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
 import io.github.alien2003.nightbaseline.ui.material.nbClickable
@@ -76,15 +76,15 @@ fun SourceOptionRow(
         ) {
             SourceIcon(source)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap)) {
-                Text(source.label, style = NbControlType.itemTitle, color = controls.title)
-                Text(
+                NbText(source.label, style = NbControlType.itemTitle, color = controls.title)
+                NbText(
                     source.lastSleep?.let { text.string(R.string.source_last_sync, text.dateShort(it)) }
                         ?: text.string(R.string.setup_source_no_sleep),
                     style = NbControlType.summary,
                     color = controls.summary,
                 )
                 if (source.metrics.isNotEmpty()) {
-                    Text(
+                    NbText(
                         text.string(R.string.setup_source_writes, text.list(source.metrics.map { text.shortName(it) })),
                         style = NbControlType.summary,
                         color = controls.summary,
@@ -123,7 +123,7 @@ private fun SourceIcon(source: SourceOption) {
             .clearAndSetSemantics {},
         contentAlignment = Alignment.Center,
     ) {
-        Text(
+        NbText(
             source.label
                 .firstOrNull()
                 ?.uppercase()
@@ -159,8 +159,9 @@ fun PresetRow(
 }
 
 /**
- * A section row of the two-pane Settings list: title, summary and chevron; the selected row sits on the neutral
- * `state.selected` fill with a bold title and `selected` semantics (fill and weight, not only colour).
+ * A section row of the two-pane Settings list, one row of its grouped card: title, summary and chevron, an inset
+ * hairline above every row but the first ([showDivider]); the selected row sits on the neutral `state.selected` fill
+ * with a bold title and `selected` semantics (fill and weight, not only colour).
  */
 @Composable
 internal fun SectionRow(
@@ -169,30 +170,29 @@ internal fun SectionRow(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    showDivider: Boolean = false,
 ) {
     val colors = NbTheme.colors
     val controls = NbTheme.controls
+    if (showDivider) NbHairline()
     Row(
         modifier
             .fillMaxWidth()
             .sizeIn(minHeight = NbControlDimens.rowMinHeight)
-            .solidCard(NbShapes.l)
-            .clip(NbShapes.l)
             .background(if (selected) controls.selectedRow else colors.surface1)
-            .nbClickable(onClick = onClick, shape = NbShapes.l, pressScale = false)
+            .nbClickable(onClick = onClick, shape = RectangleShape, pressScale = false)
             .semantics(mergeDescendants = true) { this.selected = selected }
             .padding(horizontal = NbControlDimens.rowPaddingHorizontal, vertical = NbControlDimens.rowPaddingVertical),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NbControlDimens.rowTrailingGap),
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap)) {
-            Text(
+            NbText(
                 title,
-                style = NbControlType.itemTitle,
+                style = if (selected) NbControlType.itemTitle.copy(fontWeight = FontWeight.Bold) else NbControlType.itemTitle,
                 color = controls.title,
-                fontWeight = if (selected) FontWeight.Bold else null,
             )
-            Text(summary, style = NbControlType.summary, color = controls.summary)
+            NbText(summary, style = NbControlType.summary, color = controls.summary)
         }
         NbChevron()
     }
@@ -204,7 +204,7 @@ internal fun PaneHeading(
     title: String,
     modifier: Modifier = Modifier,
 ) {
-    Text(
+    NbText(
         title,
         style = NbTheme.typography.title,
         color = NbTheme.colors.textPrimary,
@@ -219,13 +219,13 @@ internal fun TextBlock(
     body: String,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-        Text(
+        NbText(
             title,
             style = NbControlType.itemTitle,
             color = NbTheme.controls.title,
             modifier = Modifier.semantics { heading() },
         )
-        Text(body, style = NbTheme.typography.body, color = NbTheme.controls.summary)
+        NbText(body, style = NbTheme.typography.body, color = NbTheme.controls.summary)
     }
 }
 

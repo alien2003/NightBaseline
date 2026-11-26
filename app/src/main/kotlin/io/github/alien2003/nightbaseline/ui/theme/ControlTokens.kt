@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.sp
 
 /**
  * Colours of the ColorOS-style controls, lists and buttons (work package WP3 of `coloros-conformance.md`, section 6).
- * They live here, not in [NbColors], until the foundations sweep folds them in (rename only). Dark values are measured
+ * Values shared with the foundations come from [NbColors] (one source of truth); the rest are control-only. Dark values are measured
  * on the folded dark references, light values on the unfolded light references (`settings-display`: background
  * #F0F1F2, card #FFFFFF, hairline #E0E0E0, switch off #D6D6D6, chevron #BDBDBD, header #6E6E6E, tab underline
  * #181818), adjusted where accessibility requires (`coloros-conformance.md` 1.2). `ControlContrastTest` checks the
@@ -65,14 +65,6 @@ data class NbControlColors(
     val chipSelectedRim: Color,
     /** Selected chip label. */
     val chipSelectedLabel: Color,
-    /** Segmented control track (solid, content layer). */
-    val segmentTrack: Color,
-    /** Segmented control thumb top (solid convex chip). */
-    val segmentThumbTop: Color,
-    /** Segmented control thumb bottom. */
-    val segmentThumbBottom: Color,
-    /** Segmented control thumb rim. */
-    val segmentThumbRim: Color,
     /** `state.selected`: selected row in a grouped card. */
     val selectedRow: Color,
     /** Letter avatar fill when the app icon is not available. */
@@ -84,32 +76,28 @@ data class NbControlColors(
 /** Light control colours (measured on the light references where they exist). */
 val LightNbControlColors: NbControlColors =
     NbControlColors(
-        accent = Color(0xFF0068E0),
-        accentText = Color(0xFF0068E0),
+        accent = LightNbColors.primary,
+        accentText = LightNbColors.primaryText,
         fillTop = Color(0xFF0A6EE6),
         fillBottom = Color(0xFF0060D2),
         onFill = Color.White,
-        accentGlow = Color(0xFF0068E0).copy(alpha = 0.25f),
+        accentGlow = LightNbColors.accentGlow,
         gloss = Color.White.copy(alpha = 0.22f),
-        switchOff = Color(0xFFD6D6D6),
+        switchOff = LightNbColors.controlSwitchOff,
         radioRing = Color(0xFF858585),
-        chevron = Color(0xFFBDBDBD),
-        hairline = Color(0xFFE0E0E0),
-        sectionHeader = Color(0xFF6E6E6E),
-        title = Color(0xFF1A1A1A),
-        summary = Color(0xFF666666),
-        tabSelected = Color(0xFF1A1A1A),
-        tabUnselected = Color(0xFF6E6E6E),
+        chevron = LightNbColors.chevron,
+        hairline = LightNbColors.separator,
+        sectionHeader = LightNbColors.textTertiary,
+        title = LightNbColors.textPrimary,
+        summary = LightNbColors.textSecondary,
+        tabSelected = LightNbColors.textPrimary,
+        tabUnselected = LightNbColors.textTertiary,
         secondaryFill = Color.Black.copy(alpha = 0.06f),
         chip = Color(0xFFE6E7E8),
         chipSelected = Color(0xFFFFFFFF),
         chipSelectedRim = Color.Black.copy(alpha = 0.10f),
         chipSelectedLabel = Color(0xFF1A1A1A),
-        segmentTrack = Color(0xFFE6E7E8),
-        segmentThumbTop = Color(0xFFFFFFFF),
-        segmentThumbBottom = Color(0xFFF7F7F9),
-        segmentThumbRim = Color.Black.copy(alpha = 0.08f),
-        selectedRow = Color.Black.copy(alpha = 0.06f),
+        selectedRow = LightNbColors.stateSelected,
         avatar = Color(0xFFEDEDED),
         dotInactive = Color(0xFFD6D6D6),
     )
@@ -117,32 +105,28 @@ val LightNbControlColors: NbControlColors =
 /** Dark control colours (measured on the folded dark references). */
 val DarkNbControlColors: NbControlColors =
     NbControlColors(
-        accent = Color(0xFF428AF7),
-        accentText = Color(0xFF5C9DFF),
+        accent = DarkNbColors.primary,
+        accentText = DarkNbColors.primaryText,
         fillTop = Color(0xFF2A6BE0),
         fillBottom = Color(0xFF2160D2),
         onFill = Color.White,
-        accentGlow = Color(0xFF428AF7).copy(alpha = 0.35f),
+        accentGlow = DarkNbColors.accentGlow,
         gloss = Color.White.copy(alpha = 0.16f),
-        switchOff = Color(0xFF505050),
+        switchOff = DarkNbColors.controlSwitchOff,
         radioRing = Color(0xFF767676),
-        chevron = Color(0xFF5F5F5F),
-        hairline = Color(0xFF484848),
-        sectionHeader = Color(0xFF8A8A8A),
-        title = Color(0xFFE9E9E9),
-        summary = Color(0xFF969696),
-        tabSelected = Color(0xFFE9E9E9),
-        tabUnselected = Color(0xFF8A8A8A),
+        chevron = DarkNbColors.chevron,
+        hairline = DarkNbColors.separator,
+        sectionHeader = DarkNbColors.textTertiary,
+        title = DarkNbColors.textPrimary,
+        summary = DarkNbColors.textSecondary,
+        tabSelected = DarkNbColors.textPrimary,
+        tabUnselected = DarkNbColors.textTertiary,
         secondaryFill = Color.White.copy(alpha = 0.10f),
         chip = Color(0xFF262626),
         chipSelected = Color(0xFF505050),
         chipSelectedRim = Color.White.copy(alpha = 0.15f),
         chipSelectedLabel = Color(0xFFFFFFFF),
-        segmentTrack = Color(0xFF262626),
-        segmentThumbTop = Color(0xFF4A4A4A),
-        segmentThumbBottom = Color(0xFF3C3C3C),
-        segmentThumbRim = Color.White.copy(alpha = 0.14f),
-        selectedRow = Color(0xFF2E2E2E),
+        selectedRow = DarkNbColors.stateSelected,
         avatar = Color(0xFF333333),
         dotInactive = Color(0xFF505050),
     )
@@ -221,15 +205,6 @@ object NbControlDimens {
     /** Chip horizontal padding. */
     val chipPadding: Dp = 16.dp
 
-    /** Segmented control visual height (inside a 48 dp target). */
-    val segmentHeight: Dp = 40.dp
-
-    /** Segmented control track inset around the thumb. */
-    val segmentInset: Dp = 4.dp
-
-    /** Minimum segment width. */
-    val segmentMinWidth: Dp = 52.dp
-
     /** Leading icon / avatar of a source row. */
     val avatar: Dp = 40.dp
 }
@@ -244,17 +219,17 @@ object NbControlType {
     /** `type.summary` 14/19/400. */
     val summary: TextStyle
         @Composable @ReadOnlyComposable
-        get() = NbTheme.typography.bodySmall.copy(lineHeight = 19.sp, fontWeight = FontWeight.Normal)
+        get() = NbTheme.typography.summary
 
     /** `type.sectionHeader` 12/16/500. */
     val sectionHeader: TextStyle
         @Composable @ReadOnlyComposable
-        get() = NbTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium)
+        get() = NbTheme.typography.sectionHeader
 
     /** `type.button` 16/22/500. */
     val button: TextStyle
         @Composable @ReadOnlyComposable
-        get() = NbTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
+        get() = NbTheme.typography.button
 
     /** Chips, segments and tabs 14/20 (weight set per state). */
     val label: TextStyle

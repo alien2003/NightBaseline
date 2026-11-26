@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +24,7 @@ import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.NbHairline
+import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.NightGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.NightSummaryCard
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
@@ -67,7 +67,7 @@ fun HistoryNightPreview(
         if (night.state.hasSummary) {
             NightSummaryCard(night, source)
         } else {
-            Text(
+            NbText(
                 text.nightLabel(night),
                 style = NbControlType.sectionHeader,
                 color = NbTheme.controls.sectionHeader,
@@ -113,8 +113,8 @@ fun CompactNightSummary(
     ) {
         NightGlyphIcon(night.state.glyph, colors.tone(night.state.tone), size = SUMMARY_GLYPH)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s1)) {
-            Text(label, style = NbControlType.summary, color = colors.textSecondary)
-            Text(title, style = NbTheme.typography.title, color = colors.textPrimary)
+            NbText(label, style = NbControlType.summary, color = colors.textSecondary)
+            NbText(title, style = NbTheme.typography.title, color = colors.textPrimary)
         }
     }
 }
@@ -140,10 +140,10 @@ private fun MetricLine(
             MetricGlyphIcon(metric.state.glyph, colors.tone(metric.state.tone))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbControlDimens.rowTitleGap)) {
-            Text(text.name(metric.metric), style = NbControlType.itemTitle, color = colors.textPrimary)
-            Text(text.status(metric, source), style = NbControlType.summary, color = colors.textSecondary)
+            NbText(text.name(metric.metric), style = NbControlType.itemTitle, color = colors.textPrimary)
+            NbText(text.status(metric, source), style = NbControlType.summary, color = colors.textSecondary)
         }
-        Text(text.value(metric)?.text ?: "–", style = NbTheme.typography.numericSmall, color = colors.textPrimary)
+        NbText(text.value(metric)?.text ?: "–", style = NbTheme.typography.numericSmall, color = colors.textPrimary)
     }
 }
 
