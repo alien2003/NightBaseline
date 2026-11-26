@@ -3,6 +3,7 @@ package io.github.alien2003.nightbaseline
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
@@ -15,6 +16,7 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.WindowCompat
@@ -55,6 +58,8 @@ import io.github.alien2003.nightbaseline.ui.shell.BackPreviewHandler
 import io.github.alien2003.nightbaseline.ui.shell.BackSettle
 import io.github.alien2003.nightbaseline.ui.shell.backPreviewPage
 import io.github.alien2003.nightbaseline.ui.shell.rememberBackPreview
+import io.github.alien2003.nightbaseline.ui.theme.DarkNbColors
+import io.github.alien2003.nightbaseline.ui.theme.LightNbColors
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import io.github.alien2003.nightbaseline.ui.theme.NightBaselineTheme
 import io.github.alien2003.nightbaseline.work.notify.AndroidNightNotifier
@@ -173,26 +178,30 @@ class MainActivity : ComponentActivity() {
             }
             if (s == null) return@NightBaselineTheme
             val layout = resolveLayout(rememberWindowLayoutInputs(this))
-            AppNavHost(
-                layout = layout,
-                onboardingDone = s.onboardingDone,
-                system = rememberSystemActions(),
-                newestNight = s.newestNight,
-                deepLink = deepLink.value,
-                onDeepLinkHandled = { deepLink.value = null },
-                onRefresh = root::refresh,
-                onCheckNow = root::checkNow,
-                debugAction =
-                    catalog?.let {
-                        {
-                            ShellRoundButton(
-                                NbIcons.MoreVertical,
-                                contentDescription = stringResource(R.string.settings_catalog),
-                                onClick = { showCatalog = true },
-                            )
-                        }
-                    },
-            )
+            // Behind every page, also where a predictive back preview leaves a gap between the shrinking page and the
+            // shifted page under it: the in-app background, never the window's system-theme one.
+            Box(Modifier.fillMaxSize().background(NbTheme.colors.background)) {
+                AppNavHost(
+                    layout = layout,
+                    onboardingDone = s.onboardingDone,
+                    system = rememberSystemActions(),
+                    newestNight = s.newestNight,
+                    deepLink = deepLink.value,
+                    onDeepLinkHandled = { deepLink.value = null },
+                    onRefresh = root::refresh,
+                    onCheckNow = root::checkNow,
+                    debugAction =
+                        catalog?.let {
+                            {
+                                ShellRoundButton(
+                                    NbIcons.MoreVertical,
+                                    contentDescription = stringResource(R.string.settings_catalog),
+                                    onClick = { showCatalog = true },
+                                )
+                            }
+                        },
+                )
+            }
         }
     }
 
@@ -219,7 +228,9 @@ class MainActivity : ComponentActivity() {
  * `coloros-conformance.md` D1), content drawn into the display cutout, and no platform contrast scrim (the shell draws
  * its own behind a 3-button bar). Done by hand instead of `enableEdgeToEdge`: that installs a hidden view which
  * re-applies the styles of its first call on every configuration change (androidx.activity 1.13), with icons for the
- * system theme and a 90 % white or 50 % grey navigation bar scrim. Idempotent.
+ * system theme and a 90 % white or 50 % grey navigation bar scrim. The window background is the in-app theme's
+ * `color.background` too (the resource follows the system theme), so whatever shows through the content, such as
+ * the gaps around the pages of a predictive back preview, is the app's background. Idempotent.
  */
 @Suppress("DEPRECATION") // statusBarColor / navigationBarColor still decide the bar backgrounds below API 35.
 internal fun Window.applySystemBarStyle(dark: Boolean) {
@@ -241,6 +252,8 @@ internal fun Window.applySystemBarStyle(dark: Boolean) {
         isAppearanceLightStatusBars = !dark
         isAppearanceLightNavigationBars = !dark
     }
+    val background = (if (dark) DarkNbColors else LightNbColors).background.toArgb()
+    if ((decorView.background as? ColorDrawable)?.color != background) setBackgroundDrawable(ColorDrawable(background))
 }
 
 /** Key of the debug catalog in its back preview. */
