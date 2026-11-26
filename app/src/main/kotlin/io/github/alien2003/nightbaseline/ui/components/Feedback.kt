@@ -1,7 +1,6 @@
 package io.github.alien2003.nightbaseline.ui.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -18,10 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -34,7 +33,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.BannerKind
@@ -43,30 +41,35 @@ import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.StatusTone
 import io.github.alien2003.nightbaseline.ui.model.UiText
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.theme.NbDataDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.data
+import io.github.alien2003.nightbaseline.ui.theme.dataType
+import io.github.alien2003.nightbaseline.ui.theme.hairline
 
 /** Nights of the learning period. */
 const val LEARNING_NIGHTS: Int = 7
 
 /** One segment of [LearningProgress]. */
 enum class LearningSegment {
-    /** A counted night: filled. */
+    /** A counted night: filled in the accent. */
     Counted,
 
     /** A short night that did not count: half filled. */
     Skipped,
 
-    /** Not yet: outline only. */
+    /** Not yet: empty neutral track. */
     Pending,
 }
 
 /**
- * Seven segments filling in plus the visible "n of 7 nights" label (`screens.md` 4). Counted, skipped (short night)
- * and pending segments differ by shape (filled, half filled, outline), not only colour. One TalkBack node with
- * progress semantics 0..7 (`a11y_learning_progress`).
+ * Seven 8 dp segments filling in plus the visible "n of 7 nights" label (`screens.md` 4, conformance K8): counted
+ * nights in the accent, pending nights as empty neutral track, a skipped (short) night half filled. The visible count
+ * carries the meaning; the segments repeat it. One TalkBack node with progress semantics 0..7
+ * (`a11y_learning_progress`).
  */
 @Composable
 fun LearningProgress(
@@ -94,29 +97,23 @@ fun LearningProgress(
             },
         verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(NbSpace.s2), modifier = Modifier.fillMaxWidth()) {
+        val pending = colors.data.progressPending
+        Row(horizontalArrangement = Arrangement.spacedBy(NbDataDimens.progressGap), modifier = Modifier.fillMaxWidth()) {
             segments.forEach { segment ->
-                Canvas(Modifier.weight(1f).height(NbDimens.learningSegmentHeight)) {
+                Canvas(Modifier.weight(1f).height(NbDataDimens.progressSegment)) {
                     val radius = CornerRadius(size.height / 2)
-                    val stroke = NbDimens.bandEdgeStroke.toPx()
                     when (segment) {
                         LearningSegment.Counted -> {
-                            drawRoundRect(colors.accent, cornerRadius = radius)
+                            drawRoundRect(colors.primary, cornerRadius = radius)
                         }
 
                         LearningSegment.Skipped -> {
-                            drawRoundRect(colors.accent, cornerRadius = radius, style = Stroke(stroke))
-                            clipRect(right = size.width / 2) { drawRoundRect(colors.accent, cornerRadius = radius) }
+                            drawRoundRect(pending, cornerRadius = radius)
+                            clipRect(right = size.width / 2) { drawRoundRect(colors.primary, cornerRadius = radius) }
                         }
 
                         LearningSegment.Pending -> {
-                            drawRoundRect(
-                                colors.outline,
-                                topLeft = Offset(stroke / 2, stroke / 2),
-                                size = Size(size.width - stroke, size.height - stroke),
-                                cornerRadius = radius,
-                                style = Stroke(stroke),
-                            )
+                            drawRoundRect(pending, cornerRadius = radius)
                         }
                     }
                 }
@@ -124,7 +121,7 @@ fun LearningProgress(
         }
         Text(
             text.string(R.string.learning_progress, text.int(n)),
-            style = NbTheme.typography.label,
+            style = NbTheme.dataType.statusCalm,
             color = colors.textSecondary,
         )
     }
@@ -144,26 +141,33 @@ fun LearningCard(
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
+    val type = NbTheme.dataType
     NbCard(modifier.fillMaxWidth()) {
         Text(
             text.nightTitle(night, source),
-            style = NbTheme.typography.headline,
+            style = type.headline,
             color = colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )
         LearningProgress(night.historyNights, skipped = if (lastNightShort) 1 else 0)
-        Text(text.nightBody(night, source), style = NbTheme.typography.body, color = colors.textSecondary)
+        Text(text.nightBody(night, source), style = type.summary, color = colors.textSecondary)
         if (lastNightShort) {
-            Text(stringResource(R.string.state_learning_short_note), style = NbTheme.typography.bodySmall, color = colors.textSecondary)
+            Text(stringResource(R.string.state_learning_short_note), style = type.summary, color = colors.textSecondary)
         }
-        NbTextButton(stringResource(R.string.action_how_it_works), onClick = onHowItWorks)
+        // Pulled back by the button's inner padding so its label lines up with the text above.
+        NbTextButton(
+            stringResource(R.string.action_how_it_works),
+            onClick = onHowItWorks,
+            color = colors.data.primaryText,
+            modifier = Modifier.offset(x = -NbSpace.s4),
+        )
     }
 }
 
 /**
- * The shared pattern of every data problem (`screens.md` 4, `states.md` 2): decorative icon in its tonal container,
- * title as a heading, body, a primary action and an optional secondary text action. Info and neutral tones only:
- * there is no error colour.
+ * The shared pattern of every data problem (`screens.md` 4, `states.md` 2, conformance K9): a 24 dp decorative icon
+ * without a container, the title (20/26 medium) as a heading, the body, a primary action and an optional secondary
+ * text action. Info and neutral tones only: there is no error colour.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -179,10 +183,13 @@ fun StateCard(
     onSecondary: () -> Unit = {},
 ) {
     val colors = NbTheme.colors
+    val type = NbTheme.dataType
     NbCard(modifier.fillMaxWidth()) {
-        NightGlyphBadge(glyph, tone, container = 48.dp, glyphSize = NbDimens.icon)
-        Text(title, style = NbTheme.typography.headline, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
-        Text(body, style = NbTheme.typography.body, color = colors.textSecondary)
+        NightGlyphBadge(glyph, tone, container = NbDataDimens.stateIcon, glyphSize = NbDataDimens.stateIcon)
+        Column(verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
+            Text(title, style = type.title, color = colors.textPrimary, modifier = Modifier.semantics { heading() })
+            Text(body, style = type.summary, color = colors.textSecondary)
+        }
         if (primaryAction != null || secondaryAction != null) {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(NbSpace.s3),
@@ -190,7 +197,7 @@ fun StateCard(
                 itemVerticalAlignment = Alignment.CenterVertically,
             ) {
                 primaryAction?.let { PrimaryButton(it, onPrimary) }
-                secondaryAction?.let { NbTextButton(it, onSecondary) }
+                secondaryAction?.let { NbTextButton(it, onSecondary, color = colors.data.primaryText) }
             }
         }
     }
@@ -255,8 +262,9 @@ private fun BannerKind.icon(): ImageVector? =
     }
 
 /**
- * A non-blocking banner above still-valid content (`screens.md` 4): solid `shape.m`, outline icon, text that wraps at
- * large font, an action and, where the state allows it, a dismiss button. Announced once as a polite live region.
+ * A non-blocking banner above still-valid content (`screens.md` 4, conformance K9): a solid card with the one content
+ * radius (`shape.l`), a 24 dp outline icon in `primaryText`, 14 sp text in `text.primary` that wraps at large font, a
+ * `primaryText` action and, where the state allows it, a dismiss button. Announced once as a polite live region.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -272,29 +280,35 @@ fun InlineBanner(
     val text = rememberUiText()
     val colors = NbTheme.colors
     val dismissible = onDismiss != null && (kind == BannerKind.NotificationsOff || kind == BannerKind.RangeReady)
+    val action = text.bannerAction(kind)
     Row(
         modifier =
             Modifier
                 .widthIn(max = maxWidth)
                 .then(modifier)
                 .fillMaxWidth()
-                .solidCard(NbShapes.m)
-                .padding(start = NbSpace.s5, top = NbSpace.s3, bottom = NbSpace.s3, end = NbSpace.s2)
-                .semantics { liveRegion = LiveRegionMode.Polite },
+                .solidCard(NbShapes.l)
+                .padding(
+                    start = NbSpace.s5,
+                    top = NbSpace.s4,
+                    bottom = if (action == null) NbSpace.s4 else NbSpace.s0,
+                    end = if (dismissible) NbSpace.s0 else NbSpace.s5,
+                ).semantics { liveRegion = LiveRegionMode.Polite },
         horizontalArrangement = Arrangement.spacedBy(NbSpace.s4),
     ) {
-        Box(Modifier.padding(top = NbSpace.s4)) {
+        Box(Modifier.padding(top = NbSpace.s1)) {
             val icon = kind.icon()
             if (icon != null) {
-                Icon(icon, contentDescription = null, tint = colors.statusInfo, modifier = Modifier.size(NbDimens.icon))
+                Icon(icon, contentDescription = null, tint = colors.data.primaryText, modifier = Modifier.size(NbDataDimens.stateIcon))
             } else {
                 NightGlyphIcon(NightGlyph.DottedRing, colors.statusWithin)
             }
         }
-        Column(Modifier.weight(1f).padding(vertical = NbSpace.s4), verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
-            Text(text.banner(kind, source, quietDays), style = NbTheme.typography.bodySmall, color = colors.textPrimary)
-            text.bannerAction(kind)?.let { label ->
-                NbTextButton(label, onClick = onAction, modifier = Modifier.padding(top = NbSpace.s1))
+        Column(Modifier.weight(1f).padding(top = NbSpace.s1)) {
+            Text(text.banner(kind, source, quietDays), style = NbTheme.dataType.summary, color = colors.textPrimary)
+            action?.let { label ->
+                // Pulled back by the button's inner padding so the action lines up with the text.
+                NbTextButton(label, onClick = onAction, color = colors.data.primaryText, modifier = Modifier.offset(x = -NbSpace.s4))
             }
         }
         if (dismissible) {
@@ -303,21 +317,29 @@ fun InlineBanner(
                 contentDescription = stringResource(R.string.a11y_dismiss),
                 onClick = onDismiss,
                 tint = colors.textSecondary,
+                modifier = Modifier.offset(y = -NbSpace.s4),
             )
         }
     }
 }
 
-/** A small solid box inside a card (`material.solid.nested`, `shape.m`) for explanations. */
+/**
+ * A separate part of a card for explanations (conformance K11): ColorOS has no tinted boxes inside cards, so the part
+ * is split from what is above it by a hairline in `separator` and 12 dp of space.
+ */
 @Composable
 fun NestedBox(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val line = hairline
+    val color = NbTheme.colors.separator
     Box(
         modifier
             .fillMaxWidth()
-            .background(NbTheme.colors.surface2, NbShapes.m)
-            .padding(NbSpace.s4),
+            .drawBehind {
+                val y = line.toPx() / 2
+                drawLine(color, Offset(0f, y), Offset(size.width, y), line.toPx())
+            }.padding(top = NbSpace.s4),
     ) { content() }
 }

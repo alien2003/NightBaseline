@@ -358,6 +358,14 @@
     </plurals>
     <string name="stats_range">Usual range: %1$s–%2$s</string>
     <string name="stats_median">Middle value: %1$s</string>
+    <string name="stats_label_inside">Inside your usual range</string>
+    <plurals name="stats_value_inside">
+        <item quantity="one">%1$s of %2$s night</item>
+        <item quantity="other">%1$s of %2$s nights</item>
+    </plurals>
+    <string name="stats_label_range">Usual range</string>
+    <string name="stats_value_range">%1$s–%2$s</string>
+    <string name="stats_label_median">Middle value</string>
     <string name="detail_computed_title">How your usual range is computed</string>
     <string name="detail_source_line">Measured by %1$s. Last sync %2$s.</string>
     <string name="history_title">History</string>

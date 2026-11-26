@@ -38,10 +38,12 @@ import io.github.alien2003.nightbaseline.ui.model.MetricState
 import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.theme.NbDataDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.dataType
 
 /** Minimum width of one tile in a multi-column grid (`screens.md` 7.1). */
 internal val TileMinWidth: Dp = 260.dp
@@ -139,7 +141,11 @@ internal fun NotRecordedRow(
     }
 }
 
-/** A section heading inside the content column (`type.title`, heading semantics). */
+/**
+ * A ColorOS section header above a group of cards (conformance K2, T5, S2): 12 sp medium in `text.tertiary`, outside
+ * the cards, its text 32 dp from the screen edge (16 dp inside the content column), about 24 dp below the previous
+ * card and 8 dp above the next; heading semantics.
+ */
 @Composable
 internal fun BlockHeading(
     title: String,
@@ -147,13 +153,16 @@ internal fun BlockHeading(
 ) {
     Text(
         title,
-        style = NbTheme.typography.title,
-        color = NbTheme.colors.textPrimary,
+        style = NbTheme.dataType.sectionHeader,
+        color = NbTheme.colors.textTertiary,
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(top = NbSpace.s3, start = NbSpace.s1)
-                .semantics { heading() },
+                .padding(
+                    top = NbDataDimens.sectionHeaderTop,
+                    start = NbDataDimens.sectionHeaderStart,
+                    end = NbDataDimens.sectionHeaderStart,
+                ).semantics { heading() },
     )
 }
 
@@ -163,11 +172,11 @@ internal fun ExpectCard(modifier: Modifier = Modifier) {
     NbCard(modifier.fillMaxWidth()) {
         Text(
             stringResource(R.string.home_expect_title),
-            style = NbTheme.typography.titleSmall,
+            style = NbTheme.dataType.itemTitle,
             color = NbTheme.colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )
-        Text(stringResource(R.string.home_expect_body), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
+        Text(stringResource(R.string.home_expect_body), style = NbTheme.dataType.summary, color = NbTheme.colors.textSecondary)
     }
 }
 
@@ -184,22 +193,22 @@ internal fun ExplainerCard(
     NbCard(modifier.fillMaxWidth()) {
         Text(
             stringResource(R.string.explainer_title),
-            style = NbTheme.typography.title,
+            style = NbTheme.dataType.itemTitle,
             color = colors.textPrimary,
             modifier = Modifier.semantics { heading() },
         )
         listOf(R.string.explainer_range, R.string.explainer_learning, R.string.explainer_outside).forEach {
-            Text(stringResource(it), style = NbTheme.typography.body, color = colors.textSecondary)
+            Text(stringResource(it), style = NbTheme.dataType.summary, color = colors.textSecondary)
         }
         if (meaning) {
             Text(
                 stringResource(R.string.explainer_meaning_title),
-                style = NbTheme.typography.titleSmall,
+                style = NbTheme.dataType.itemTitle,
                 color = colors.textPrimary,
                 modifier = Modifier.semantics { heading() },
             )
-            Text(stringResource(R.string.explainer_meaning), style = NbTheme.typography.body, color = colors.textSecondary)
-            Text(stringResource(R.string.explainer_care), style = NbTheme.typography.body, color = colors.textSecondary)
+            Text(stringResource(R.string.explainer_meaning), style = NbTheme.dataType.summary, color = colors.textSecondary)
+            Text(stringResource(R.string.explainer_care), style = NbTheme.dataType.summary, color = colors.textSecondary)
         }
     }
 }

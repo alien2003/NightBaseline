@@ -28,10 +28,13 @@ import io.github.alien2003.nightbaseline.algo.MetricId
 import io.github.alien2003.nightbaseline.ui.components.MetricRangeTile
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.model.MetricUi
+import io.github.alien2003.nightbaseline.ui.theme.NbDataDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.data
+import io.github.alien2003.nightbaseline.ui.theme.dataType
 
 /**
  * The metric tiles in registry order (`screens.md` 7.1), in [columns] columns; with an odd count the last tile spans
@@ -83,13 +86,13 @@ internal fun LoadingCard(modifier: Modifier = Modifier) {
     val colors = NbTheme.colors
     NbCard(modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = body }) {
         Row(horizontalArrangement = Arrangement.spacedBy(NbSpace.s5), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(NbDimens.iconSummaryContainer).background(colors.surface2, NbShapes.circle))
+            Box(Modifier.size(NbDataDimens.summaryGlyph).background(colors.surface2, NbShapes.circle))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
                 SkeletonLine(SKELETON_LABEL)
                 SkeletonLine(SKELETON_TITLE)
             }
         }
-        Text(body, style = NbTheme.typography.body, color = colors.textSecondary)
+        Text(body, style = NbTheme.dataType.summary, color = colors.textSecondary)
     }
 }
 
@@ -110,7 +113,7 @@ internal fun SkeletonTiles(
                 NbCard(Modifier.weight(1f)) {
                     SkeletonLine(SKELETON_NAME)
                     SkeletonLine(SKELETON_VALUE, height = SkeletonValueHeight)
-                    Box(Modifier.fillMaxWidth().height(NbDimens.bandHeight).background(colors.surface2, NbShapes.pill))
+                    Box(Modifier.fillMaxWidth().height(NbDimens.bandHeight).background(colors.data.bandTrack, NbShapes.pill))
                 }
             }
             repeat(columns - row.size) { Box(Modifier.weight(1f)) }

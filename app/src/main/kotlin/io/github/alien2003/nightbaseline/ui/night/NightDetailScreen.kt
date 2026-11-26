@@ -76,6 +76,7 @@ import io.github.alien2003.nightbaseline.ui.model.rememberUiText
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.dataType
 
 /**
  * Night detail (`screens.md` 7.2): the Home view of one night. Top bar with back, the night label as title and

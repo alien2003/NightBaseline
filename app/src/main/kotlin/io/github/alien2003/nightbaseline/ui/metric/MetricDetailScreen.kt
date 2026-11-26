@@ -75,6 +75,7 @@ import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.dataType
 
 /** Test tag of the top bar (screenshot stitching keeps it once at the top). */
 const val METRIC_TOP_BAR_TAG: String = "metric_top_bar"
@@ -254,7 +255,7 @@ fun MetricDetailPane(
         Row(Modifier.widthIn(max = NbDimens.chartMax).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text.name(state.metric.metric),
-                style = NbTheme.typography.title,
+                style = NbTheme.dataType.title,
                 color = NbTheme.colors.textPrimary,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
@@ -512,11 +513,11 @@ private fun TabletopLabel(state: MetricDetailState) {
         verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text.name(metric.metric), style = NbTheme.typography.title, color = colors.textPrimary)
-        Text(text.value(metric)?.text ?: DASH, style = NbTheme.typography.title, color = colors.textPrimary)
+        Text(text.name(metric.metric), style = NbTheme.dataType.title, color = colors.textPrimary)
+        Text(text.value(metric)?.text ?: DASH, style = NbTheme.dataType.title, color = colors.textPrimary)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
             MetricGlyphIcon(metric.state.glyph, colors.tone(metric.state.tone), size = NbDimens.iconInline)
-            Text(text.status(metric, state.source), style = NbTheme.typography.title, color = colors.textPrimary)
+            Text(text.status(metric, state.source), style = NbTheme.dataType.title, color = colors.textPrimary)
         }
     }
 }
@@ -528,7 +529,7 @@ private fun SelectedNightLine(state: MetricDetailState) {
     val point = state.selected?.let { state.shownPoints.getOrNull(it) } ?: return
     Text(
         text.chartPoint(state.metric.metric, point, state.source),
-        style = NbTheme.typography.titleSmall,
+        style = NbTheme.dataType.itemTitle,
         color = NbTheme.colors.textPrimary,
         modifier = Modifier.fillMaxWidth().widthIn(max = NbDimens.chartMax),
     )
@@ -620,7 +621,7 @@ private fun GlanceDetail(
             NbIconButton(NbIcons.Back, text.string(R.string.a11y_back), onClick = actions.onBack)
             Text(
                 text.name(metric.metric),
-                style = NbTheme.typography.titleSmall,
+                style = NbTheme.dataType.itemTitle,
                 color = colors.textPrimary,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
@@ -643,7 +644,7 @@ private fun GlanceDetail(
                 if (metric.state != MetricState.NotProvided && metric.state != MetricState.AccessOff) HeaderValue(metric, large = false)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
                     MetricGlyphIcon(metric.state.glyph, colors.tone(metric.state.tone))
-                    Text(text.status(metric, state.source), style = NbTheme.typography.label, color = colors.textPrimary)
+                    Text(text.status(metric, state.source), style = NbTheme.dataType.segment, color = colors.textPrimary)
                 }
             }
             if (metric.range != null && metric.value != null) RangeBand(metric.range, metric.value, metric.state, height = 10.dp)
@@ -781,7 +782,7 @@ private fun InfoDialog(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 title,
-                style = NbTheme.typography.title,
+                style = NbTheme.dataType.title,
                 color = colors.onGlassPrimary,
                 modifier = Modifier.weight(1f).semantics { heading() },
             )
@@ -829,7 +830,7 @@ private fun ExplainerBody(
             ).forEach { Text(it, style = NbTheme.typography.body, color = colors.textPrimary) }
             Text(
                 text.string(R.string.explainer_meaning_title),
-                style = NbTheme.typography.titleSmall,
+                style = NbTheme.dataType.itemTitle,
                 color = colors.textPrimary,
                 modifier = Modifier.semantics { heading() },
             )

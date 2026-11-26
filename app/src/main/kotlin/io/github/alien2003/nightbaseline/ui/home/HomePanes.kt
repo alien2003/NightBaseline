@@ -41,9 +41,8 @@ import io.github.alien2003.nightbaseline.ui.components.PeriodSelector
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
 import io.github.alien2003.nightbaseline.ui.components.RangeBand
 import io.github.alien2003.nightbaseline.ui.components.StatsRow
-import io.github.alien2003.nightbaseline.ui.components.StatusChip
 import io.github.alien2003.nightbaseline.ui.components.TrendChart
-import io.github.alien2003.nightbaseline.ui.components.tone
+import io.github.alien2003.nightbaseline.ui.components.statusGlyph
 import io.github.alien2003.nightbaseline.ui.material.nbClickable
 import io.github.alien2003.nightbaseline.ui.model.BannerKind
 import io.github.alien2003.nightbaseline.ui.model.ChartPeriod
@@ -53,10 +52,12 @@ import io.github.alien2003.nightbaseline.ui.model.MetricUi
 import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.theme.NbDataDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.dataType
 import java.time.LocalDate
 
 /**
@@ -106,7 +107,7 @@ internal fun GlanceHome(
             leading?.invoke()
             Text(
                 if (night.state == NightState.HealthConnectNone) stringResource(R.string.home_title) else text.nightLabel(night),
-                style = NbTheme.typography.labelSmall,
+                style = NbTheme.dataType.statusCalm,
                 color = colors.textSecondary,
                 modifier = Modifier.weight(1f).padding(start = if (leading == null) NbSpace.s1 else 0.dp),
             )
@@ -152,8 +153,8 @@ private fun GlanceNightText(
                     description
             },
     ) {
-        if (night.state != NightState.Loading) NightGlyphBadge(night.state.glyph, night.state.tone, container = 40.dp, glyphSize = 28.dp)
-        Text(title.ifEmpty { body }, style = NbTheme.typography.headline, color = colors.textPrimary, modifier = Modifier.weight(1f))
+        if (night.state != NightState.Loading) NightGlyphBadge(night.state.glyph, night.state.tone, container = 36.dp, glyphSize = 28.dp)
+        Text(title.ifEmpty { body }, style = NbTheme.dataType.headline, color = colors.textPrimary, modifier = Modifier.weight(1f))
     }
     if (night.state.hasSummary || night.state == NightState.Loading) return
     Text(body, style = NbTheme.typography.bodySmall, color = colors.textSecondary, modifier = Modifier.clearAndSetSemantics {})
@@ -184,10 +185,14 @@ private fun GlanceMetricLine(
         verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
-            MetricGlyphIcon(metric.state.glyph, colors.tone(metric.state.tone))
+            MetricGlyphIcon(metric.state.glyph, colors.statusGlyph(metric.state.tone))
             Column(Modifier.weight(1f)) {
-                Text(text.shortName(metric.metric), style = NbTheme.typography.titleSmall, color = colors.textPrimary)
-                Text(status, style = NbTheme.typography.caption, color = colors.textSecondary)
+                Text(text.shortName(metric.metric), style = NbTheme.dataType.itemTitle, color = colors.textPrimary)
+                Text(
+                    status,
+                    style = NbTheme.typography.caption,
+                    color = if (metric.state.moved) colors.statusMoved else colors.textSecondary,
+                )
             }
             if (metric.state != MetricState.NotProvided) {
                 Text(value, style = NbTheme.typography.numericSmall, color = colors.textPrimary)
