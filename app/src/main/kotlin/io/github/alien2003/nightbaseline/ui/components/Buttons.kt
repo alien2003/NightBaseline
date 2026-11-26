@@ -40,6 +40,8 @@ import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import io.github.alien2003.nightbaseline.ui.theme.controls
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterIsInstance
 
 /** Disabled buttons keep their fill and label, at this alpha (`coloros-conformance.md` L4). */
 private const val DISABLED_ALPHA = 0.3f
@@ -136,16 +138,28 @@ private fun touchLight(
     val light = remember { TouchLight() }
     light.forced = forced
     LaunchedEffect(source, motion) {
-        source.interactions.collect { interaction ->
+        // Tracked per press, and the latest change wins: a release never waits behind the light's fade-in, and the
+        // end of one press does not put out the light of another finger.
+        val active = mutableSetOf<PressInteraction.Press>()
+        source.interactions.filterIsInstance<PressInteraction>().collectLatest { interaction ->
             when (interaction) {
                 is PressInteraction.Press -> {
+                    active += interaction
                     light.center = interaction.pressPosition
-                    motion.glowIn<Float>()?.let { light.animatable.animateTo(1f, it) }
                 }
 
-                is PressInteraction.Release, is PressInteraction.Cancel -> {
-                    light.animatable.animateTo(0f, motion.glowOut())
+                is PressInteraction.Release -> {
+                    active -= interaction.press
                 }
+
+                is PressInteraction.Cancel -> {
+                    active -= interaction.press
+                }
+            }
+            if (active.isEmpty()) {
+                light.animatable.animateTo(0f, motion.glowOut())
+            } else {
+                motion.glowIn<Float>()?.let { light.animatable.animateTo(1f, it) }
             }
         }
     }

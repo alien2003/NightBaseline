@@ -2,6 +2,7 @@ package io.github.alien2003.nightbaseline.ui.material
 
 import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.clickable
@@ -14,6 +15,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -47,20 +49,33 @@ import androidx.compose.ui.node.invalidateLayer
 import androidx.compose.ui.node.requireDensity
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.eventFlow
 import io.github.alien2003.nightbaseline.ui.motion.NB_PRESS_SCALE_LARGE
 import io.github.alien2003.nightbaseline.ui.motion.NB_PRESS_SCALE_SMALL
 import io.github.alien2003.nightbaseline.ui.motion.NbMotionScheme
 import io.github.alien2003.nightbaseline.ui.motion.NbSprings
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
+import java.util.Collections
+import java.util.IdentityHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.max
 import kotlin.math.min
@@ -184,18 +199,39 @@ private data class PressLook(
 )
 
 /**
- * Counts the press animations [nbClickable] and [NbPressIndication] have created, so a test can check that idle
- * elements (rows that are only scrolled past, never touched) create none.
+ * Test hooks of the press feedback: how many press animations [nbClickable] and [NbPressIndication] have created (so a
+ * test can check that idle elements, rows only scrolled past, create none), and, once [trackLit] is on, which
+ * elements last drew a pressed highlight or glow (so a test can check that no press stays lit).
  */
 @VisibleForTesting
 internal object PressAnimationProbe {
     private val created = AtomicInteger()
+    private val lit: MutableSet<Any> = Collections.newSetFromMap(IdentityHashMap())
 
     /** Press, highlight and glow animations created since the process started. */
     val animationsCreated: Int get() = created.get()
 
+    /** Records [litElements]; off outside tests, so drawing pays one boolean check. */
+    @Volatile
+    var trackLit: Boolean = false
+
+    /** Elements whose last frame drew a pressed highlight or glow (a settled hover highlight does not count). */
+    val litElements: Int get() = synchronized(lit) { lit.size }
+
     fun onCreated() {
         created.incrementAndGet()
+    }
+
+    fun onDrawn(
+        element: Any,
+        pressedLook: Boolean,
+    ) {
+        if (!trackLit) return
+        synchronized(lit) { if (pressedLook) lit.add(element) else lit.remove(element) }
+    }
+
+    fun resetLit() {
+        synchronized(lit) { lit.clear() }
     }
 }
 
@@ -204,24 +240,73 @@ private fun newPressAnimatable(initial: Float): Animatable<Float, AnimationVecto
     return Animatable(initial)
 }
 
-/** Counts the presses of one interaction source (several fingers may press at once). */
-private class PressCounter {
-    var presses = 0
-        private set
+/**
+ * The presses of one interaction source that are still down, tracked per [PressInteraction.Press]: a release or
+ * cancel ends only its own press (several fingers, or a new tap that starts before the previous release arrives), and
+ * the end of a press that was already cleared ([clear]) changes nothing.
+ */
+private class PressTracker {
+    private val active = ArrayList<PressInteraction.Press>(1)
+
+    val pressed: Boolean get() = active.isNotEmpty()
 
     /** Applies [interaction]; true when the pressed state changed. */
     fun apply(interaction: Interaction): Boolean {
-        val before = presses > 0
+        val before = pressed
         when (interaction) {
-            is PressInteraction.Press -> presses++
-            is PressInteraction.Release, is PressInteraction.Cancel -> presses = (presses - 1).coerceAtLeast(0)
+            is PressInteraction.Press -> active += interaction
+            is PressInteraction.Release -> active.remove(interaction.press)
+            is PressInteraction.Cancel -> active.remove(interaction.press)
             else -> return false
         }
-        return before != presses > 0
+        return before != pressed
     }
 
-    fun reset() {
-        presses = 0
+    /** Forgets every press; true when something was pressed. */
+    fun clear(): Boolean {
+        val was = pressed
+        active.clear()
+        return was
+    }
+}
+
+/**
+ * While a press is held, waits until the app leaves the foreground: the window loses focus (a tap that starts another
+ * activity, the notification shade, a system dialog) or the activity pauses or stops. Then calls [onLeave] once, with
+ * `stopped` true when the activity is no longer visible (the press-out then snaps instead of animating unseen). The
+ * clickable normally ends the press itself; this guarantees that no element comes back to the foreground pressed.
+ */
+private fun <N> N.watchPressLeave(
+    onLeave: (stopped: Boolean) -> Unit,
+): Job
+    where N : Modifier.Node, N : CompositionLocalConsumerModifierNode {
+    val lifecycle = currentValueOf(LocalLifecycleOwner).lifecycle
+    val window = currentValueOf(LocalWindowInfo)
+    return coroutineScope.launch {
+        // Only a change counts: a window that has no focus to begin with (tests, previews) clears nothing.
+        val focusLost = snapshotFlow { window.isWindowFocused }.drop(1).filter { !it }.map { false }
+        val paused =
+            lifecycle.eventFlow
+                .filter { it == Lifecycle.Event.ON_PAUSE || it == Lifecycle.Event.ON_STOP }
+                .map { it == Lifecycle.Event.ON_STOP }
+        onLeave(merge(focusLost, paused).first())
+    }
+}
+
+/**
+ * Starts an animation of [anim] to [target] in place of [previous]. It starts undispatched, so its target is set
+ * before the next interaction is handled (a release that arrives in the same frame as its press must not find the
+ * press animation still unstarted); a null [spec] jumps without waiting for a frame (the activity is not visible).
+ */
+private fun CoroutineScope.retarget(
+    previous: Job?,
+    anim: Animatable<Float, AnimationVector1D>,
+    target: Float,
+    spec: AnimationSpec<Float>?,
+): Job {
+    previous?.cancel()
+    return launch(start = CoroutineStart.UNDISPATCHED) {
+        if (spec == null) anim.snapTo(target) else anim.animateTo(target, spec)
     }
 }
 
@@ -247,10 +332,13 @@ private class PressScaleNode(
     private var source: InteractionSource,
     private var motion: NbMotionScheme,
 ) : Modifier.Node(),
-    LayoutModifierNode {
+    LayoutModifierNode,
+    CompositionLocalConsumerModifierNode {
     private var scale: Animatable<Float, AnimationVector1D>? = null
-    private val presses = PressCounter()
+    private var scaleJob: Job? = null
+    private val presses = PressTracker()
     private var collector: Job? = null
+    private var leaveWatch: Job? = null
     private var size = IntSize.Zero
     private val layerBlock: GraphicsLayerScope.() -> Unit = {
         val s = (scale?.value ?: 1f).coerceAtMost(1f)
@@ -265,8 +353,10 @@ private class PressScaleNode(
     }
 
     override fun onDetach() {
-        presses.reset()
+        presses.clear()
         collector = null
+        leaveWatch = null
+        scaleJob = null
         if (scale != null) {
             // A recycled row must not keep a half-finished shrink.
             scale = null
@@ -281,9 +371,12 @@ private class PressScaleNode(
         this.motion = motion
         if (source != this.source) {
             this.source = source
-            presses.reset()
             collector?.cancel()
-            if (isAttached) collect()
+            val wasPressed = presses.clear()
+            if (isAttached) {
+                if (wasPressed) onPressedChanged(snap = false)
+                collect()
+            }
         }
     }
 
@@ -291,12 +384,23 @@ private class PressScaleNode(
         collector =
             coroutineScope.launch {
                 source.interactions.collect { interaction ->
-                    if (presses.apply(interaction)) animate(pressed = presses.presses > 0)
+                    if (presses.apply(interaction)) onPressedChanged(snap = false)
                 }
             }
     }
 
-    private fun animate(pressed: Boolean) {
+    /** The pressed state changed, or was cleared because the app left the foreground ([snap] when not visible). */
+    private fun onPressedChanged(snap: Boolean) {
+        val pressed = presses.pressed
+        leaveWatch?.cancel()
+        leaveWatch = if (pressed) watchPressLeave { stopped -> if (presses.clear()) onPressedChanged(snap = stopped) } else null
+        animate(pressed, snap)
+    }
+
+    private fun animate(
+        pressed: Boolean,
+        snap: Boolean,
+    ) {
         val target = if (pressed) nbPressScale(size, requireDensity()) else 1f
         val spec = (if (pressed) motion.pressIn<Float>(target >= WIDE_PRESS_THRESHOLD) else motion.pressOut()) ?: return
         val anim =
@@ -306,7 +410,7 @@ private class PressScaleNode(
                 invalidateLayer()
             }
         // A new target cancels the running animation and keeps its velocity (the release carries the press over).
-        coroutineScope.launch { anim.animateTo(target, spec) }
+        scaleJob = coroutineScope.retarget(scaleJob, anim, target, if (snap) null else spec)
     }
 
     override fun MeasureScope.measure(
@@ -349,13 +453,16 @@ private class PressFeedbackNode(
     DrawModifierNode,
     PointerInputModifierNode,
     CompositionLocalConsumerModifierNode {
-    private val presses = PressCounter()
+    private val presses = PressTracker()
     private var hovers = 0
     private var focused = false
     private var collector: Job? = null
+    private var leaveWatch: Job? = null
     private var highlight: Animatable<Float, AnimationVector1D>? = null
+    private var highlightJob: Job? = null
     private var highlightTarget = 0f
     private var glowLevel: Animatable<Float, AnimationVector1D>? = null
+    private var glowJob: Job? = null
     private var glowCenter = Offset.Unspecified
     private val glowBrush = GlowBrushCache()
     private val outline = OutlineCache()
@@ -368,25 +475,32 @@ private class PressFeedbackNode(
     }
 
     override fun onDetach() {
-        presses.reset()
+        presses.clear()
         hovers = 0
         focused = false
         collector = null
+        leaveWatch = null
         highlight = null
+        highlightJob = null
         highlightTarget = 0f
         glowLevel = null
+        glowJob = null
         glowCenter = Offset.Unspecified
+        PressAnimationProbe.onDrawn(this, pressedLook = false)
     }
 
     fun update(next: PressFeedbackElement) {
         val previous = spec
         spec = next
         if (next.source != previous.source) {
-            presses.reset()
+            val wasPressed = presses.clear()
             hovers = 0
             focused = false
             collector?.cancel()
-            if (isAttached) collect()
+            if (isAttached) {
+                if (wasPressed) onPressedChanged(snap = false)
+                collect()
+            }
         }
         if (isAttached) syncHighlight(animate = true)
         invalidateDraw()
@@ -402,8 +516,10 @@ private class PressFeedbackNode(
     private fun onInteraction(interaction: Interaction) {
         when (interaction) {
             is PressInteraction -> {
-                presses.apply(interaction)
-                if (spec.glow) glowFor(interaction)
+                val changed = presses.apply(interaction)
+                if (spec.glow && interaction is PressInteraction.Press) glowIn(interaction.pressPosition)
+                if (changed) onPressedChanged(snap = false)
+                return
             }
 
             is HoverInteraction.Enter -> {
@@ -435,14 +551,27 @@ private class PressFeedbackNode(
 
     private val hovered: Boolean get() = hovers > 0 || spec.forced == ForcedInteraction.Hover
 
-    private fun syncHighlight(animate: Boolean) {
-        val target =
+    /** The pressed state changed, or was cleared because the app left the foreground ([snap] when not visible). */
+    private fun onPressedChanged(snap: Boolean) {
+        val pressed = presses.pressed
+        leaveWatch?.cancel()
+        leaveWatch = if (pressed) watchPressLeave { stopped -> if (presses.clear()) onPressedChanged(snap = stopped) } else null
+        if (!pressed && spec.glow) glowOut(snap)
+        syncHighlight(animate = !snap)
+    }
+
+    /** The grey highlight the element should show now (none with the glow). */
+    private val highlightGoal: Float
+        get() =
             when {
                 spec.glow -> 0f
-                presses.presses > 0 || spec.forced == ForcedInteraction.Pressed -> 1f
+                presses.pressed || spec.forced == ForcedInteraction.Pressed -> 1f
                 hovered -> HOVER_FRACTION
                 else -> 0f
             }
+
+    private fun syncHighlight(animate: Boolean) {
+        val target = highlightGoal
         if (target == highlightTarget) return
         highlightTarget = target
         val anim =
@@ -451,30 +580,32 @@ private class PressFeedbackNode(
                 highlight = it
                 invalidateDraw()
             }
-        if (anim.value == target) return
-        val animation = if (target > 0f) spec.motion.stateLayer<Float>(spec.row) else spec.motion.stateLayerOut(spec.row)
-        coroutineScope.launch { anim.animateTo(target, animation) }
+        // A running animation counts too: a release that arrives before its press animation's first frame still finds
+        // the value at 0 and must not be skipped, or the press animation runs on to 1 and the element stays lit.
+        if (anim.value == target && !anim.isRunning) return
+        val animation =
+            when {
+                !animate -> null
+                target > 0f -> spec.motion.stateLayer<Float>(spec.row)
+                else -> spec.motion.stateLayerOut(spec.row)
+            }
+        highlightJob = coroutineScope.retarget(highlightJob, anim, target, animation)
     }
 
-    private fun glowFor(interaction: PressInteraction) {
-        when (interaction) {
-            is PressInteraction.Press -> {
-                glowCenter = interaction.pressPosition
-                val anim =
-                    glowLevel ?: newPressAnimatable(0f).also {
-                        glowLevel = it
-                        invalidateDraw()
-                    }
-                val animation = spec.motion.glowIn<Float>()
-                // Reduced motion: no spread animation, the light is simply there while pressed.
-                coroutineScope.launch { if (animation != null) anim.animateTo(1f, animation) else anim.snapTo(1f) }
+    private fun glowIn(position: Offset) {
+        glowCenter = position
+        val anim =
+            glowLevel ?: newPressAnimatable(0f).also {
+                glowLevel = it
+                invalidateDraw()
             }
+        // Reduced motion: no spread animation, the light is simply there while pressed.
+        glowJob = coroutineScope.retarget(glowJob, anim, 1f, spec.motion.glowIn())
+    }
 
-            is PressInteraction.Release, is PressInteraction.Cancel -> {
-                val anim = glowLevel ?: return
-                coroutineScope.launch { anim.animateTo(0f, spec.motion.glowOut()) }
-            }
-        }
+    private fun glowOut(snap: Boolean) {
+        val anim = glowLevel ?: return
+        glowJob = coroutineScope.retarget(glowJob, anim, 0f, if (snap) null else spec.motion.glowOut())
     }
 
     override fun onPointerEvent(
@@ -512,6 +643,7 @@ private class PressFeedbackNode(
         val glowAlpha = glowAlpha(forcedGlow)
         val level = highlight?.value ?: 0f
         val rim = s.onGlass && hovered
+        PressAnimationProbe.onDrawn(this@PressFeedbackNode, pressedLook = glowAlpha > 0f || level > HOVER_FRACTION)
         if (glowAlpha <= 0f && level <= 0f && !rim) return
         val shapeOutline = outline.get(s.shape, size, layoutDirection, this)
         if (glowAlpha > 0f) {
@@ -608,48 +740,79 @@ class NbPressIndication(
         private val source: InteractionSource,
         private val color: Color,
     ) : Modifier.Node(),
-        DrawModifierNode {
+        DrawModifierNode,
+        CompositionLocalConsumerModifierNode {
         private var level: Animatable<Float, AnimationVector1D>? = null
+        private var levelJob: Job? = null
         private var target = 0f
-        private var presses = 0
+        private val presses = PressTracker()
+        private var leaveWatch: Job? = null
         private var hovers = 0
 
         override fun onAttach() {
             coroutineScope.launch {
                 source.interactions.collect { interaction ->
                     when (interaction) {
-                        is PressInteraction.Press -> presses++
-                        is PressInteraction.Release, is PressInteraction.Cancel -> presses = (presses - 1).coerceAtLeast(0)
-                        is HoverInteraction.Enter -> hovers++
-                        is HoverInteraction.Exit -> hovers = (hovers - 1).coerceAtLeast(0)
-                        else -> return@collect
-                    }
-                    val next =
-                        when {
-                            presses > 0 -> 1f
-                            hovers > 0 -> HOVER_FRACTION
-                            else -> 0f
+                        is PressInteraction -> {
+                            if (presses.apply(interaction)) onPressedChanged(snap = false)
                         }
-                    if (next == target) return@collect
-                    target = next
-                    val anim = level ?: newPressAnimatable(0f).also { level = it }
-                    launch {
-                        val spec = if (next > anim.value) NbSprings.HighlightIn else NbSprings.HighlightOut
-                        anim.animateTo(next, spec.spec()) { invalidateDraw() }
+
+                        is HoverInteraction.Enter -> {
+                            hovers++
+                            sync(snap = false)
+                        }
+
+                        is HoverInteraction.Exit -> {
+                            hovers = (hovers - 1).coerceAtLeast(0)
+                            sync(snap = false)
+                        }
+
+                        else -> {}
                     }
                 }
             }
         }
 
+        /** The pressed state changed, or was cleared because the app left the foreground ([snap] when not visible). */
+        private fun onPressedChanged(snap: Boolean) {
+            leaveWatch?.cancel()
+            leaveWatch =
+                if (presses.pressed) watchPressLeave { stopped -> if (presses.clear()) onPressedChanged(snap = stopped) } else null
+            sync(snap)
+        }
+
+        private fun sync(snap: Boolean) {
+            val next =
+                when {
+                    presses.pressed -> 1f
+                    hovers > 0 -> HOVER_FRACTION
+                    else -> 0f
+                }
+            if (next == target) return
+            target = next
+            val anim =
+                level ?: newPressAnimatable(0f).also {
+                    // The last frame read no state; from now on the draw reads the animation's value.
+                    level = it
+                    invalidateDraw()
+                }
+            val spec = if (next > anim.value) NbSprings.HighlightIn else NbSprings.HighlightOut
+            levelJob = coroutineScope.retarget(levelJob, anim, next, if (snap) null else spec.spec())
+        }
+
         override fun onDetach() {
             level = null
+            levelJob = null
             target = 0f
-            presses = 0
+            presses.clear()
+            leaveWatch = null
             hovers = 0
+            PressAnimationProbe.onDrawn(this, pressedLook = false)
         }
 
         override fun ContentDrawScope.draw() {
             val value = level?.value ?: 0f
+            PressAnimationProbe.onDrawn(this@Node, pressedLook = value > HOVER_FRACTION)
             if (value > 0f) drawRect(color, alpha = value)
             drawContent()
         }

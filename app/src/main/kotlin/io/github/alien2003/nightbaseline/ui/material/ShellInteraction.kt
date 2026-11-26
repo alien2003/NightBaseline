@@ -113,23 +113,26 @@ fun Modifier.shellPressInput(
                     }
                 }
                 if (!reduced) state.scope.launch { state.scale.animateTo(pressedScale, spring(PRESS_IN_DAMPING, PRESS_IN_STIFFNESS)) }
-                var up = false
-                while (!up) {
-                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                    val change = event.changes.firstOrNull { it.id == down.id } ?: event.changes.first()
-                    tracker.addPosition(change.uptimeMillis, change.position)
-                    if (!reduced) state.center = change.position
-                    up = event.changes.none { it.pressed }
-                }
-                val velocity = tracker.calculateVelocity()
-                val speedDp = hypot(velocity.x, velocity.y) / density
-                state.scope.launch {
-                    state.glow.animateTo(
-                        0f,
-                        if (reduced) tween(NbDurations.REDUCED) else tween(NbDurations.GLOW_OUT, easing = NbEasing.Exit),
-                    )
-                }
-                if (!reduced) {
+                var speedDp = 0f
+                try {
+                    var up = false
+                    while (!up) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: event.changes.first()
+                        tracker.addPosition(change.uptimeMillis, change.position)
+                        if (!reduced) state.center = change.position
+                        up = event.changes.none { it.pressed }
+                    }
+                    val velocity = tracker.calculateVelocity()
+                    speedDp = hypot(velocity.x, velocity.y) / density
+                } finally {
+                    // Also when the gesture is cancelled or the input restarts mid-press: never leave the light on.
+                    state.scope.launch {
+                        state.glow.animateTo(
+                            0f,
+                            if (reduced) tween(NbDurations.REDUCED) else tween(NbDurations.GLOW_OUT, easing = NbEasing.Exit),
+                        )
+                    }
                     state.scope.launch {
                         val start = (speedDp / RELEASE_SPEED_PER_UNIT).coerceAtMost(MAX_RELEASE_VELOCITY)
                         state.scale.animateTo(1f, spring(RELEASE_DAMPING, RELEASE_STIFFNESS), initialVelocity = start)
