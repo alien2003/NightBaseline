@@ -30,6 +30,17 @@
         <package android:name="com.google.android.apps.healthdata" />
         <!-- The default and first verified source; other sources are found through Health Connect. -->
         <package android:name="com.heytap.health.international" />
+        <!-- Every other Health Connect client: an app that requests Health Connect permissions must declare one of
+             these two entry points, so they make exactly those apps visible (names and icons of other sources)
+             without QUERY_ALL_PACKAGES. Android 13 and below: -->
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+        </intent>
+        <!-- Android 14 and later: -->
+        <intent>
+            <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+            <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+        </intent>
     </queries>
 
     <application

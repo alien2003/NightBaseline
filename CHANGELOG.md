@@ -21,6 +21,9 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 
 ### Fixed
 
+- **Sources other than OHealth.** On Android 11 and later the app could not see any other source app, so right after
+  setup it said the source was no longer on the phone and showed package names instead of app names. The app can now
+  see every app that works with Health Connect (and only those).
 - **No more rows or tabs stuck pressed.** A quick tap in a scrolling screen (for example "Health Connect permissions"
   in Settings, or the "All / Moved / Learning and gaps" filters in History) could leave the grey pressed highlight on
   after the tap: the release arrived before the highlight had drawn its first frame and was skipped. Every press now
