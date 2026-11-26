@@ -143,6 +143,13 @@ class BackPreview internal constructor(
         private set
 
     private var token = 0
+
+    /**
+     * Where a resumed gesture picks the page up: its progress when the new gesture started during the cancel of the
+     * same page. The new gesture's own progress (from about 0) then covers the rest of the way, so the page does not
+     * jump back to rest under the finger. 0 for a fresh gesture.
+     */
+    private var resumeFrom = 0f
     private var cancelHook: (() -> Unit)? = null
     private var settleJob: Job? = null
     private var underJob: Job? = null
@@ -166,6 +173,7 @@ class BackPreview internal constructor(
         onCancelled: () -> Unit,
     ): Pair<Int, Boolean> {
         val resume = phase == BackPhase.Cancelling && key == pageKey
+        resumeFrom = if (resume) progress.value.coerceIn(0f, 1f) else 0f
         settleJob?.cancel()
         settleJob = null
         if (!resume) finishPending()
@@ -182,13 +190,16 @@ class BackPreview internal constructor(
         return token to resume
     }
 
-    /** The finger moved: the page follows [fraction] directly (no animation). */
+    /**
+     * The finger moved: the page follows [fraction] directly (no animation). A resumed gesture maps its 0..1 onto
+     * the rest of the way from where the page was ([resumeFrom]..1).
+     */
     internal fun follow(
         gesture: Int,
         fraction: Float,
     ) {
         if (gesture != token || phase != BackPhase.Dragging) return
-        snap(progress, fraction.coerceIn(0f, 1f))
+        snap(progress, resumed(resumeFrom, fraction))
     }
 
     /** The gesture was cancelled: the page returns to rest, then the host's cancel hook runs. */
@@ -271,6 +282,7 @@ class BackPreview internal constructor(
     }
 
     private fun reset() {
+        resumeFrom = 0f
         key = null
         phase = BackPhase.Idle
         snap(progress, 0f)
@@ -283,9 +295,18 @@ class BackPreview internal constructor(
         scope.launch(start = CoroutineStart.UNDISPATCHED) { animatable.snapTo(value) }
     }
 
-    private companion object {
+    internal companion object {
+        /** The progress of a gesture that resumed at [from] when its own progress is [fraction]. */
+        fun resumed(
+            from: Float,
+            fraction: Float,
+        ): Float {
+            val f = fraction.coerceIn(0f, 1f)
+            return (from + (1f - from) * f).coerceIn(0f, 1f)
+        }
+
         /** Longest a committed page may keep its pose without leaving (the page spring settles in about 470 ms). */
-        const val LEAVE_TIMEOUT_MS = 1000L
+        private const val LEAVE_TIMEOUT_MS = 1000L
     }
 }
 
