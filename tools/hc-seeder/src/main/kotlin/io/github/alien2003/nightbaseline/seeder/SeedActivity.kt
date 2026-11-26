@@ -23,7 +23,8 @@ import java.time.format.DateTimeParseException
  * `am start -n <pkg>/.SeedActivity --es scenario <name> [--ei nights <n>] [--es now <iso>] [--ei end_days_ago <n>]`,
  * `--es action append_tail` (late upload of the last `late_upload` seed) or `--es scenario wipe`.
  * Every run first deletes what the seeder wrote before, so a scenario always replaces the previous one. The result is
- * logged as one `SEED_RESULT ...` line under the tag [TAG].
+ * logged as one `SEED_RESULT ...` line under the tag [TAG], ending with ` run=<id>` when the intent has
+ * `--es run_id <id>` ([SeedResult]).
  */
 class SeedActivity : ComponentActivity() {
     private lateinit var log: TextView
@@ -81,6 +82,8 @@ class SeedActivity : ComponentActivity() {
     }
 
     private fun run(intent: Intent) {
+        val runId = intent.getStringExtra(EXTRA_RUN_ID)
+        val result = { text: String -> line(SeedResult.line(text, runId)) }
         if (running) {
             result("error busy")
             return
@@ -95,7 +98,7 @@ class SeedActivity : ComponentActivity() {
             try {
                 val missing = PERMISSIONS - client.permissionController.getGrantedPermissions()
                 check(missing.isEmpty()) { "missing permissions: ${missing.joinToString { it.substringAfterLast('.') }}" }
-                execute(SeedWriter(client, ::line), intent)
+                execute(SeedWriter(client, ::line), intent, result)
             } catch (
                 @Suppress("TooGenericExceptionCaught") e: Exception, // Any failure is reported to the script.
             ) {
@@ -109,6 +112,7 @@ class SeedActivity : ComponentActivity() {
     private suspend fun execute(
         writer: SeedWriter,
         intent: Intent,
+        result: (String) -> Unit,
     ) {
         val scenarioKey = intent.getStringExtra(EXTRA_SCENARIO)
         val action = intent.getStringExtra(EXTRA_ACTION) ?: if (scenarioKey == ACTION_WIPE) ACTION_WIPE else ACTION_SEED
@@ -146,10 +150,13 @@ class SeedActivity : ComponentActivity() {
                     .putLong(KEY_NOW_MS, nowMs)
                     .putInt(EXTRA_END_DAYS_AGO, endDaysAgo)
                     .apply()
-                val last = plan.sessions.lastOrNull()?.let { Instant.ofEpochMilli(it.endMs).atZone(zone()).toLocalDateTime() }
+                val lastEndMs = plan.sessions.lastOrNull()?.endMs
+                val last = lastEndMs?.let { Instant.ofEpochMilli(it).atZone(zone()).toLocalDateTime() }
+                // last_session_end_s (epoch seconds) lets seed.sh compare the night's end with the emulator clock.
                 result(
                     "ok seed scenario=${scenario.key} nights=$nights records=$n sessions=${plan.sessions.size} " +
-                        "last_wake_date=${plan.lastWakeDate} last_session_end=$last tail=${plan.tail.values.sumOf { it.size }}",
+                        "last_wake_date=${plan.lastWakeDate} last_session_end=$last " +
+                        "last_session_end_s=${lastEndMs?.div(MS_PER_S)} tail=${plan.tail.values.sumOf { it.size }}",
                 )
             }
 
@@ -182,8 +189,6 @@ class SeedActivity : ComponentActivity() {
         runOnUiThread { log.append(text + "\n") }
     }
 
-    private fun result(text: String) = line("SEED_RESULT $text")
-
     private companion object {
         const val TAG = "NbSeeder"
         const val PADDING_DP = 16
@@ -193,6 +198,8 @@ class SeedActivity : ComponentActivity() {
         const val EXTRA_NIGHTS = "nights"
         const val EXTRA_NOW = "now"
         const val EXTRA_END_DAYS_AGO = "end_days_ago"
+        const val EXTRA_RUN_ID = "run_id"
+        const val MS_PER_S = 1000L
         const val KEY_NOW_MS = "now_ms"
         const val ACTION_SEED = "seed"
         const val ACTION_WIPE = "wipe"

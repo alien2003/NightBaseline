@@ -1,6 +1,8 @@
 package io.github.alien2003.nightbaseline.seeder
 
 import io.github.alien2003.nightbaseline.algo.ChannelId
+import io.github.alien2003.nightbaseline.algo.MetricId
+import io.github.alien2003.nightbaseline.algo.MetricStatus
 import io.github.alien2003.nightbaseline.algo.NightEvaluation
 import io.github.alien2003.nightbaseline.algo.NightStatus
 import io.github.alien2003.nightbaseline.algo.Pipeline
@@ -54,13 +56,41 @@ class SeedPlanTest {
         val before = SeedPlanner.plan(Scenario.NORMAL, 60, now, zone, endDaysAgo = 1)
         val after = SeedPlanner.plan(Scenario.DEVIATIONS, 61, now, zone)
         assertEquals(before.sessions, after.sessions.dropLast(1))
-        assertEquals(
-            NightStatus.DEVIATIONS,
-            Pipeline
-                .run(after.sessions, after.channels)
-                .last()
-                .second.status,
-        )
+        assertClearDeviations(Pipeline.run(after.sessions, after.channels).last().second, "61 nights (bench path)")
+    }
+
+    @Test
+    fun `deviations clears the range edges for any night count`() {
+        // The last night is a fresh noise draw for every night count, so a thin margin would pass for one count and
+        // fail for the next (the bench seeds 61 nights after 60). Check a wide band of counts.
+        (30..120).forEach { n ->
+            val p = SeedPlanner.plan(Scenario.DEVIATIONS, n, now, zone)
+            assertClearDeviations(Pipeline.run(p.sessions, p.channels).last().second, "$n nights")
+        }
+    }
+
+    /** Heart rate and respiratory rate above, SpO2 below the range, each clearly beyond the edge (not by rounding). */
+    private fun assertClearDeviations(
+        e: NightEvaluation,
+        label: String,
+    ) {
+        assertEquals(NightStatus.DEVIATIONS, e.status, label)
+        assertTrue(e.deviating >= 3, "$label: deviating ${e.deviating}")
+        val margins = mapOf(MetricId.SLEEPING_HR to 3.0, MetricId.RESPIRATORY_RATE to 0.5, MetricId.SPO2 to 1.0)
+        margins.forEach { (id, minMargin) ->
+            val m = e.metrics.first { it.metric == id }
+            val value = checkNotNull(m.value) { "$label: no ${id.key}" }
+            val base = checkNotNull(m.baseline) { "$label: no ${id.key} baseline" }
+            val margin =
+                if (id == MetricId.SPO2) {
+                    assertEquals(MetricStatus.BELOW, m.status, "$label ${id.key}")
+                    base.low - value
+                } else {
+                    assertEquals(MetricStatus.ABOVE, m.status, "$label ${id.key}")
+                    value - base.high
+                }
+            assertTrue(margin >= minMargin, "$label ${id.key}: $value is only $margin beyond the edge")
+        }
     }
 
     @Test

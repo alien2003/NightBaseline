@@ -21,7 +21,7 @@ enum class Scenario(
     /** 60 regular nights, the last one within the usual range. */
     NORMAL("normal", 60),
 
-    /** Like [NORMAL], but last night's heart rate, respiratory rate and SpO2 moved outside the usual range. */
+    /** Like [NORMAL], but last night's heart rate (+14 bpm), respiratory rate (+2.5) and SpO2 (-4) clearly moved out. */
     DEVIATIONS("deviations", 60),
 
     /** Only 3 nights: the learning period. */
@@ -83,6 +83,17 @@ object SeedPlanner {
     /** The same seed for every scenario, so the histories of `normal` and `deviations` are identical. */
     private const val SEED = 7L
     private const val MIN_MS = 60_000L
+
+    /*
+     * The deviations scenario's last-night shifts: two to three times the half-width of each range (heart rate at
+     * least 2.5 x 2.5 bpm, respiratory rate about 0.85, SpO2 about 1.2), so the night still clears the edge by a wide
+     * margin when its own noise draw (SD: heart rate 1.6, respiratory rate 0.35, SpO2 0.5) goes against it. With
+     * the earlier +8 / +2 / -2.5 the result depended on the night count (61 nights moved only 2 measurements).
+     * SeedPlanTest checks the margins for 30..120 nights.
+     */
+    private const val DEVIATION_HR_SHIFT = 14.0
+    private const val DEVIATION_RR_SHIFT = 2.5
+    private const val DEVIATION_SPO2_SHIFT = -4.0
 
     /** Before this local time the newest night is yesterday's (today's may still be going on). */
     private val TODAY_AFTER: LocalTime = LocalTime.of(10, 0)
@@ -175,9 +186,9 @@ object SeedPlanner {
             napP = 0.0,
             splitP = 0.0,
             episodes = if (scenario == Scenario.DEVIATIONS) mapOf(nights - 1 to 1) else emptyMap(),
-            episodeHrShift = 8.0,
-            episodeRrShift = 2.0,
-            episodeSpo2Shift = -2.5,
+            episodeHrShift = DEVIATION_HR_SHIFT,
+            episodeRrShift = DEVIATION_RR_SHIFT,
+            episodeSpo2Shift = DEVIATION_SPO2_SHIFT,
         )
     }
 
