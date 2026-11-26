@@ -1,5 +1,6 @@
 package io.github.alien2003.nightbaseline.work.process
 
+import io.github.alien2003.nightbaseline.algo.AlgoFingerprint
 import io.github.alien2003.nightbaseline.algo.AlgoParams
 import io.github.alien2003.nightbaseline.algo.ChannelId
 import io.github.alien2003.nightbaseline.algo.Completeness
@@ -51,8 +52,13 @@ import javax.inject.Inject
  *    status changed into DEVIATIONS. Learning, short and ambiguous nights are never notified.
  * 5. When no new night is visible yet in the morning (before [NO_NIGHT_WAIT_UNTIL]), the check is repeated every
  *    [NO_NIGHT_RETRY_MS] so that a late upload is still evaluated on its own day.
+ *
+ * Before all of this, stored nights evaluated by another algorithm version or other parameters are re-evaluated from
+ * their stored summaries ([NightReevaluator]; silent, no Health Connect read), so the history the new night is compared
+ * with is current. Every stored record carries the [AlgoFingerprint] of the parameters of the run.
  */
 class NightProcessor
+    @Suppress("LongParameterList") // Its collaborators, each a fake in the tests.
     @Inject
     constructor(
         private val settings: SettingsRepository,
@@ -62,12 +68,15 @@ class NightProcessor
         private val runLog: RunLog,
         private val clock: Clock,
         private val zone: ZoneSource,
+        private val reevaluator: NightReevaluator,
     ) {
         /** Runs one check. Throws [HcError.RateLimited] / [HcError.Other]; refusals become [ProcessOutcome.Blocked]. */
         suspend fun process(): ProcessOutcome {
             val s = settings.settings.first()
+            val params = s.algoParams()
+            reevaluator.reevaluateIfNeeded(params)
             return try {
-                Run(s, s.algoParams(), clock.millis()).execute()
+                Run(s, params, clock.millis()).execute()
             } catch (e: HcError) {
                 val reason = blockReasonOf(e) ?: throw e
                 runLog.log(RunLogKind.BLOCKED, "night check blocked: ${reason.name}")
@@ -82,6 +91,7 @@ class NightProcessor
             val now: Long,
         ) {
             val source = settings.sourcePackage
+            val fingerprint = AlgoFingerprint.of(params)
             val stored = mutableMapOf<String, NightRecord>()
             var provided: Set<ChannelId> = emptySet()
             val reevaluated = mutableListOf<String>()
@@ -235,6 +245,7 @@ class NightProcessor
                         evaluationCount = count,
                         notifiedAtMs = if (shown) now else previous?.notifiedAtMs,
                         notifiedStatus = if (shown) evaluation.status else previous?.notifiedStatus,
+                        algoFingerprint = fingerprint,
                     )
                 return store(record)
             }

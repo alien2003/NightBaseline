@@ -226,7 +226,7 @@ object NightPresenter {
         val granted = access?.granted.orEmpty()
         val coreOk = access != null && HcPermissions.missingRequired(granted).isEmpty()
         if (coreOk && access.backgroundFeature && HcPermissions.READ_HEALTH_DATA_IN_BACKGROUND !in granted) return BannerKind.Background
-        val lastRun = runLog.firstOrNull { it.kind != RunLogKind.NOTIFIED }
+        val lastRun = runLog.firstOrNull { it.kind != RunLogKind.NOTIFIED && it.kind != RunLogKind.RECOMPUTED }
         if (lastRun?.kind == RunLogKind.ERROR) return BannerKind.ReadFailed
         if (newest != null && quietDays >= QUIET_DAYS) return BannerKind.SourceQuiet
         if (newest != null && !hasExpected && localTime < WAIT_UNTIL) return BannerKind.Wait

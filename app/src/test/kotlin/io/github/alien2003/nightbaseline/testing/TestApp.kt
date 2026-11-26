@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
+import io.github.alien2003.nightbaseline.algo.AlgoFingerprint
 import io.github.alien2003.nightbaseline.app.AccessMonitor
 import io.github.alien2003.nightbaseline.app.AccessStatus
 import io.github.alien2003.nightbaseline.app.AppData
@@ -27,6 +28,7 @@ import io.github.alien2003.nightbaseline.ui.sample.SampleData
 import io.github.alien2003.nightbaseline.ui.settings.NotificationAccess
 import io.github.alien2003.nightbaseline.ui.settings.SettingsViewModel
 import io.github.alien2003.nightbaseline.work.process.HistoryBackfill
+import io.github.alien2003.nightbaseline.work.process.NightReevaluator
 import io.github.alien2003.nightbaseline.work.schedule.NightScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -168,6 +170,7 @@ class TestApp(
             platform = platform,
             reader = reader,
             backfill = HistoryBackfill(this.settings, reader, this.nights, runLog, clock),
+            reevaluator = NightReevaluator(this.settings, this.nights, runLog, clock),
             compute = Dispatchers.Unconfined,
             io = Dispatchers.Unconfined,
         )
@@ -223,10 +226,24 @@ class TestApp(
                 notifications = notifications,
             )
 
-        /** The first [count] synthetic nights as stored records of the default source, oldest first. */
-        fun records(count: Int = SampleData.evaluated.size): List<NightRecord> =
-            SampleData.evaluated.take(count).map { (summary, evaluation) ->
-                NightRecord(AppSettings.DEFAULT_SOURCE_PACKAGE, summary.date, summary, evaluation, 0L, final = true, evaluationCount = 1)
+        /**
+         * The first [count] synthetic nights as stored records of the default source, oldest first, evaluated with the
+         * default parameters (their fingerprint is current, so nothing is re-evaluated unless a test changes them).
+         */
+        fun records(count: Int = SampleData.evaluated.size): List<NightRecord> {
+            val fingerprint = AlgoFingerprint.of(AppSettings().algoParams())
+            return SampleData.evaluated.take(count).map { (summary, evaluation) ->
+                NightRecord(
+                    AppSettings.DEFAULT_SOURCE_PACKAGE,
+                    summary.date,
+                    summary,
+                    evaluation,
+                    0L,
+                    final = true,
+                    evaluationCount = 1,
+                    algoFingerprint = fingerprint,
+                )
             }
+        }
     }
 }

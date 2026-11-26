@@ -25,7 +25,10 @@ data class RootState(
     val newestNight: String?,
 )
 
-/** The root of the activity: settings that shape the whole app, and the platform status refresh on resume. */
+/**
+ * The root of the activity: settings that shape the whole app, the platform status refresh on resume, and the
+ * re-evaluation of stored nights when the algorithm or its parameters change.
+ */
 @HiltViewModel
 class AppRootViewModel
     @Inject
@@ -37,6 +40,11 @@ class AppRootViewModel
             combine(data.settings, data.currentNights) { s, nights ->
                 RootState(s.onboardingDone, s.theme, s.glassMode, nights.firstOrNull()?.date)
             }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+        init {
+            // App start and every sensitivity change: stored nights follow the current algorithm and parameters.
+            viewModelScope.launch(data.io) { data.keepEvaluationsCurrent() }
+        }
 
         /** Re-checks Health Connect, permissions, the source and notifications (start, resume). */
         fun refresh() {

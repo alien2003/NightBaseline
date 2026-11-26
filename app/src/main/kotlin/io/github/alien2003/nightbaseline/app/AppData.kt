@@ -10,6 +10,7 @@ import io.github.alien2003.nightbaseline.data.local.ZoneSource
 import io.github.alien2003.nightbaseline.data.local.settings.AppSettings
 import io.github.alien2003.nightbaseline.data.local.settings.SettingsRepository
 import io.github.alien2003.nightbaseline.work.process.HistoryBackfill
+import io.github.alien2003.nightbaseline.work.process.NightReevaluator
 import io.github.alien2003.nightbaseline.work.schedule.NightScheduler
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +62,8 @@ class AppData(
     val reader: HealthDataReader,
     /** First-run history read. */
     val backfill: HistoryBackfill,
+    /** Re-evaluation of stored nights when the algorithm or its parameters change. */
+    val reevaluator: NightReevaluator,
     /** Where the mapping to UI state runs. */
     val compute: CoroutineDispatcher,
     /** Where Health Connect and the database are called from (onboarding, source picker). */
@@ -81,6 +84,7 @@ class AppData(
         platform: AppPlatform,
         reader: HealthDataReader,
         backfill: HistoryBackfill,
+        reevaluator: NightReevaluator,
     ) : this(
         settingsRepository,
         nightRepository,
@@ -93,6 +97,7 @@ class AppData(
         platform,
         reader,
         backfill,
+        reevaluator,
         Dispatchers.Default,
         Dispatchers.IO,
     )
@@ -125,6 +130,15 @@ class AppData(
     suspend fun refresh() {
         access.refresh()
         tick.update { it + 1 }
+    }
+
+    /**
+     * Keeps the stored evaluations in step with the current parameters for as long as the caller collects: on start
+     * and on every change of the effective [AlgoParams][io.github.alien2003.nightbaseline.algo.AlgoParams] (the
+     * sensitivity), nights evaluated with another algorithm version or other parameters are re-evaluated silently.
+     */
+    suspend fun keepEvaluationsCurrent() {
+        settings.map { it.algoParams() }.distinctUntilChanged().collect { reevaluator.reevaluateIfNeeded(it) }
     }
 
     /** "Check now": one night check right away. */

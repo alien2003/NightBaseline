@@ -128,16 +128,20 @@ its tone are defined in [design/states.md](design/states.md).
 
 The screenshot tests in `app/src/testDebug/kotlin/…/screenshots/` render screens and components on the JVM
 (Robolectric, hardware PixelCopy so that blur is captured) from **synthetic data only**. A normal test run writes the
-PNGs to `app/build/screenshots/`; CI uploads them as the artifact `screenshots`. With `-PrecordScreenshots` they are
-written to `docs/screenshots/` instead:
+PNGs to `app/build/screenshots/`; CI uploads them as the artifact `screenshots`. With `-PrecordScreenshots` the
+tests that run write to `docs/screenshots/` instead, so record only the README set (the full matrix stays in
+`app/build/screenshots/`):
 
 ```sh
-mise exec -- ./gradlew :app:testDebugUnitTest --tests '*ScreenshotsTest' -PrecordScreenshots
+mise exec -- ./gradlew :app:testDebugUnitTest --tests '*ReadmeScreenshotsTest*' -PrecordScreenshots
 ```
 
-The README shows ten images recorded this way, light and dark, from synthetic nights: `home-light.png`,
-`home-dark.png`, `metric-light.png`, `metric-dark.png`, `history-light.png`, `history-dark.png`,
-`onboarding-light.png`, `onboarding-dark.png`, `settings-light.png`, `settings-dark.png`. Screenshots of real data
+`ReadmeScreenshotsTest` renders the ten images the README shows: the integrated app over the fake repositories filled
+with the synthetic `SampleData` nights, on the `phone` window (412 x 915 dp) at font 1.0 with the glass shell, light
+and dark, captured at rest: `home-{light,dark}.png` (last night with measurements outside the usual range),
+`metric-{light,dark}.png` (sleeping heart rate, 30 nights), `history-{light,dark}.png`,
+`onboarding-{light,dark}.png` (welcome step) and `settings-{light,dark}.png` (main page). It fails on an unfilled
+placeholder or clipped text. Look at the images before committing them. Screenshots of real data
 never go into the repository; reference screenshots of other apps stay in `.data/design-refs/`.
 
 ## Health data, the dataset exporter and algo-cli

@@ -129,10 +129,9 @@ val prepareRobolectricDependencies =
         into(robolectricDependencyDir)
     }
 
-// The screenshot matrix (component catalog pages and the placeholder Home, synthetic data only) is rendered on the JVM
-// by CatalogScreenshotsTest. Every test run renders into build/screenshots; with -PrecordScreenshots the images are
-// written to docs/screenshots instead:
-//   ./gradlew :app:testDebugUnitTest --tests '*CatalogScreenshotsTest' -PrecordScreenshots
+// The screenshot tests (synthetic data only) render on the JVM. Every test run renders into build/screenshots; with
+// -PrecordScreenshots the images are written to docs/screenshots instead. Record only the README set there:
+//   ./gradlew :app:testDebugUnitTest --tests '*ReadmeScreenshotsTest*' -PrecordScreenshots
 val recordScreenshots = providers.gradleProperty("recordScreenshots").isPresent
 val screenshotDir: String =
     if (recordScreenshots) {

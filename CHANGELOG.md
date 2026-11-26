@@ -40,6 +40,9 @@ a medical device.
 - **History on first run.** With the past-data permission, up to 60 earlier nights are evaluated right away, so the
   learning period can be over on day one.
 - **Sensitivity.** "Fewer notes", "Balanced" (default) and "More notes", with a preview over your own stored nights.
+  A change applies to the stored nights too: they are evaluated again from their stored summaries, without notes.
+- **Stored nights follow the algorithm.** After an update that changes how nights are evaluated, stored nights are
+  evaluated again from their stored summaries (no new Health Connect read, no notifications).
 - **Any source.** Choose any app that writes sleep sessions and heart rate to Health Connect; OHealth is the default
   and the first tested source. PulseStages sessions are always ignored.
 - **Adaptive layouts** for phones, foldables (outer and inner screen, tabletop and book postures), tablets, split

@@ -25,6 +25,12 @@ enum class RunLogKind {
 
     /** A run failed. */
     ERROR,
+
+    /**
+     * Stored nights were re-evaluated from their stored summaries because the algorithm or its parameters changed
+     * (nothing was read from Health Connect, nothing was notified).
+     */
+    RECOMPUTED,
 }
 
 /** One run-log line. */

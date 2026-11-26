@@ -37,6 +37,11 @@ data class NightRecord(
     val notifiedAtMs: Long? = null,
     /** The status the shown notification was about. */
     val notifiedStatus: NightStatus? = null,
+    /**
+     * `AlgoFingerprint` of the algorithm version and parameters that produced [evaluation]; null when unknown (stored
+     * before fingerprints existed). A night whose fingerprint differs from the current one is re-evaluated.
+     */
+    val algoFingerprint: String? = null,
 )
 
 /** Stored nights, per source. */
@@ -90,6 +95,7 @@ object NightJson {
             evaluationCount = record.evaluationCount,
             notifiedAtMs = record.notifiedAtMs,
             notifiedStatus = record.notifiedStatus?.name,
+            algoFingerprint = record.algoFingerprint,
         )
 
     /** Record of [entity]. */
@@ -104,6 +110,7 @@ object NightJson {
             evaluationCount = entity.evaluationCount,
             notifiedAtMs = entity.notifiedAtMs,
             notifiedStatus = NightStatus.entries.firstOrNull { it.name == entity.notifiedStatus },
+            algoFingerprint = entity.algoFingerprint,
         )
 }
 

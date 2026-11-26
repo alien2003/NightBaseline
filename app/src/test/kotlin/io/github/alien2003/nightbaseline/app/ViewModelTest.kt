@@ -1,12 +1,16 @@
 package io.github.alien2003.nightbaseline.app
 
 import androidx.lifecycle.SavedStateHandle
+import io.github.alien2003.nightbaseline.algo.AlgoFingerprint
+import io.github.alien2003.nightbaseline.algo.AlgoParams
+import io.github.alien2003.nightbaseline.algo.Evaluator
 import io.github.alien2003.nightbaseline.algo.MetricId
 import io.github.alien2003.nightbaseline.data.hc.HcAvailability
 import io.github.alien2003.nightbaseline.data.hc.HcPermissions
 import io.github.alien2003.nightbaseline.data.local.RunLogKind
 import io.github.alien2003.nightbaseline.data.local.settings.AppSettings
 import io.github.alien2003.nightbaseline.data.local.settings.SensitivityLevel
+import io.github.alien2003.nightbaseline.nav.AppRootViewModel
 import io.github.alien2003.nightbaseline.testing.TestApp
 import io.github.alien2003.nightbaseline.ui.history.HistoryAccess
 import io.github.alien2003.nightbaseline.ui.history.HistoryView
@@ -309,6 +313,34 @@ class ViewModelTest {
             assertEquals(SensitivityLevel.HIGH, app.settings.current.value.sensitivity)
             val more = vm.ui.ready { it?.sensitivity == SensitivityPreset.More }!!
             assertTrue(more.previewNotes!! >= state.previewNotes!!)
+        }
+
+    @Test
+    fun `the root re-evaluates stale stored nights at start and after a sensitivity change, silently`() =
+        runTest {
+            val app = TestApp()
+            val newest = app.nights.all.last()
+            val stale = Evaluator.evaluate(newest.summary, app.nights.all.map { it.summary }, AlgoParams(zThreshold = 4.5))
+            app.nights.upsert(newest.copy(evaluation = stale, algoFingerprint = null))
+
+            AppRootViewModel(app.data)
+            val balanced = AppSettings(onboardingDone = true).algoParams()
+            assertTrue(app.nights.all.all { it.algoFingerprint == AlgoFingerprint.of(balanced) })
+            assertEquals(
+                newest.evaluation,
+                app.nights.all
+                    .last()
+                    .evaluation,
+            )
+            assertEquals(1, app.runLog.lines.count { it.kind == RunLogKind.RECOMPUTED })
+
+            SettingsViewModel(SavedStateHandle(), app.data).setSensitivity(SensitivityPreset.More)
+            val more = AppSettings(sensitivity = SensitivityLevel.HIGH).algoParams()
+            assertTrue(app.nights.all.all { it.algoFingerprint == AlgoFingerprint.of(more) })
+            val history = app.nights.all.map { it.summary }
+            assertEquals(app.nights.all.map { Evaluator.evaluate(it.summary, history, more) }, app.nights.all.map { it.evaluation })
+            assertEquals(2, app.runLog.lines.count { it.kind == RunLogKind.RECOMPUTED })
+            assertTrue(app.runLog.lines.none { it.kind == RunLogKind.NOTIFIED })
         }
 
     @Test

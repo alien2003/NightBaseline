@@ -40,7 +40,11 @@ object DataLocalModule {
     @Singleton
     fun provideDatabase(
         @ApplicationContext context: Context,
-    ): NightBaselineDatabase = Room.databaseBuilder(context, NightBaselineDatabase::class.java, NightBaselineDatabase.FILE_NAME).build()
+    ): NightBaselineDatabase =
+        Room
+            .databaseBuilder(context, NightBaselineDatabase::class.java, NightBaselineDatabase.FILE_NAME)
+            .addMigrations(NightBaselineDatabase.MIGRATION_1_2)
+            .build()
 
     /** DAO of `nights`. */
     @Provides

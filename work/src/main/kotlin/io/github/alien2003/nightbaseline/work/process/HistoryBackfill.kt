@@ -1,5 +1,6 @@
 package io.github.alien2003.nightbaseline.work.process
 
+import io.github.alien2003.nightbaseline.algo.AlgoFingerprint
 import io.github.alien2003.nightbaseline.algo.AlgoParams
 import io.github.alien2003.nightbaseline.algo.Evaluator
 import io.github.alien2003.nightbaseline.algo.MetricExtractor
@@ -68,9 +69,21 @@ class HistoryBackfill
                 val data = reader.readNight(source, chunk.first().startMs, chunk.last().endMs + 1)
                 chunk.forEach { c -> summaries += MetricExtractor.summarize(c.withSamples(data.channels), provided, params) }
             }
+            val fingerprint = AlgoFingerprint.of(params)
             summaries.forEach { summary ->
                 val evaluation = Evaluator.evaluate(summary, summaries, params)
-                nights.upsert(NightRecord(source, summary.date, summary, evaluation, now, final = true, evaluationCount = 1))
+                nights.upsert(
+                    NightRecord(
+                        source,
+                        summary.date,
+                        summary,
+                        evaluation,
+                        now,
+                        final = true,
+                        evaluationCount = 1,
+                        algoFingerprint = fingerprint,
+                    ),
+                )
             }
             runLog.log(RunLogKind.BACKFILL, "backfill stored ${summaries.size} nights (${if (whole) "whole history" else "last 30 days"})")
             return BackfillOutcome.Done(summaries.size, whole)

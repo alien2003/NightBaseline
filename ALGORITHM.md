@@ -121,6 +121,13 @@ noisiest metric and changes with everyday life.
 
 Sensitivity setting: *Balanced* (default) z 2.5; *Fewer notes* z 3.0; *More notes* z 2.0.
 
+Stored evaluations follow the current algorithm. Each stored night carries a fingerprint: `AlgoFingerprint.ALGO_VERSION`
+(bumped on every change that can change an evaluation of the same summaries) and a hash of the effective parameters,
+sensitivity included. When a stored fingerprint differs from the current one (after an app update or a sensitivity
+change), every stored night of that source is evaluated again from its stored summary against the other stored
+summaries, at app start, after the setting changes and before each night check. Nothing is read from Health Connect
+for this, and re-evaluated past nights are never notified.
+
 ## 7. Validation
 
 **Synthetic people** (`SyntheticBehaviourTest`, 200 people × 90 nights, with one 3-night episode each that raises heart

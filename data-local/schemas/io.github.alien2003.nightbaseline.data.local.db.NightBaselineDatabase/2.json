@@ -1,0 +1,130 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "a054b252fd628942dc9d47e387228c4b",
+    "entities": [
+      {
+        "tableName": "nights",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sourcePackage` TEXT NOT NULL, `date` TEXT NOT NULL, `summaryJson` TEXT NOT NULL, `evaluationJson` TEXT NOT NULL, `computedAtMs` INTEGER NOT NULL, `final` INTEGER NOT NULL, `evaluationCount` INTEGER NOT NULL, `notifiedAtMs` INTEGER, `notifiedStatus` TEXT, `algoFingerprint` TEXT, PRIMARY KEY(`sourcePackage`, `date`))",
+        "fields": [
+          {
+            "fieldPath": "sourcePackage",
+            "columnName": "sourcePackage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "summaryJson",
+            "columnName": "summaryJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evaluationJson",
+            "columnName": "evaluationJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "computedAtMs",
+            "columnName": "computedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "final",
+            "columnName": "final",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evaluationCount",
+            "columnName": "evaluationCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notifiedAtMs",
+            "columnName": "notifiedAtMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "notifiedStatus",
+            "columnName": "notifiedStatus",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "algoFingerprint",
+            "columnName": "algoFingerprint",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sourcePackage",
+            "date"
+          ]
+        }
+      },
+      {
+        "tableName": "run_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timeMs` INTEGER NOT NULL, `kind` TEXT NOT NULL, `message` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timeMs",
+            "columnName": "timeMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "message",
+            "columnName": "message",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_run_log_timeMs",
+            "unique": false,
+            "columnNames": [
+              "timeMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_run_log_timeMs` ON `${TABLE_NAME}` (`timeMs`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a054b252fd628942dc9d47e387228c4b')"
+    ]
+  }
+}

@@ -29,6 +29,8 @@ data class NightEntity(
     val notifiedAtMs: Long? = null,
     /** `NightStatus` name the shown notification was about. */
     val notifiedStatus: String? = null,
+    /** `AlgoFingerprint` of the algorithm and parameters that produced the evaluation; null for rows of schema 1. */
+    val algoFingerprint: String? = null,
 )
 
 /**

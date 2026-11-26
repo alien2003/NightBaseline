@@ -46,7 +46,8 @@ class Harness {
         }
     val problems = mutableListOf<DataProblem?>()
     val problemNotifier = ProblemNotifier { problems += it }
-    val processor = NightProcessor(settings, reader, nights, notifier, runLog, clock, { zone })
+    val reevaluator = NightReevaluator(settings, nights, runLog, clock)
+    val processor = NightProcessor(settings, reader, nights, notifier, runLog, clock, { zone }, reevaluator)
     val backfill = HistoryBackfill(settings, reader, nights, runLog, clock)
 
     /** Stored record of [night]. */

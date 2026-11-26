@@ -375,6 +375,8 @@ Three presets decide how far from your usual range a value must be before it cou
 | "More notes" | "Smaller changes count too." | 2 spreads. |
 
 The minimum amounts per measurement ([Metric detail](#metric-detail-and-the-usual-range)) apply with every preset.
+A new preset applies to your stored nights too: they are compared again with the new setting on the phone, and no
+notification is sent for past nights.
 After the learning period, the screen previews the effect: "With this setting, {k} of your last {n} nights would have
 sent a note." (computed on the phone from your stored nights; during learning: "A preview appears after the learning
 period.").
