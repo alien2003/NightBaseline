@@ -67,4 +67,4 @@ no internet. Current state and plan: `docs/STATUS.md` (read it first in a new se
 - `mise exec -- <cmd>` (or activated mise) provides Java, the Android SDK in `.tooling/android-sdk`,
   `GRADLE_USER_HOME=.tooling/gradle`, `ADB_WIN=adb.exe`, `ANDROID_USER_HOME=.tooling/android-user`.
 - Package `io.github.alien2003.nightbaseline`. License: Apache-2.0.
-- github.com/alien2003/NightBaseline stays private until stage 5.
+- github.com/alien2003/NightBaseline is public (since 2026-11-26).
