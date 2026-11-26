@@ -26,6 +26,11 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
   ([ADR 0008](https://github.com/alien2003/NightBaseline/blob/main/docs/adr/0008-high-refresh-rate.md)).
 - **Less work per frame and at start-up.** The calendar no longer redraws every day cell when one changes, the
   start-up work runs off the main thread, and the start-up profile now covers the whole blur library.
+- **"Set up again" asks first.** Settings > "Set up again" now asks for confirmation. Back on the source step returns
+  to Settings, and the app stays set up until the new setup is finished, so History and Settings stay reachable even
+  without Health Connect.
+- **Test bench: emulator console ports are limited to 5554..5584**, the range adb scans. `seed.sh late_upload` warns
+  when the 12-hour cap will skip the "waits: channel incomplete" state, and the bench README explains it.
 
 ### Fixed
 
@@ -37,6 +42,24 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
   after the tap: the release arrived before the highlight had drawn its first frame and was skipped. Every press now
   ends on its own release or cancel, and a press also clears when the window loses focus or the app is paused or
   stopped.
+- **Back gesture after a cancelled one.** A second swipe right after cancelling one on a page opened from History or
+  Settings now goes back one level, and the page continues from where it was instead of jumping back.
+- **Settings pages move as a whole.** The title and back button of a Settings page now move with the page during the
+  back gesture and page transitions.
+- **No double pages.** A fast double tap on a card or row no longer opens the same page twice.
+- **Background access.** "Allow" on the background-access banner now opens Health Connect when Health Connect no
+  longer shows its permission dialog.
+- **Keyboard shortcuts right after a touch.** Ctrl+1/2/3, Ctrl+R, Esc and Alt+Left now work right after touching the
+  screen, without first pressing Tab.
+- **Source names.** Settings shows the source app's name instead of a package id broken mid-word when the app is not
+  installed.
+- **Test bench.** The "deviations" scenario now reliably moves 3 measurements (heart rate +14 bpm, breathing +2.5,
+  SpO2 -4), whatever the night count. `emu.sh clock` retries `adb root`/`unroot`, checks that it took effect and waits
+  for adbd to come back, so scripted runs right after boot no longer break. `seed.sh` ties the result line to its own
+  run, so it no longer reports an older result after the emulator clock was set back. `install.sh --no-grant` still
+  grants the seeder, so seeding works on a fresh emulator. `multiwindow.sh reset` restores the freeform settings that
+  `freeform` turned on. `rotate.sh` works on API 28, checks the lock and fails loudly if it did not apply. `diag.sh`
+  lists only NightBaseline's scheduled jobs on API 28 too.
 
 ## [0.1.0] - 2026-11-26
 
