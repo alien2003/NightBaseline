@@ -3,7 +3,6 @@ package io.github.alien2003.nightbaseline.ui.model
 import android.content.res.Resources
 import android.icu.text.DateFormat
 import android.icu.text.DisplayContext
-import android.icu.text.ListFormatter
 import android.icu.util.TimeZone
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
@@ -92,7 +91,7 @@ data class FormattedValue(
 
 /**
  * Turns the UI model into text with the app's resources and the current locale: numbers through [NumberFormat],
- * dates through ICU skeletons, lists through [ListFormatter], counted nouns through plurals. Every text the
+ * dates through ICU skeletons, lists through ICU's ListFormatter ([InlineNames.join]), counted nouns through plurals. Every text the
  * components show or announce comes from here, so screens and tests share one wording.
  */
 @Suppress("TooManyFunctions") // The one wording facade of the UI: every text the components show comes from here.
@@ -108,7 +107,6 @@ class UiText(
     private val decimalFormats = HashMap<Int, NumberFormat>()
     private val percentFormat by lazy(LazyThreadSafetyMode.NONE) { NumberFormat.getPercentInstance(locale) }
     private val dateFormats = HashMap<String, DateFormat>()
-    private val listFormatter by lazy(LazyThreadSafetyMode.NONE) { ListFormatter.getInstance(locale) }
     private val nightLabels = HashMap<LocalDate, String>()
 
     /** String resource with arguments. */
@@ -454,7 +452,7 @@ class UiText(
     fun list(
         items: List<String>,
         inline: Boolean = false,
-    ): String = listFormatter.format(InlineNames.of(items, locale, inline))
+    ): String = InlineNames.join(items, locale, inline)
 
     /** Headline of a night (`state_*_title`). */
     @Suppress("CyclomaticComplexMethod") // An exhaustive state -> copy table (states.md); splitting it would hide the mapping.

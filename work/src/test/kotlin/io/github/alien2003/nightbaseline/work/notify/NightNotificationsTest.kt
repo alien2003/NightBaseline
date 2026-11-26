@@ -42,7 +42,7 @@ class NightNotificationsTest {
         // The same full names as the app's cards, summary and History (one name per measurement).
         assertEquals("Sleeping heart rate and Respiratory rate. Night of Nov 24–25.", NoticeText.body(res, two, Locale.US).dash())
         assertEquals(
-            "Sleeping heart rate, Respiratory rate, Skin temperature and 2 more. Night of Nov 24–25.",
+            "Sleeping heart rate, Respiratory rate, Skin temperature, and 2 more. Night of Nov 24–25.",
             NoticeText.body(res, five, Locale.US).dash(),
         )
         // Across a month boundary both months are named.
@@ -80,14 +80,31 @@ class NightNotificationsTest {
         val rr = res.getString(R.string.metric_respiratory_rate)
         // Inside a Russian sentence only the first name keeps its capital letter.
         val rrInline = rr.replaceFirstChar { it.lowercase(ru) }
-        assertTrue(NoticeText.body(res, two, ru).startsWith(res.getString(R.string.notif_list_and, hr, rrInline)))
+        assertTrue(NoticeText.body(res, two, ru).startsWith("$hr $RU_AND $rrInline"))
         // After "Higher than usual:" the first name is inside the sentence too; the sentences keep their spaces.
         val long = NoticeText.bodyLong(res, mixed)
         assertTrue(long, long.contains(hr.replaceFirstChar { it.lowercase(ru) } + ". "))
         assertTrue(long, long.contains("(SpO2). "))
-        assertTrue(NoticeText.body(res, five, ru).contains(res.getQuantityString(R.plurals.notif_list_more, 2, 2)))
+        // Russian lists put no comma before the last item, the same as the app's lists.
+        val more = res.getQuantityString(R.plurals.notif_list_more, 2, 2)
+        assertTrue(NoticeText.body(res, five, ru).contains(" $RU_AND $more"))
+        assertFalse(NoticeText.body(res, five, ru).contains(", $RU_AND "))
         assertNotEquals(NoticeText.bodyLong(res, mixed), "")
         assertTrue("Russian title is fully translated", NoticeText.title(res, two).none { it in 'A'..'z' })
+    }
+
+    @Test
+    fun theNotificationAndTheAppShareOneListFormat() {
+        val res = app.resources
+        val three = listOf(MetricId.SLEEPING_HR, MetricId.RESPIRATORY_RATE, MetricId.SPO2)
+        val names = three.map { res.getString(NoticeText.metricNameRes(it)) }
+        // The app's lists (UiText.list) go through InlineNames.join too, so both read the same.
+        assertEquals(InlineNames.join(names, Locale.US), NoticeText.list(res, three, Locale.US))
+        assertEquals("Sleeping heart rate, Respiratory rate, and Blood oxygen (SpO2)", NoticeText.list(res, three, Locale.US))
+        assertEquals("A and B", InlineNames.join(listOf("A", "B"), Locale.US))
+        val ru = Locale.forLanguageTag("ru")
+        assertEquals("A, B $RU_AND C", InlineNames.join(listOf("A", "B", "C"), ru))
+        assertEquals(InlineNames.join(names, ru, inline = true), NoticeText.list(res, three, ru, inline = true))
     }
 
     @Test
@@ -196,5 +213,8 @@ class NightNotificationsTest {
                 stem(0x442, 0x440, 0x435, 0x432, 0x43E, 0x433),
                 stem(0x43E, 0x43F, 0x430, 0x441, 0x43D),
             )
+
+        /** The Russian "and" of a list, from its code point (no readable Russian outside resources). */
+        val RU_AND = stem(0x438)
     }
 }

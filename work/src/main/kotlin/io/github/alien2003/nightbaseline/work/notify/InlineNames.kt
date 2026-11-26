@@ -1,5 +1,6 @@
 package io.github.alien2003.nightbaseline.work.notify
 
+import android.icu.text.ListFormatter
 import java.util.Locale
 
 /**
@@ -22,6 +23,18 @@ object InlineNames {
         if (locale.language != RUSSIAN) return names
         return names.mapIndexed { i, name -> if (i > 0 || inline) lowerFirst(name, locale) else name }
     }
+
+    /**
+     * [names] joined as a list in [locale] through ICU's [ListFormatter] ("A, B, and C" in English, no comma before
+     * the last item in Russian), after [of]. The one list format of the app's screens and the notification, so they always agree.
+     * [tail] is appended as the last item unchanged ("2 more").
+     */
+    fun join(
+        names: List<String>,
+        locale: Locale,
+        inline: Boolean = false,
+        tail: String? = null,
+    ): String = ListFormatter.getInstance(locale).format(of(names, locale, inline) + listOfNotNull(tail))
 
     private fun lowerFirst(
         name: String,

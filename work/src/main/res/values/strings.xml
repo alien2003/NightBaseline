@@ -15,11 +15,9 @@
     <!-- %1$s metric list, %2$s night label. -->
     <string name="notif_dev_body">%1$s. %2$s.</string>
     <plurals name="notif_list_more">
-        <item quantity="one">and %1$d more</item>
-        <item quantity="other">and %1$d more</item>
+        <item quantity="one">%1$d more</item>
+        <item quantity="other">%1$d more</item>
     </plurals>
-    <!-- Joins the last name of a short list: "Heart rate and Breathing". Not in states.md (implementation detail). -->
-    <string name="notif_list_and">%1$s and %2$s</string>
     <!-- %1$s higher part, %2$s lower part (each empty or ending with a space). -->
     <string name="notif_dev_body_long">%1$s%2$sThis compares the night with your own recent nights and isn\'t a diagnosis. Not a medical device.</string>
     <string name="notif_higher_prefix">"Higher than usual: %1$s. "</string>

@@ -95,8 +95,9 @@ object NoticeText {
     }
 
     /**
-     * Names: "A", "A and B", "A, B and C", "A, B, C and {n} more", written as inside a sentence ([InlineNames];
-     * [inline] when the list follows other words, as after "Lower than usual:").
+     * Names: "A", "A and B", "A, B, and C", "A, B, C, and {n} more", in the locale's list format ([InlineNames.join],
+     * the same as the app's lists), written as inside a sentence ([inline] when the list follows other words, as after
+     * "Lower than usual:").
      */
     fun list(
         res: Resources,
@@ -104,15 +105,11 @@ object NoticeText {
         locale: Locale = res.configuration.locales[0],
         inline: Boolean = false,
     ): String {
-        val names = InlineNames.of(metrics.map { res.getString(metricNameRes(it)) }, locale, inline)
+        val names = metrics.map { res.getString(metricNameRes(it)) }
         val shown = names.take(MAX_LISTED)
         val rest = names.size - shown.size
-        return when {
-            shown.isEmpty() -> ""
-            rest > 0 -> shown.joinToString(", ") + " " + res.getQuantityString(R.plurals.notif_list_more, rest, rest)
-            shown.size == 1 -> shown[0]
-            else -> res.getString(R.string.notif_list_and, shown.dropLast(1).joinToString(", "), shown.last())
-        }
+        val tail = if (rest > 0) res.getQuantityString(R.plurals.notif_list_more, rest, rest) else null
+        return if (shown.isEmpty()) "" else InlineNames.join(shown, locale, inline, tail)
     }
 
     /** `night_label` of the night that ends on [wakeDate], the same label the app's screens show ([NightLabel]). */
