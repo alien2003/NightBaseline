@@ -1,15 +1,130 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 108 dp adaptive foreground: a crescent moon above a rounded horizontal band (the "usual range"). -->
+<!-- 108 dp adaptive foreground "aurora-range": a luminous aurora ribbon crossing the icon is the personal usual range,
+     three dots on it are nights, a small crescent above it is the night. Light comes from the top left; the ribbon has
+     a light rim on its upper edge and a translucent echo behind it for depth. Content sits inside the 66 dp safe circle
+     except the ribbon's ends, which deliberately run off the edge. Own art, no vendor resources. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Aurora curtain: a translucent veil rising from the ribbon and fading upwards, for layered depth. -->
+    <path android:pathData="M0,74 C20,70 36,54 56,56 C74,58 84,48 108,34 L108,16 C86,32 74,38 56,36 C36,34 20,50 0,56 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="50"
+                android:startY="60"
+                android:endX="58"
+                android:endY="34">
+                <item android:offset="0" android:color="#5C6FC8FF" />
+                <item android:offset="0.45" android:color="#226E9BFF" />
+                <item android:offset="1" android:color="#00B09CFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Glow under the ribbon. -->
+    <path android:pathData="M0,78 C20,74 36,60 56,62 C74,64 84,54 108,40 L108,54 C86,70 74,80 56,79 C38,78 22,88 0,90 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54"
+                android:startY="64"
+                android:endX="54"
+                android:endY="82">
+                <item android:offset="0" android:color="#404FD6C6" />
+                <item android:offset="1" android:color="#004FD6C6" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Main ribbon: teal to blue to violet. -->
+    <path android:pathData="M0,74 C20,70 36,54 56,56 C74,58 84,48 108,34 L108,44 C86,61 74,73.5 56,72.5 C38,71.5 22,80.5 0,82.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="10"
+                android:startY="78"
+                android:endX="100"
+                android:endY="42">
+                <item android:offset="0" android:color="#334FD6C6" />
+                <item android:offset="0.18" android:color="#FF4FD6C6" />
+                <item android:offset="0.55" android:color="#FF7AA8FF" />
+                <item android:offset="0.88" android:color="#FFBBA8FF" />
+                <item android:offset="1" android:color="#99B09CFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Inner shade: the lower half of the ribbon turns a little deeper, so the band reads as a soft fold. -->
+    <path android:pathData="M0,78 C21,75 37,62 56,63.5 C74,65 85,54 108,39 L108,44 C86,61 74,73.5 56,72.5 C38,71.5 22,80.5 0,82.5 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54"
+                android:startY="60"
+                android:endX="54"
+                android:endY="74"
+                android:startColor="#001A2A7A"
+                android:endColor="#3D24307A" />
+        </aapt:attr>
+    </path>
+    <!-- Light rim on the upper edge, brightest towards the top-left light source. -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M58,30 A16,16 0 1,0 72,52 A12,12 0 1,1 58,30 Z" />
+        android:pathData="M0,74 C20,70 36,54 56,56 C74,58 84,48 108,34"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="14"
+                android:startY="66"
+                android:endX="96"
+                android:endY="42"
+                android:startColor="#00FFFFFF"
+                android:centerColor="#FFFFFFFF"
+                android:endColor="#33FFFFFF" />
+        </aapt:attr>
+    </path>
+    <!-- Three nights on the ribbon: soft halos, then the dots; the latest night is the brightest. -->
     <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.85"
-        android:pathData="M36,64 L72,64 A4,4 0 0,1 72,72 L36,72 A4,4 0 0,1 36,64 Z" />
+        android:fillColor="#33FFFFFF"
+        android:pathData="M38,65.8m-4.2,0a4.2,4.2 0,1 1,8.4 0a4.2,4.2 0,1 1,-8.4 0 M54,63.4m-4.2,0a4.2,4.2 0,1 1,8.4 0a4.2,4.2 0,1 1,-8.4 0 M70,62m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+    <path
+        android:fillColor="#E6FFFFFF"
+        android:pathData="M38,65.8m-2.5,0a2.5,2.5 0,1 1,5 0a2.5,2.5 0,1 1,-5 0 M54,63.4m-2.5,0a2.5,2.5 0,1 1,5 0a2.5,2.5 0,1 1,-5 0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M70,62m-3.1,0a3.1,3.1 0,1 1,6.2 0a3.1,3.1 0,1 1,-6.2 0" />
+    <!-- Crescent glow. -->
+    <path android:pathData="M58,35m-19,0a19,19 0,1 1,38 0a19,19 0,1 1,-38 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="56"
+                android:centerY="36"
+                android:gradientRadius="19"
+                android:startColor="#59C9D4FF"
+                android:endColor="#00C9D4FF" />
+        </aapt:attr>
+    </path>
+    <!-- Crescent, lit from the top left. -->
+    <path android:pathData="M57.65,22.51 A12.5,12.5 0,1 0,69.7 39.39 A10.5,10.5 0,0 1,57.65 22.51 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="47"
+                android:startY="24"
+                android:endX="66"
+                android:endY="46"
+                android:startColor="#FFFFFFFF"
+                android:centerColor="#FFF1EEFF"
+                android:endColor="#FFC3C6F5" />
+        </aapt:attr>
+    </path>
+    <!-- Crescent rim: a thin bright edge on the lit outer side. -->
+    <path
+        android:pathData="M57.65,22.51 A12.5,12.5 0,0 0,46.2 39.5"
+        android:strokeWidth="0.9"
+        android:strokeColor="#B3FFFFFF"
+        android:strokeLineCap="round" />
 </vector>

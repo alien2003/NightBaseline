@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 108 dp adaptive background "aurora-range": a midnight gradient lit from the top left, a faint aurora haze behind
+     the ribbon and a soft vignette towards the edges. Own art, no vendor resources. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Midnight base: lighter indigo at the top left, deep navy at the bottom right. -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="18"
+                android:startY="14"
+                android:endX="90"
+                android:endY="98"
+                android:startColor="#FF33449A"
+                android:centerColor="#FF1B2263"
+                android:endColor="#FF0A0E33" />
+        </aapt:attr>
+    </path>
+    <!-- Aurora haze: a wide, very soft teal-blue glow along the ribbon's path. -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="56"
+                android:centerY="64"
+                android:gradientRadius="40"
+                android:startColor="#5548B8D8"
+                android:centerColor="#224A6BD8"
+                android:endColor="#00000000" />
+        </aapt:attr>
+    </path>
+    <!-- Top-left light source: a soft sheen. -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="26"
+                android:centerY="20"
+                android:gradientRadius="46"
+                android:startColor="#3DA9B8FF"
+                android:endColor="#00A9B8FF" />
+        </aapt:attr>
+    </path>
+    <!-- Vignette: the corners settle into night. -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="52"
+                android:centerY="50"
+                android:gradientRadius="62"
+                android:startColor="#00050720"
+                android:centerColor="#00050720"
+                android:endColor="#99050720" />
+        </aapt:attr>
+    </path>
+</vector>

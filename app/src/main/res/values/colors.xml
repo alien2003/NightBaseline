@@ -2,6 +2,4 @@
 <resources>
     <!-- color.background (tokens.md 2.1) for the window before Compose draws; values-night has the dark value. -->
     <color name="nb_window_background">#F1F2F5</color>
-    <!-- Launcher icon: color.primary (light) behind the own crescent-and-band glyph. -->
-    <color name="nb_launcher_background">#2C5BD6</color>
 </resources>
