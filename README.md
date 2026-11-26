@@ -163,7 +163,10 @@ worried, talk to a health professional.
 
 ## Project status
 
-- **First release: 0.1.0** (in preparation, [CHANGELOG.md](CHANGELOG.md)).
+- **Current release: 0.1.0** (2026-11-26, [CHANGELOG.md](CHANGELOG.md)). First public version; feedback and source
+  reports are welcome in GitHub issues.
+- **Tested on a device:** the on-device suite ([tools/device-test](tools/device-test/README.md)) passes on the
+  developer's phone, and real nights from OHealth are processed automatically.
 - **Platform.** Android 9 and later (minSdk 28, targetSdk 36, compileSdk 37). Developed on an OPPO book foldable with
   Android 17 and ColorOS 17; the layouts adapt to phones, foldables (both screens, tabletop and book postures) and
   tablets.

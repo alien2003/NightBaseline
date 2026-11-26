@@ -10,7 +10,7 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-11-27
+## [0.1.0] - 2026-11-26
 
 First release. NightBaseline reads last night's measurements from Health Connect once a day, compares each one with
 your own recent nights and tells you, calmly, when two or more measurements moved outside your usual range. It is not
