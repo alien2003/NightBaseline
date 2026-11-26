@@ -140,6 +140,8 @@ private const val WIDE_PRESS_THRESHOLD = 0.97f
  * @param pressScale false for rows inside a grouped card: they only light up.
  * @param glow touch-following light also on a solid element (round shell buttons, period thumb, primary button).
  * @param forced draws a state without real input (component catalog only).
+ * @param focusRingInside draws the focus ring 2 dp inside [shape] instead of outside: for elements that fill a
+ *   parent which clips at their bounds (rows of a grouped card, a card-wide target), where an outside ring is cut off.
  */
 @Composable
 fun Modifier.nbClickable(
@@ -153,6 +155,7 @@ fun Modifier.nbClickable(
     forced: ForcedInteraction? = null,
     interactionSource: MutableInteractionSource? = null,
     glow: Boolean = onGlass,
+    focusRingInside: Boolean = false,
 ): Modifier {
     val source = interactionSource ?: remember { MutableInteractionSource() }
     val motion = NbTheme.motion
@@ -174,6 +177,7 @@ fun Modifier.nbClickable(
             row = !pressScale,
             glow = glow,
             forced = forced,
+            ringInside = focusRingInside,
         )
     return this
         .then(if (pressScale && !motion.reduced) PressScaleElement(source, motion) else Modifier)
@@ -432,6 +436,7 @@ private data class PressFeedbackElement(
     val row: Boolean,
     val glow: Boolean,
     val forced: ForcedInteraction?,
+    val ringInside: Boolean,
 ) : ModifierNodeElement<PressFeedbackNode>() {
     override fun create(): PressFeedbackNode = PressFeedbackNode(this)
 
@@ -626,7 +631,7 @@ private class PressFeedbackNode(
         drawUnderContent()
         drawContent()
         val keyboard = focused && currentValueOf(LocalInputModeManager).inputMode == InputMode.Keyboard
-        if (keyboard || spec.forced == ForcedInteraction.Focus) drawFocusRing(spec.shape, spec.look.ring)
+        if (keyboard || spec.forced == ForcedInteraction.Focus) drawFocusRing(spec.shape, spec.look.ring, spec.ringInside)
     }
 
     private fun glowAlpha(forced: Boolean): Float =
@@ -659,11 +664,14 @@ private class PressFeedbackNode(
     }
 }
 
+/** The 2 dp ring 2 dp outside [shape], or 2 dp inside it with [inside] (a parent clips at the element's bounds). */
 private fun DrawScope.drawFocusRing(
     shape: Shape,
     color: Color,
+    inside: Boolean,
 ) {
-    val inset = (NbDimens.focusRingOffset + NbDimens.focusRingWidth / 2).toPx()
+    val outset = (NbDimens.focusRingOffset + NbDimens.focusRingWidth / 2).toPx()
+    val inset = if (inside) -outset else outset
     val ringSize = Size(size.width + 2 * inset, size.height + 2 * inset)
     val ring = shape.createOutline(ringSize, layoutDirection, this)
     translate(-inset, -inset) {

@@ -26,11 +26,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.cardTag
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
@@ -212,7 +215,9 @@ private fun BalancedColumns(
         Column(
             Modifier
                 .fillMaxWidth()
+                .focusRingRoom()
                 .verticalScroll(scroll)
+                .padding(FocusRingRoom)
                 .heightIn(min = minHeight)
                 .padding(vertical = NbSpace.s7),
             verticalArrangement = Arrangement.Center,
@@ -264,11 +269,22 @@ private fun CardStep(
             verticalAlignment = Alignment.Top,
         ) {
             StartColumn(state, actions, illustration, Modifier.weight(START_COLUMN_SHARE))
-            Column(
-                Modifier.weight(1f - START_COLUMN_SHARE).verticalScroll(scroll),
-                verticalArrangement = Arrangement.spacedBy(NbSpace.s5),
-            ) {
-                TextAndActions(state, actions, showTitle = illustration)
+            // The body scrolls inside the card and the action row stays pinned at its bottom, so a tall step (the
+            // partial-access note above the permission list) never pushes "Next" below the card's edge.
+            Column(Modifier.weight(1f - START_COLUMN_SHARE)) {
+                Column(
+                    Modifier
+                        .weight(1f, fill = false)
+                        .focusRingRoom()
+                        .verticalScroll(scroll)
+                        .padding(FocusRingRoom),
+                    verticalArrangement = Arrangement.spacedBy(NbSpace.s5),
+                ) {
+                    if (illustration) Title(state, NbTheme.typography.headline)
+                    StepBody(state, actions)
+                }
+                // The same 8 dp + 2 x 16 dp gap as in TextAndActions (a spacer between two spaced items).
+                StepActionRow(stepButtons(state, actions), actions.onBack, Modifier.padding(top = NbSpace.s5 * 2 + NbSpace.s3))
             }
         }
     }
@@ -303,7 +319,9 @@ private fun TabletopStep(
                 .weight(1f)
                 .widthIn(max = TextColumnMax)
                 .fillMaxWidth()
+                .focusRingRoom()
                 .verticalScroll(scroll)
+                .padding(FocusRingRoom)
                 .padding(bottom = NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s4),
         ) {
@@ -334,6 +352,23 @@ private fun BookStep(
         }
     }
 }
+
+/** Room for the focus ring (2 dp outside the element, 2 dp wide) at the edges of a scroll container. */
+private val FocusRingRoom: Dp = NbDimens.focusRingOffset + NbDimens.focusRingWidth
+
+/**
+ * Lays a scroll container out [FocusRingRoom] larger on every side than it reports, so it clips that much further
+ * out and the focus ring of a button at its edge stays whole. Paired with `.padding(FocusRingRoom)` inside the
+ * scroll, the content stays exactly where it was.
+ */
+private fun Modifier.focusRingRoom(): Modifier =
+    layout { measurable, constraints ->
+        val room = FocusRingRoom.roundToPx()
+        val placeable = measurable.measure(constraints.offset(room * 2, room * 2))
+        val width = (placeable.width - room * 2).coerceAtLeast(0)
+        val height = (placeable.height - room * 2).coerceAtLeast(0)
+        layout(width, height) { placeable.place(-room, -room) }
+    }
 
 /** The back action for the round button next to the step indicator, or null on steps without "Back". */
 @Composable

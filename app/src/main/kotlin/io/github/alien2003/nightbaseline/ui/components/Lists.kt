@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CollectionInfo
@@ -151,8 +152,14 @@ fun NightRow(
                 .fillMaxWidth()
                 .sizeIn(minHeight = NbControlDimens.rowMinHeight)
                 .then(if (selected) Modifier.background(controls.selectedRow) else Modifier)
-                .nbClickable(onClick = onClick, shape = RectangleShape, forced = forced, pressScale = position == GroupPosition.Single)
-                .semantics {
+                // The card clips at the row's bounds: the focus ring follows the group corners inside the row.
+                .nbClickable(
+                    onClick = onClick,
+                    shape = shape,
+                    forced = forced,
+                    pressScale = position == GroupPosition.Single,
+                    focusRingInside = true,
+                ).semantics {
                     contentDescription = description
                     this.selected = selected
                 }.padding(horizontal = NbControlDimens.rowPaddingHorizontal, vertical = NbControlDimens.rowPaddingVertical),
@@ -202,8 +209,10 @@ fun CalendarCell(
     val text = rememberUiText()
     val colors = NbTheme.colors
     val controls = NbTheme.controls
-    val status = night?.let { text.nightStatusLabel(it) } ?: text.string(R.string.history_status_nodata)
-    val description = text.string(R.string.a11y_history_day, text.dateLong(date), status)
+    // A day that is not a night of the history (before the first one, after today) reads as just its date: "No data"
+    // belongs to gap nights only, which come as NoData nights (states.md E-NODATA).
+    val description =
+        night?.let { text.string(R.string.a11y_history_day, text.dateLong(date), text.nightStatusLabel(it)) } ?: text.dateLong(date)
     val numberColor =
         when {
             selected -> controls.onFill
@@ -401,7 +410,8 @@ fun HistoryStrip(
                 .then(
                     if (interactive && !individualTargets) {
                         Modifier
-                            .nbClickable(onClick = onSeeAll, shape = NbShapes.l, pressScale = false)
+                            // Card-wide target inside the card's clip: the focus ring is drawn inside it.
+                            .nbClickable(onClick = onSeeAll, shape = NbShapes.l, pressScale = false, focusRingInside = true)
                             .semantics { contentDescription = stripDescription }
                     } else {
                         Modifier
@@ -588,8 +598,16 @@ fun SettingsRow(
             Modifier
                 .fillMaxWidth()
                 .sizeIn(minHeight = NbControlDimens.rowMinHeight)
-                .nbClickable(onClick = click, shape = RectangleShape, role = role, enabled = enabled, forced = forced, pressScale = false)
-                .semantics(mergeDescendants = true) {
+                .nbClickable(
+                    onClick = click,
+                    shape = RectangleShape,
+                    role = role,
+                    enabled = enabled,
+                    forced = forced,
+                    pressScale = false,
+                    // The group card clips at the row: an outside ring would be cut off.
+                    focusRingInside = true,
+                ).semantics(mergeDescendants = true) {
                     when (trailing) {
                         is SettingsTrailing.Toggle -> toggleableState = ToggleableState(trailing.checked)
                         is SettingsTrailing.Radio -> selected = trailing.selected
@@ -610,13 +628,18 @@ fun SettingsRow(
                 }
 
                 is SettingsTrailing.Value -> {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
+                    Row(
+                        Modifier.trailingShare(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(NbSpace.s2),
+                    ) {
                         NbText(
                             trailing.text,
                             style = NbTheme.typography.bodySmall,
                             color = controls.summary,
                             textAlign = TextAlign.End,
-                            modifier = Modifier.widthIn(max = VALUE_MAX).clearAndSetSemantics {},
+                            // Weighted: the chevron is measured first and never squeezed out by a long value.
+                            modifier = Modifier.weight(1f, fill = false).widthIn(max = VALUE_MAX).clearAndSetSemantics {},
                         )
                         NbChevron()
                     }
@@ -638,3 +661,24 @@ fun SettingsRow(
 
 /** A trailing value never takes more than this; longer values wrap. */
 private val VALUE_MAX = 160.dp
+
+/** The title column of a settings row keeps at least this much beside a trailing value, or half the row if less. */
+private val TITLE_MIN = 88.dp
+
+/**
+ * Caps the trailing value of a settings row so the title column keeps [TITLE_MIN] (or half the row in a very narrow
+ * window): the row measures the unweighted trailing slot first, which would otherwise squeeze the title to one
+ * character per line. The slot is measured with the width left beside the fixed parts of the row.
+ */
+private fun Modifier.trailingShare(): Modifier =
+    layout { measurable, constraints ->
+        val available = constraints.maxWidth
+        val cap =
+            if (constraints.hasBoundedWidth) {
+                maxOf(available / 2, available - TITLE_MIN.roundToPx()).coerceAtLeast(constraints.minWidth)
+            } else {
+                available
+            }
+        val placeable = measurable.measure(constraints.copy(maxWidth = cap))
+        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+    }
