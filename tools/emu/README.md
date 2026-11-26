@@ -48,32 +48,40 @@ tools/emu/emu.sh stop 5560
 | nb-tablet | Pixel Tablet | 37 | 5564 |
 | nb-api28 | Pixel 5, no Health Connect | 28 | 5566 |
 
+Ports are even console ports in 5554..5584 (the scripts refuse others): adb scans only adb ports 5555..5585, and an
+emulator on a higher port warns "ADB may not function properly" and its first adb calls can hang.
+
 ## Scripts
 
 `emu.sh start <avd> [port]` starts headless (`-no-window -gpu swiftshader_indirect -no-snapshot`), waits for
 `sys.boot_completed`, then sets the three animation scales to 1, turns auto-rotation off (rotation 0; `rotate.sh` sets
 it), keeps the screen on and dismisses the keyguard. `emu.sh stop <port>`, `emu.sh list`.
 `emu.sh clock <port> +<min>` moves the emulator clock forward (adb root, automatic time off); `clock <port> sync`
-restores the host time.
+restores the host time. Both restart adbd twice (root, then unroot): the script retries `adb root` / `unroot` until
+`id -u` shows the expected user (it fails at once with adb's own message when the image has no root) and returns only
+when adbd answers again, so a following `ui.sh` call never meets adbd mid-restart. The clock only moves forward by
+design: do not set it back with a root `date`; use `clock <port> sync` to return to the host time.
 
 `install.sh <port> [debug|e2e|release] [--no-build] [--no-grant] [--fresh] [--no-visibility-fix]` builds
 `:app:assemble<Variant>` and `:hc-seeder:assembleDebug`, installs both and grants with `pm grant`: NightBaseline its
 whole READ set (sleep, heart rate, SpO2, respiratory rate, HRV, skin temperature, steps, history, background) and
 POST_NOTIFICATIONS; the seeder WRITE + READ for its seven types. `e2e` / `release` are re-signed with the local debug
-key (an existing install with another key is replaced). `--no-grant` leaves the Health Connect permission screen to
-onboarding. By default it also disables package-visibility filtering for NightBaseline (see "App issues" below).
+key (an existing install with another key is replaced). `--no-grant` grants NightBaseline nothing and leaves the Health Connect permission
+screen to onboarding; the seeder is granted either way. By default it also disables package-visibility filtering for NightBaseline (see "App issues" below).
 
 `seed.sh <port> <scenario> [nights] [--now <iso>] [--end-days-ago <n>]` runs the seeder
 (`am start -n io.github.alien2003.nightbaseline.seeder/.SeedActivity --es scenario <name> --ei nights <n> --es now
 <iso> --ei end_days_ago <n>`), waits for its `SEED_RESULT` log line (tag `NbSeeder`), force-stops it and exits non-zero
-on an error. `--now` is an ISO instant (`2026-11-26T08:30:00Z`) or a local date-time; default the emulator clock. The
+on an error. The script passes a run id (`--es run_id <id>`) that the seeder echoes as ` run=<id>`, and waits for that
+line only, so an older line in the log buffer never counts (not even after the clock was set back); a seeder APK older
+than the script never answers it: reinstall with `install.sh`. `--now` is an ISO instant (`2026-11-26T08:30:00Z`) or a local date-time; default the emulator clock. The
 newest night wakes today when the local time is after 10:00, otherwise yesterday, minus `--end-days-ago`; nothing is
 written after "now".
 
 | Scenario | Default nights | What NightBaseline should show |
 |---|---|---|
 | `normal` | 60 | all within the usual range |
-| `deviations` | 60 | last night: heart rate +8 bpm, respiratory rate +2, SpO2 −2.5 → DEVIATIONS (3 moved) |
+| `deviations` | 60 | last night: heart rate +14 bpm, respiratory rate +2.5, SpO2 −4 → DEVIATIONS (3 moved, each well beyond the range edge for any night count) |
 | `learning` | 3 | learning period |
 | `learning6` | 6 | learning, one night before the first evaluation |
 | `short_last` | 60 | last night only 2 h → short night |
@@ -81,7 +89,7 @@ written after "now".
 | `no_spo2_rr` | 60 | the source writes only sleep + heart rate (no steps either: completeness falls back to "ended 3 h ago") |
 | `gap` | 60 | no last night (newest is the day before) |
 | `hrv_skin` | 60 | also HRV (RMSSD) and skin temperature (deltas against 33.5 °C) |
-| `late_upload` | 60 | last night without RR/SpO2 (waits: channel incomplete); then `seed.sh <port> append_tail` |
+| `late_upload` | 60 | last night without RR/SpO2 (waits: channel incomplete, see below); then `seed.sh <port> append_tail` |
 | `wipe` | – | deletes everything the seeder wrote |
 
 All scenarios use the same generator seed, so the histories match: a scenario with `n + 1` nights after one with `n`
@@ -91,6 +99,12 @@ every scenario through the `:core-algo` pipeline.
 Timing: NightBaseline evaluates the newest night only when the source wrote nothing for the night for 15 min (or 12 h
 after the night's end). Seeded records carry the seeding time as their Health Connect `lastModifiedTime`, so after
 seeding either wait 15 min, use `emu.sh clock <port> +16`, or seed with `--now` far enough in the past.
+
+`late_upload` and the 12 h cap: NightBaseline waits for a missing channel (CHANNEL_INCOMPLETE) only until 12 h after
+the night's end, measured against the emulator clock (`--now` does not change that); later it evaluates right away
+without RR/SpO2 (CAP_REACHED). The seeded night wakes in the morning, so the wait shows only when seeding within
+about 11 h of that wake, e.g. shortly after 10:00. Later in the day `seed.sh` prints a warning; then move the emulator
+clock to the next morning after 10:00 (`emu.sh clock <port> +<min>`) and seed `late_upload` again.
 
 `ui.sh <port> launch | shot [name] | dump [name] | text-list | tap <text> | wait <text> [sec] | tapxy <x> <y> |
 swipe up|down|left|right|<x1> <y1> <x2> <y2> [ms] | back | home`. `tap` and `wait` match a node's text or content
@@ -103,7 +117,11 @@ inner); `adb emu fold` / `unfold` work too. `rear` is a device-state override (`
 REAR_DISPLAY_MODE, outer display), cleared by the next closed/half/open. A fold change locks the screen like a power
 press; the script dismisses the keyguard afterwards.
 
-`rotate.sh <port> 0|1|2|3|free` (`wm user-rotation lock <n>`).
+`rotate.sh <port> 0|1|2|3|free`: `wm user-rotation lock <n>` on API 29+; API 28 has no `wm user-rotation`, so there
+it writes the settings `system accelerometer_rotation 0` and `user_rotation <n>`. It then checks the settings (up to
+~5 s), writes them once more if a write was missed, and fails if they still do not match. The status line shows the
+two settings, the display rotation WindowManager reports and the `cur=` size; a display rotation other than the lock
+(an app with a fixed orientation) is reported, not failed.
 
 `prefs.sh <port> dark | light | font <scale> | bold 0|1 | density <dpi>|reset | animations 0|1 | reduce-blur 0|1 |
 contrast <-1..1> | outline-text 0|1 | show | reset`. "Reduce blur effects" (Accessibility > Color & motion) is the
@@ -115,11 +133,14 @@ on this image and its effect on the app was not verified.
 split puts NightBaseline beside Settings through WM Shell (`dumpsys activity service SystemUIService WMShell
 splitscreen moveToSideStage <task> <pos>`; task bounds 1026 px wide on the inner display); freeform starts it with
 `am start --windowingMode 5` after enabling freeform support and `am task resize` sizes it; `resize` is a `wm size`
-override; `reset` leaves split / desktop mode and resets the size.
+override; `reset` leaves split / desktop mode, resets the size and restores the global `enable_freeform_support` /
+`force_resizable_activities` that freeform turned on (their earlier values are kept in `build/emu/<port>.freeform`;
+without that file both are deleted).
 
 `diag.sh <port> [--reset-gfx]` writes `build/emu-shots/<avd>/diag-<time>.txt`: the `NightBaseline` log tag (the
 night-check trace), crash buffer, FATAL/ANR lines and dropbox entries for the package, `gfxinfo` frame stats, the
-WorkManager job in `jobscheduler`, alarms; prints a summary.
+WorkManager job in `jobscheduler` (only the package's JOB blocks: on API 28 `dumpsys jobscheduler <pkg>` lists every job), alarms;
+prints a summary.
 
 ## Health Connect unavailable (nb-api28)
 

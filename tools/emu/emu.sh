@@ -102,12 +102,48 @@ list() {
   done
 }
 
+# Waits until adbd answers again after a restart: state 'device' and sys.boot_completed 1 (at most ~60 s).
+wait_adbd() {
+  local i
+  for i in $(seq 1 30); do
+    if [[ "$(eadb get-state 2>/dev/null || true)" == "device" ]] &&
+      [[ "$(timeout 10 "$ADB_BIN" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+      return 0
+    fi
+    sleep 2
+  done
+  die "$SERIAL did not come back after the adbd restart"
+}
+
+# Restarts adbd as root ($1 = root, expects uid 0) or as shell ($1 = unroot, expects uid 2000) and returns once it
+# really runs that way and answers. `adb root` / `unroot` restart adbd: right after boot or other adb traffic the
+# command can fail for a passing reason ("error: closed") although the restart has begun, and `wait-for-device` can
+# return while the old adbd is still up. So: retry, and check the uid instead of trusting the exit code.
+adbd_as() {
+  local mode="$1" want="$2" i out="" uid=""
+  for i in $(seq 1 10); do
+    out="$(eadb "$mode" 2>&1 || true)"
+    if [[ "$out" == *"not available"* || "$out" == *"cannot run as root"* ]]; then
+      die "adb root is not available on this image: $out"
+    fi
+    timeout 30 "$ADB_BIN" -s "$SERIAL" wait-for-device >/dev/null 2>&1 || true
+    uid="$(timeout 10 "$ADB_BIN" -s "$SERIAL" shell id -u 2>/dev/null | tr -d '\r' || true)"
+    if [[ "$uid" == "$want" ]]; then
+      wait_adbd
+      return 0
+    fi
+    sleep 2
+  done
+  die "adb $mode did not take effect on $SERIAL (uid '${uid:-?}', last adb output: ${out:-none})"
+}
+
+# adb root restarts adbd twice (root, then unroot); clock returns only once adbd answers again.
 clock() {
   use_port "${1:?port}"
   require_emulator
   local arg="${2:?+<minutes> or sync}"
-  eadb root >/dev/null 2>&1 || die "adb root is not available on this image"
-  eadb wait-for-device
+  [[ "$arg" == "sync" || "$arg" =~ ^\+[0-9]+$ ]] || die "clock: +<minutes> or sync"
+  adbd_as root 0
   if [[ "$arg" == "sync" ]]; then
     eadb shell date -u "@$(date -u +%s)" >/dev/null
     eadb shell settings put global auto_time 1
@@ -116,11 +152,8 @@ clock() {
     now="$(eadb shell date +%s | tr -d '\r')"
     eadb shell settings put global auto_time 0
     eadb shell date -u "@$((now + BASH_REMATCH[1] * 60))" >/dev/null
-  else
-    die "clock: +<minutes> or sync"
   fi
-  eadb unroot >/dev/null 2>&1 || true
-  eadb wait-for-device
+  adbd_as unroot 2000
   echo "$SERIAL clock: $(eadb shell date | tr -d '\r')"
 }
 

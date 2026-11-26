@@ -7,7 +7,8 @@
 #   e2e       the e2e build type (release code without R8), re-signed with the local debug key
 #   release   the minified release build (R8), re-signed with the local debug key
 #   --no-build  install the APKs already built
-#   --no-grant  grant nothing: onboarding then goes through the Health Connect permission screen
+#   --no-grant  grant NightBaseline nothing: onboarding then goes through the Health Connect permission screen (the
+#               seeder is still granted)
 #   --fresh     uninstall NightBaseline first (clean onboarding; also needed when switching the signing key)
 #   --no-visibility-fix  keep Android's package-visibility filtering for NightBaseline (see below)
 #
@@ -17,7 +18,7 @@
 # NightBaseline (emulator only; `am compat`, works for debuggable apps and on userdebug images).
 #
 # Grants: NightBaseline gets its whole READ set (incl. history and background reads, where the feature exists) and
-# POST_NOTIFICATIONS; the seeder gets WRITE + READ for the types it writes.
+# POST_NOTIFICATIONS (unless --no-grant); the seeder always gets WRITE + READ for the types it writes.
 # shellcheck source=tools/emu/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -76,9 +77,9 @@ fi
 echo "installing ${seeder_apk#"$EMU_ROOT"/}"
 eadb install -r -t "$seeder_apk"
 
+h="android.permission.health"
+failed=()
 if ((grant)); then
-  h="android.permission.health"
-  failed=()
   for p in READ_SLEEP READ_HEART_RATE READ_OXYGEN_SATURATION READ_RESPIRATORY_RATE READ_HEART_RATE_VARIABILITY \
     READ_SKIN_TEMPERATURE READ_STEPS READ_HEALTH_DATA_HISTORY READ_HEALTH_DATA_IN_BACKGROUND; do
     eadb shell pm grant "$NB_PKG" "$h.$p" >/dev/null 2>&1 || failed+=("nightbaseline:$p")
@@ -86,16 +87,19 @@ if ((grant)); then
   if (($(sdk_int) >= 33)); then
     eadb shell pm grant "$NB_PKG" android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || failed+=("nightbaseline:POST_NOTIFICATIONS")
   fi
-  for t in SLEEP HEART_RATE OXYGEN_SATURATION RESPIRATORY_RATE HEART_RATE_VARIABILITY SKIN_TEMPERATURE STEPS; do
-    for m in WRITE READ; do
-      eadb shell pm grant "$SEEDER_PKG" "$h.${m}_$t" >/dev/null 2>&1 || failed+=("seeder:${m}_$t")
-    done
+fi
+# The seeder is always granted: it is a bench tool without its own onboarding, and seed.sh fails without them.
+for t in SLEEP HEART_RATE OXYGEN_SATURATION RESPIRATORY_RATE HEART_RATE_VARIABILITY SKIN_TEMPERATURE STEPS; do
+  for m in WRITE READ; do
+    eadb shell pm grant "$SEEDER_PKG" "$h.${m}_$t" >/dev/null 2>&1 || failed+=("seeder:${m}_$t")
   done
-  if ((${#failed[@]})); then
-    echo "not granted (feature or Health Connect missing on this image?): ${failed[*]}"
-  else
-    echo "all health permissions granted"
-  fi
+done
+if ((${#failed[@]})); then
+  echo "not granted (feature or Health Connect missing on this image?): ${failed[*]}"
+elif ((grant)); then
+  echo "all health permissions granted"
+else
+  echo "seeder permissions granted; NightBaseline granted nothing (--no-grant)"
 fi
 if ((visibility_fix)) && (($(sdk_int) >= 30)); then
   eadb shell am compat disable FILTER_APPLICATION_QUERY "$NB_PKG" >/dev/null 2>&1 ||

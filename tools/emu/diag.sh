@@ -13,6 +13,16 @@ reset_gfx=0
 [[ "${2:-}" == "--reset-gfx" ]] && reset_gfx=1
 require_emulator
 
+# Filters `dumpsys jobscheduler` output on stdin to the JOB blocks of package $1.
+package_jobs() {
+  awk -v comp="$1/" '
+    { lead = match($0, /[^ ]/) }
+    /^ *JOB #/ { keep = index($0, comp) > 0; depth = lead; if (keep) print; next }
+    keep && lead > depth { print; next }
+    { keep = 0 }
+  '
+}
+
 out="$(shots_dir)/diag-$(date +%Y%m%d-%H%M%S).txt"
 pid="$(eadb shell pidof "$NB_PKG" 2>/dev/null | tr -d '\r' || true)"
 {
@@ -36,7 +46,13 @@ pid="$(eadb shell pidof "$NB_PKG" 2>/dev/null | tr -d '\r' || true)"
   eadb shell dumpsys gfxinfo "$NB_PKG" | tr -d '\r' | sed -n '/Total frames rendered/,/Number Frame deadline missed/p'
   echo
   echo "== scheduled work (jobscheduler, WorkManager's SystemJobService)"
-  eadb shell dumpsys jobscheduler "$NB_PKG" 2>/dev/null | tr -d '\r' | grep -E "JOB |Required constraints|Satisfied constraints|Unsatisfied|Run time|Enqueue time|Last run|Ready:|Pending" | head -60 || true
+  # `dumpsys jobscheduler <pkg>` does not filter on every release (API 28 lists every job), so keep only the JOB
+  # blocks whose component belongs to the package: from a `JOB #u0a88/0: <hash> <pkg>/<service>` line through the
+  # lines indented deeper than it.
+  jobs_out="$(eadb shell dumpsys jobscheduler "$NB_PKG" 2>/dev/null | tr -d '\r' | package_jobs "$NB_PKG" |
+    grep -E "JOB |Required constraints|Satisfied constraints|Unsatisfied|Run time|Enqueue time|Last run|Ready:|Pending" |
+    head -60 || true)"
+  echo "${jobs_out:-none}"
   echo
   echo "== alarms of the package"
   eadb shell dumpsys alarm | tr -d '\r' | grep -A3 "$NB_PKG" | head -30 || true
@@ -51,5 +67,5 @@ crash="$(sed -n '/^== crashes/,/^== AndroidRuntime/p' "$out" | grep -c "FATAL EX
 anr="$(grep -c "ANR in $NB_PKG" "$out" || true)"
 echo "crashes: $crash, ANRs: $anr"
 grep -E "Total frames rendered|Janky frames" "$out" | head -2 | sed 's/^/  /'
-jobs="$(grep -c '^  JOB ' "$out" || true)"
+jobs="$(sed -n '/^== scheduled work/,/^== alarms/p' "$out" | grep -c '^  JOB #' || true)"
 echo "scheduled jobs: $jobs"

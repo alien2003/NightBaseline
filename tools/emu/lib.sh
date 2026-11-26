@@ -25,11 +25,14 @@ die() {
   exit 1
 }
 
-# Validates an emulator console port (even, 5554..5682) and sets PORT and SERIAL.
+# Validates an emulator console port and sets PORT and SERIAL. adb scans only adb ports 5555..5585, i.e. console
+# ports 5554..5584; the emulator accepts higher ones but then warns "ADB may not function properly" and the first adb
+# calls can hang.
 use_port() {
   local p="${1:-}"
   [[ "$p" =~ ^[0-9]+$ ]] || die "port expected (e.g. 5560), got '$p'"
-  ((p >= 5554 && p <= 5682 && p % 2 == 0)) || die "emulator console ports are even numbers in 5554..5682, got $p"
+  ((p >= 5554 && p <= 5584 && p % 2 == 0)) ||
+    die "emulator console ports are even numbers in 5554..5584 (adb scans adb ports 5555..5585), got $p"
   PORT="$p"
   SERIAL="emulator-$p"
 }

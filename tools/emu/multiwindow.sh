@@ -4,7 +4,11 @@
 #   tools/emu/multiwindow.sh <port> split [left|right]   NightBaseline beside Settings (WM Shell split screen)
 #   tools/emu/multiwindow.sh <port> freeform [<w>x<h>]   NightBaseline as a desktop (freeform) window, optional size
 #   tools/emu/multiwindow.sh <port> resize <w>x<h>       display size override (`wm size`): any window width class
-#   tools/emu/multiwindow.sh <port> reset                fullscreen again, no split, display size reset
+#   tools/emu/multiwindow.sh <port> reset                fullscreen again, no split, display size reset, the two
+#                                                        global settings freeform turned on restored
+#
+# freeform turns on the global settings enable_freeform_support and force_resizable_activities; their earlier values
+# are kept in build/emu/<port>.freeform and put back by reset (deleted when they were unset).
 # shellcheck source=tools/emu/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -28,6 +32,34 @@ launch_nb() {
   echo "$t"
 }
 
+FREEFORM_KEYS=(enable_freeform_support force_resizable_activities)
+freeform_state="$EMU_STATE/$PORT.freeform"
+
+# Records the freeform settings as they were before the first freeform call (a second call keeps the first record).
+save_freeform_settings() {
+  [[ -f "$freeform_state" ]] && return 0
+  mkdir -p "$EMU_STATE"
+  local k
+  for k in "${FREEFORM_KEYS[@]}"; do
+    echo "$k=$(eadb shell settings get global "$k" | tr -d '\r')"
+  done >"$freeform_state"
+}
+
+# Puts the recorded values back; without a record both keys are deleted (the images ship without them).
+restore_freeform_settings() {
+  local k v
+  for k in "${FREEFORM_KEYS[@]}"; do
+    v=""
+    [[ -f "$freeform_state" ]] && v="$(sed -n "s/^$k=//p" "$freeform_state")"
+    if [[ -z "$v" || "$v" == "null" ]]; then
+      eadb shell settings delete global "$k" >/dev/null
+    else
+      eadb shell settings put global "$k" "$v"
+    fi
+  done
+  rm -f "$freeform_state"
+}
+
 bounds() { eadb shell am stack list | tr -d '\r' | grep "taskId=$1:" | grep -o 'bounds=[^ ]*' | head -1; }
 
 case "$mode" in
@@ -42,8 +74,8 @@ case "$mode" in
     echo "split: NightBaseline task $t $(bounds "$t")"
     ;;
   freeform)
-    eadb shell settings put global enable_freeform_support 1
-    eadb shell settings put global force_resizable_activities 1
+    save_freeform_settings
+    for k in "${FREEFORM_KEYS[@]}"; do eadb shell settings put global "$k" 1; done
     t="$(launch_nb --windowingMode 5)"
     if [[ -n "$arg" ]]; then
       [[ "$arg" =~ ^([0-9]+)x([0-9]+)$ ]] || die "size as <w>x<h>"
@@ -65,9 +97,11 @@ case "$mode" in
       shell_cmd desktopmode moveTaskOutOfDesk "$t" || true
     fi
     eadb shell wm size reset
+    restore_freeform_settings
     sleep 2
     [[ -n "$t" ]] && echo "NightBaseline task $t $(bounds "$t")"
     echo "display: $(eadb shell wm size | tr -d '\r' | tail -1)"
+    echo "freeform settings: $(for k in "${FREEFORM_KEYS[@]}"; do printf '%s=%s ' "$k" "$(eadb shell settings get global "$k" | tr -d '\r')"; done)"
     ;;
   *) die "split|freeform|resize|reset" ;;
 esac
