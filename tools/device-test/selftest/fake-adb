@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# A fake adb for run-selftest.sh (adapted from PulseStages): answers the calls run-device-tests.sh makes, keeps the
+# phone's state in $FAKE_STATE and logs every call to $FAKE_STATE/calls.log. Knobs (environment):
+#   FAKE_DEVICES          the `adb devices` lines (tab-separated serial and state; default one authorised phone)
+#   FAKE_NOT_INSTALLED=1  NightBaseline is not installed
+#   FAKE_INSTALLED_APK    the APK `pm path` / `pull` hand out as the installed app (with its .cert / .res sidecars)
+#   FAKE_FAIL_CLASS       the test class (or Class#method) whose instrumentation fails
+#   FAKE_SLEEP_CLASS, FAKE_SLEEP   the test class whose instrumentation takes FAKE_SLEEP seconds
+#   FAKE_SKIP_CLASS       the test class whose instrumentation reports an assumption failure (skipped)
+state="${FAKE_STATE:?}"
+printf '%s\n' "$*" >>"$state/calls.log"
+args=("$@")
+[[ "${args[0]}" == "-s" ]] && args=("${args[@]:2}")
+readonly APP="io.github.alien2003.nightbaseline"
+readonly TEST="$APP.test"
+
+instrument() {
+  local rest="$1" cls fail=0 skip=0
+  cls="$(sed -n 's/.*-e class [^ ]*\.e2e\.\([^ ]*\) .*/\1/p' <<<"$rest")"
+  printf '%s %s\n' "$cls" "$rest" >>"$state/instrumentations.log"
+  echo "INSTRUMENTATION_STATUS: class=$cls"
+  echo "INSTRUMENTATION_STATUS_CODE: 1"
+  echo "INSTRUMENTATION_STATUS: e2e=progress of $cls"
+  echo "INSTRUMENTATION_STATUS_CODE: 2"
+  if [[ -n "${FAKE_SLEEP_CLASS:-}" && "$cls" == "$FAKE_SLEEP_CLASS" ]]; then
+    sleep "${FAKE_SLEEP:-20}"
+  fi
+  [[ "$cls" == "${FAKE_FAIL_CLASS:-}" ]] && fail=1
+  [[ "$cls" == "${FAKE_SKIP_CLASS:-}" ]] && skip=1
+  # Like the real test: without WRITE_STEPS granted to the test package, the write and its cleanup are skipped.
+  if [[ "$cls" == WriteDeleteE2e || "$cls" == WriteCleanupE2e ]] && [[ ! -f "$state/granted" ]]; then
+    skip=1
+  fi
+  if [[ "$cls" == WriteDeleteE2e && "$skip" == 0 && "$fail" == 0 ]]; then
+    echo "wrote-and-deleted" >>"$state/hc-writes.log"
+  fi
+  if ((fail)); then
+    printf 'INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: fake failure\n'
+    printf 'INSTRUMENTATION_STATUS_CODE: -2\nINSTRUMENTATION_RESULT: stream=\nFAILURES!!!\nINSTRUMENTATION_CODE: -1\n'
+  elif ((skip)); then
+    printf 'INSTRUMENTATION_STATUS: stack=org.junit.AssumptionViolatedException: fake skip\n'
+    printf 'INSTRUMENTATION_STATUS_CODE: -4\nINSTRUMENTATION_RESULT: stream=\nOK (1 test)\nINSTRUMENTATION_CODE: -1\n'
+  else
+    printf 'INSTRUMENTATION_STATUS_CODE: 0\nINSTRUMENTATION_RESULT: stream=\nOK (1 test)\nINSTRUMENTATION_CODE: -1\n'
+  fi
+}
+
+case "${args[0]}" in
+  devices) printf 'List of devices attached\r\n%b\r\n\r\n' "${FAKE_DEVICES:-FAKE123\tdevice}" ;;
+  install)
+    printf '%s\n' "${args[*]}" >>"$state/installs.log"
+    touch "$state/installed"
+    printf 'Performing Streamed Install\nSuccess\n'
+    ;;
+  uninstall)
+    printf '%s\n' "${args[1]}" >>"$state/uninstalls.log"
+    [[ "${args[1]}" == "$TEST" ]] && rm -f "$state/installed" "$state/granted"
+    echo "Success"
+    ;;
+  pull)
+    if [[ "${args[1]}" == *base.apk ]]; then
+      cp "$FAKE_INSTALLED_APK" "${args[2]}"
+      for ext in cert res; do [[ -f "$FAKE_INSTALLED_APK.$ext" ]] && cp "$FAKE_INSTALLED_APK.$ext" "${args[2]}.$ext"; done
+    else
+      mkdir -p "${args[2]}/status"
+      printf '{"test": "FakeE2e.test", "result": "PASSED", "durationMs": 12, "counts": {"reads": 3}, "flags": {}, "runId": "x"}\n' \
+        >"${args[2]}/status/FakeE2e.test.json"
+    fi
+    ;;
+  shell)
+    rest="${args[*]:1}"
+    case "$rest" in
+      "getprop "*) echo "X" ;;
+      "dumpsys package $APP")
+        [[ -n "${FAKE_NOT_INSTALLED:-}" ]] && exit 0
+        printf '  versionCode=1000 minSdk=28 targetSdk=36\r\n  versionName=0.1.0\r\n  pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]\r\n'
+        ;;
+      "pm path $APP") printf 'package:/data/app/~~x==/%s-y==/base.apk\r\n' "$APP" ;;
+      "pm list instrumentation")
+        if [[ -f "$state/installed" ]]; then
+          echo "instrumentation:$TEST/$APP.e2e.E2eRunner (target=$APP)"
+          echo "instrumentation:$TEST/$APP.e2e.SelfE2eRunner (target=$TEST)"
+        fi
+        ;;
+      "pm list packages $TEST") [[ -f "$state/installed" ]] && echo "package:$TEST" ;;
+      "pm grant "*)
+        printf '%s\n' "$rest" >>"$state/grants.log"
+        [[ "$rest" == "pm grant $TEST android.permission.health.WRITE_STEPS" ]] && touch "$state/granted"
+        ;;
+      "rm -rf "*) printf '%s\n' "$rest" >>"$state/removed.log" ;;
+      "am force-stop "*) printf '%s\n' "$rest" >>"$state/force-stops.log" ;;
+      "am start -W -n $APP/.MainActivity") touch "$state/rearmed" && echo "Status: ok" ;;
+      am\ instrument*) instrument "$rest" ;;
+      *) : ;;
+    esac
+    ;;
+  *) : ;;
+esac
+exit 0

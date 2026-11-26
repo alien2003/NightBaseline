@@ -1,3 +1,6 @@
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import com.android.build.api.variant.HostTestBuilder
+import com.android.build.api.variant.LibraryAndroidComponentsExtension
 import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 import org.jlleitschuh.gradle.ktlint.KtlintExtension
@@ -69,6 +72,29 @@ subprojects {
         resolutionStrategy.eachDependency {
             if (requested.group == "org.jetbrains.kotlin") {
                 useVersion(detektKotlinVersion)
+            }
+        }
+    }
+}
+
+/*
+ * Unit tests run for the debug build type only, in every Android module. AGP 9 creates them for the tested build type
+ * only; :app's tested build type is "e2e" (the test APK of the on-device suite, tools/device-test/README.md), so
+ * gradle.properties turns that off (android.onlyEnableUnitTestForTheTestedBuildType=false) and this keeps exactly the
+ * unit-test tasks there were before: testDebugUnitTest.
+ */
+subprojects {
+    pluginManager.withPlugin("com.android.application") {
+        extensions.configure<ApplicationAndroidComponentsExtension> {
+            beforeVariants { variant ->
+                if (variant.buildType != "debug") variant.hostTests[HostTestBuilder.UNIT_TEST_TYPE]?.enable = false
+            }
+        }
+    }
+    pluginManager.withPlugin("com.android.library") {
+        extensions.configure<LibraryAndroidComponentsExtension> {
+            beforeVariants { variant ->
+                if (variant.buildType != "debug") variant.hostTests[HostTestBuilder.UNIT_TEST_TYPE]?.enable = false
             }
         }
     }

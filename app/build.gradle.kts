@@ -1,5 +1,10 @@
+import com.android.build.api.artifact.ScopedArtifact
 import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.variant.HostTestBuilder
+import com.android.build.api.variant.ScopedArtifacts
+import java.util.jar.JarEntry
+import java.util.jar.JarOutputStream
+import java.util.zip.ZipFile
 
 // The NightBaseline app: UI (own design layer on Compose, ADR 0003), Hilt wiring and the Health Connect manifest.
 // Build setup follows PulseStages :app (version from -P properties, env-var signing, offline Robolectric).
@@ -39,7 +44,14 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = appVersionCode
         versionName = appVersionName
+        // The on-device end-to-end suite (src/androidTest, tools/device-test/README.md) runs inside the INSTALLED
+        // release app without reinstalling it. E2eRunner installs an in-memory WorkManager before the app's
+        // Application.onCreate, so that no worker of the app runs in a test process.
+        testInstrumentationRunner = "io.github.alien2003.nightbaseline.e2e.E2eRunner"
     }
+
+    // The test APK is built for the "e2e" build type (below), never for debug: see the comment there.
+    testBuildType = "e2e"
 
     androidResources {
         localeFilters += listOf("en", "ru")
@@ -65,6 +77,24 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
+        // Only the test APK of the on-device suite is built from this build type; its app APK is never installed.
+        // The phone runs the owner's RELEASE build (minified, release key). An instrumentation must be signed with the
+        // target's key, and a test APK compiled against a minified app cannot link (R8 renamed or removed what the
+        // test libraries need). So the test APK carries its own unminified copy of every class of the app
+        // (e2eAppClasses below): Android puts the test APK first on the app's class path, so inside the test process
+        // the whole app runs from that copy, with the installed app's manifest, resources, uid, permissions and data.
+        // The runner refuses to start unless the installed APK's dex equals the local release build of the same
+        // sources and every resource id matches this build type (tools/device-test/run-device-tests.sh).
+        create("e2e") {
+            initWith(getByName("release"))
+            isMinifyEnabled = false
+            isShrinkResources = false
+            matchingFallbacks += "release"
+        }
+    }
+    // The e2e build type is the release build without R8: it compiles the release-only sources.
+    sourceSets.getByName("e2e") {
+        kotlin.directories += "src/release/kotlin"
     }
 
     compileOptions {
@@ -164,7 +194,115 @@ tasks.withType<Test>().configureEach {
     forkEvery = providers.gradleProperty("testForkEvery").map(String::toLong).getOrElse(0L)
 }
 
+/**
+ * Merges every class of the e2e variant (the app's own classes, the Hilt-generated ones, R and all dependencies, before
+ * dexing; Variant API, ScopedArtifacts.Scope.ALL) into one jar that is appended to the classes of its test APK. AGP
+ * leaves the tested app's classes out of a test APK; this puts them back, so that the test APK links on its own
+ * (tools/device-test/README.md, "How it runs against the installed release"). Java resources are not copied.
+ */
+abstract class E2eAppClassesTask : DefaultTask() {
+    @get:InputFiles
+    @get:Classpath
+    abstract val allJars: ListProperty<RegularFile>
+
+    @get:InputFiles
+    @get:Classpath
+    abstract val allDirectories: ListProperty<Directory>
+
+    @get:OutputFile
+    abstract val output: RegularFileProperty
+
+    @TaskAction
+    fun merge() {
+        val seen = HashSet<String>()
+        JarOutputStream(output.get().asFile.outputStream().buffered()).use { out ->
+            fun put(
+                name: String,
+                bytes: () -> ByteArray,
+            ) {
+                if (!name.endsWith(".class") || name.startsWith("META-INF/") || !seen.add(name)) return
+                out.putNextEntry(JarEntry(name).apply { time = 0 })
+                out.write(bytes())
+                out.closeEntry()
+            }
+            allDirectories.get().forEach { dir ->
+                val root = dir.asFile
+                root.walkTopDown().filter { it.isFile }.sortedBy { it.path }.forEach { f ->
+                    put(f.relativeTo(root).invariantSeparatorsPath) { f.readBytes() }
+                }
+            }
+            allJars.get().forEach { jar ->
+                ZipFile(jar.asFile).use { zip ->
+                    zip.entries().toList().sortedBy { it.name }.filter { !it.isDirectory }.forEach { e ->
+                        put(e.name) { zip.getInputStream(e).readBytes() }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Adds the second instrumentation of the test APK, SelfE2eRunner targeting the test package itself (only
+ * WriteDeleteE2e runs there, as the test package, with its own test-only WRITE_STEPS permission). It cannot be
+ * declared in src/androidTest/AndroidManifest.xml: AGP's test manifest merger folds every `<instrumentation>` into the
+ * one generated from testInstrumentationRunner.
+ */
+abstract class E2eSelfInstrumentationTask : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val mergedManifest: RegularFileProperty
+
+    @get:Input
+    abstract val testPackage: Property<String>
+
+    @get:OutputFile
+    abstract val updatedManifest: RegularFileProperty
+
+    @TaskAction
+    fun add() {
+        val text = mergedManifest.get().asFile.readText()
+        val at = text.indexOf("<application")
+        check(at > 0 && text.indexOf("<application", at + 1) < 0) { "unexpected test manifest: one <application> expected" }
+        val element =
+            """
+            |<instrumentation
+            |        android:name="io.github.alien2003.nightbaseline.e2e.SelfE2eRunner"
+            |        android:label="NightBaseline E2E (test package itself)"
+            |        android:targetPackage="${testPackage.get()}" />
+            |
+            |
+            """.trimMargin()
+        updatedManifest.get().asFile.writeText(text.substring(0, at) + element + text.substring(at))
+    }
+}
+
 androidComponents {
+    onVariants(selector().withBuildType("e2e")) { variant ->
+        val classes =
+            tasks.register<E2eAppClassesTask>("e2eAppClasses${variant.name.replaceFirstChar(Char::uppercase)}") {
+                output.set(layout.buildDirectory.file("intermediates/e2e-app-classes/${variant.name}/classes.jar"))
+            }
+        variant.artifacts.forScope(ScopedArtifacts.Scope.ALL).use(classes).toGet(
+            ScopedArtifact.CLASSES,
+            E2eAppClassesTask::allJars,
+            E2eAppClassesTask::allDirectories,
+        )
+        variant.androidTest?.artifacts?.forScope(ScopedArtifacts.Scope.PROJECT)?.use(classes)?.toAppend(
+            ScopedArtifact.CLASSES,
+            E2eAppClassesTask::output,
+        )
+        variant.androidTest?.let { test ->
+            val self =
+                tasks.register<E2eSelfInstrumentationTask>("e2eSelfInstrumentation${variant.name.replaceFirstChar(Char::uppercase)}") {
+                    testPackage.set(test.applicationId)
+                }
+            test.artifacts
+                .use(self)
+                .wiredWithFiles(E2eSelfInstrumentationTask::mergedManifest, E2eSelfInstrumentationTask::updatedManifest)
+                .toTransform(SingleArtifact.MERGED_MANIFEST)
+        }
+    }
     onVariants { variant ->
         val manifest = variant.artifacts.get(SingleArtifact.MERGED_MANIFEST)
         mergedManifests.manifestFiles.from(manifest)
@@ -224,4 +362,16 @@ dependencies {
     robolectricAndroidAll(libs.robolectric.android.all.instrumented)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
+
+    // The on-device end-to-end suite (src/androidTest, JUnit 4): only the test APK carries these; nothing is added to
+    // the app (its merged manifest, and MergedManifestTest, stay unchanged).
+    androidTestImplementation(testFixtures(project(":data-local")))
+    androidTestImplementation(libs.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    // The in-memory WorkManager of the suite's processes (E2eWorkManager); the app keeps its own WorkManager.
+    androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 }
