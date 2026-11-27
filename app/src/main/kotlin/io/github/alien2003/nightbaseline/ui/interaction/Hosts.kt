@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
@@ -21,10 +22,12 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.IntOffset
@@ -42,11 +45,11 @@ internal fun layoutSide(): Int = if (LocalLayoutDirection.current == LayoutDirec
 @Composable
 internal fun rememberTransition(id: String): NbTransition {
     val scope = rememberCoroutineScope()
-    val transition = remember(scope) { NbTransition(id, scope) }
+    val router = LocalNbBackRouter.current
+    val transition = remember(scope, router) { NbTransition(id, scope).also { it.reprojecting = { router?.reprojecting == true } } }
+    // Snapshot state: a discarded composition rolls these writes back (V4).
     transition.reduced = LocalNbMotion.current.reduced
     transition.dark = NbTheme.colors.isDark
-    val router = LocalNbBackRouter.current
-    transition.reprojecting = { router?.reprojecting == true }
     return transition
 }
 
@@ -60,17 +63,25 @@ internal fun RunPending(
 }
 
 /**
- * The plain memory of a host: the state it shows and the keys it knew. Never read by drawing. It is written only
- * after a composition has been applied ([SideEffect]): a composition that is discarded after it set up a change rolls
- * back its snapshot writes, and the memory still holds the old state, so the next composition sets the change up
- * again (ADR 0011: nothing of a thrown-away composition leaks out).
+ * The plain memory of a host: the state it shows, the keys and values it knew, the page it parked. Never read by
+ * drawing. It is written only after a composition has been applied ([SideEffect]) or outside composition (measure,
+ * effects): a composition that is discarded after it set up a change rolls back its snapshot writes, and the memory
+ * still holds the old state, so the next composition sets the change up again (ADR 0011: nothing of a thrown-away
+ * composition leaks out; review V4: the hosts still wrote values, visited sections and their targets' side in
+ * composition).
  */
-private class HostMemory {
+private class HostMemory<T> {
     var top: Any? = null
     var keys: List<Any> = emptyList()
     val saved = HashSet<Any>()
 
-    /** Layers that have content to draw (rule R8), written by [NbLayer]. */
+    /** The values of the keys of applied compositions: a leaving layer still draws its value. */
+    val values = HashMap<Any, T>()
+
+    /** The page parked below the top while at rest (kept composed through the next change, review V8). */
+    var parked: Any? = null
+
+    /** Layers that have content to draw (rule R8), written by [NbLayer]: in its measure, and false when it leaves. */
     val withContent = HashSet<Any>()
 
     /** The host's width in px (the travel of a back gesture over it). */
@@ -106,31 +117,16 @@ fun <T : Any> NbStackHost(
 ) {
     val transition = rememberTransition(id)
     val side = layoutSide()
-    val memory = remember { HostMemory() }
-    val values = remember { HashMap<Any, T>() }
+    val memory = remember { HostMemory<T>() }
     val holder = rememberSaveableStateHolder()
     val keys = stack.map(key)
-    stack.forEach { values[key(it)] = it }
+    val current = stack.associateBy(key)
     val top = keys.lastOrNull() ?: return
     val previous = memory.top
     if (previous != null && previous != top) {
         val pop = top in memory.keys && previous !in keys
         transition.go(previous, top, NbKind.Page, toIsUpper = !pop, e = side)
     }
-    SideEffect {
-        memory.top = top
-        memory.keys = keys
-    }
-    if (memory.top == null) {
-        // The first composition: nothing to set up, the targets may read the memory right away.
-        memory.top = top
-        memory.keys = keys
-    }
-    transition.hasContent = { it in memory.withContent }
-    RunPending(transition, transition.runId)
-    @Suppress("UNUSED_VARIABLE")
-    val version = transition.version
-    val layers = transition.layers(top)
     val back by rememberUpdatedState(onBack)
     val canBack = rememberUpdatedState(backEnabled && keys.size > 1)
     val scope = LocalNbBackScope.current
@@ -138,28 +134,50 @@ fun <T : Any> NbStackHost(
         remember(transition, scope) {
             StackBackTarget(transition, scope, memory, canBack, side) { back() }
         }
-    target.side = side
+    SideEffect {
+        memory.top = top
+        memory.keys = keys
+        memory.values.putAll(current)
+        target.side = side
+        transition.hasContent = { it in memory.withContent }
+    }
+    RunPending(transition, transition.runId)
+    @Suppress("UNUSED_VARIABLE")
+    val version = transition.version
+    val layers = transition.layers(top)
     RegisterBackTarget(target)
     val settled = rememberUpdatedState(onSettled)
     LaunchedEffect(transition.settled) {
         // Only at rest: a change set up after the one that settled (a fold's snap right after a dropped push) still
         // shows its leaving page, whose entry must stay alive until that change settles too (V7).
         if (transition.running) return@LaunchedEffect
-        values.keys.retainAll((keys + layers).toSet())
+        memory.values.keys.retainAll((keys + layers).toSet())
         if (saveable) memory.forgotten(holder, keys)
         settled.value()
+        // A Back that came while a deferred Back ran (R9) runs now, from the state that one left.
+        if (transition.takeQueuedBack() && target.enabled()) target.back()
     }
     // The page below the top is composed, measured, placed and drawn ahead, parked (an invisible layer: no semantics,
     // no input, no focus): a back gesture or a pop starts on a page whose layer and display lists already exist, so
-    // its first frame only changes layer properties (V5, R1-3: a page that was only measured still had to be placed
-    // and drawn in full in the gesture's first frame).
+    // its first frame only changes layer properties (V5, R1-3). While a change runs, the page parked before it stays
+    // composed, and the page that will be below the top after a pop is composed ahead (review V8: the parked page was
+    // disposed in the push's first frame, and the new page below was composed from scratch at a pop's settle).
     val below = keys.getOrNull(keys.size - 2)
-    val composed = if (below != null && !transition.running) listOf(below) + layers else layers
+    val parkedKeys =
+        buildList {
+            if (transition.running) {
+                memory.parked?.let { if (it in keys) add(it) }
+                keys.getOrNull(keys.size - BELOW_NEXT)?.let { add(it) }
+            }
+            below?.let { add(it) }
+        }.filter { it !in layers }.distinct()
+    SideEffect { if (!transition.running) memory.parked = below }
+    val composed = parkedKeys + layers
     Box(modifier.fillMaxSize().onSizeChanged { memory.width = it.width.toFloat() }) {
         composed.forEach { k ->
             key(k) {
-                val value = values[k]
-                val child = rememberChildScope { memory.top == k }
+                val value = current[k] ?: memory.values[k]
+                val child = rememberChildScope { memory.top == k && !transition.deferred }
                 val isTop = k == top
                 val parked = k !in layers
                 NbLayer(
@@ -167,9 +185,10 @@ fun <T : Any> NbStackHost(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .evictFocus(hidden = !isTop)
                             .zIndex(if (k == layers.last()) 1f else 0f)
                             .poseLayer(transition, k, parked = if (parked) id else null)
-                            .blockInput { memory.top != k || transition.gesture }
+                            .blockInput { memory.top != k || transition.inputBlocked }
                             .then(if (isTop) Modifier else Hidden),
                 ) {
                     if (value != null) {
@@ -183,8 +202,11 @@ fun <T : Any> NbStackHost(
     }
 }
 
+/** The page two below the top: below the top once the top is popped. */
+private const val BELOW_NEXT = 3
+
 /** Saveable state of pages that left the stack is dropped. */
-private fun HostMemory.forgotten(
+private fun HostMemory<*>.forgotten(
     holder: SaveableStateHolder,
     keys: List<Any>,
 ) {
@@ -193,11 +215,14 @@ private fun HostMemory.forgotten(
     saved.addAll(keys)
 }
 
-/** The Back target of a [NbStackHost]: pops the top page, previewed under the finger. */
+/**
+ * The Back target of a [NbStackHost]: pops the top page, previewed under the finger. Every Back (gesture or not)
+ * moves first and pops when its motion has settled (R9).
+ */
 private class StackBackTarget(
     private val transition: NbTransition,
     private val scope: NbBackScope,
-    private val memory: HostMemory,
+    private val memory: HostMemory<*>,
     private val canBack: State<Boolean>,
     var side: Int,
     private val onBack: () -> Unit,
@@ -212,7 +237,9 @@ private class StackBackTarget(
         edge: Int,
         touchX: Float,
     ) {
-        val keys = memory.keys
+        token = -1
+        // A Back still moving lands first: this gesture goes back from the page that Back leads to (R9).
+        val keys = if (transition.land()) memory.keys.dropLast(1) else memory.keys
         if (keys.size < 2) return
         finger.start(edge, touchX)
         token = transition.beginGesture(keys.last(), keys[keys.size - 2], NbKind.Page, toIsUpper = false, e = edgeSide(edge, side))
@@ -225,14 +252,33 @@ private class StackBackTarget(
     }
 
     override fun commit() {
-        if (!transition.gesture) return
-        onBack()
-        transition.release(token, commit = true)
+        // A gesture that never started here (the platform committed without a start): a Back like any other.
+        if (token == -1) back() else transition.release(token, commit = true, then = onBack)
+        token = -1
     }
 
-    override fun back() = onBack()
+    override fun back() {
+        val keys = memory.keys
+        if (keys.size < 2) {
+            onBack()
+            return
+        }
+        transition.goBack(keys.last(), keys[keys.size - 2], NbKind.Page, toIsUpper = false, e = side, then = onBack)
+    }
 
     override fun abort() = transition.abort()
+}
+
+/**
+ * A layer that stops being the shown one gives up the focus it holds (review V6: a hidden layer stopped focus from
+ * entering, but a focused element inside it kept the focus, so its key handlers still answered for a page not shown).
+ */
+@Composable
+private fun Modifier.evictFocus(hidden: Boolean): Modifier {
+    val manager = LocalFocusManager.current
+    val holds = remember { BooleanArray(1) }
+    LaunchedEffect(hidden) { if (hidden && holds[0]) manager.clearFocus(force = true) }
+    return onFocusChanged { holds[0] = it.hasFocus }
 }
 
 /** A layer that is not the shown one: no semantics (screen readers, tests) and no focus can enter it. */
@@ -245,7 +291,7 @@ private val Hidden: Modifier =
 /**
  * One layer of a host: its content stacked as in a `Box` (top start, loose constraints), and whether that content
  * emitted anything to draw (rule R8: a change waits for its entering layer's content). [onContent] runs in every
- * measure of the layer.
+ * measure of the layer, and with false when the layer leaves the composition.
  */
 @Composable
 internal fun NbLayer(
@@ -253,6 +299,10 @@ internal fun NbLayer(
     modifier: Modifier,
     content: @Composable () -> Unit,
 ) {
+    // A layer that leaves the composition has no content any more (review V7: a key that came back reported the
+    // content of its old layer, so its change skipped the wait for its new one).
+    val gone by rememberUpdatedState(onContent)
+    DisposableEffect(Unit) { onDispose { gone(false) } }
     Layout(content, modifier) { measurables, constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val placeables = measurables.map { it.measure(loose) }
@@ -290,35 +340,48 @@ fun <K : Any> NbSectionHost(
     val side = layoutSide()
     val holder = rememberSaveableStateHolder()
     val memory = remember { SectionMemory<K>() }
-    val visited = remember { LinkedHashSet<K>() }
-    visited += selected
     val previous = memory.selected
     if (previous != null && previous != selected) {
         val upper = order.indexOf(selected) > order.indexOf(previous)
         transition.go(previous, selected, NbKind.Tab, toIsUpper = upper, e = side)
     }
-    SideEffect { memory.selected = selected }
-    if (memory.selected == null) memory.selected = selected
-    memory.first = order.first()
-    transition.hasContent = { it in memory.withContent }
     RunPending(transition, transition.runId)
     @Suppress("UNUSED_VARIABLE")
     val version = transition.version
     val layers = transition.layers(selected)
+
+    // The sections to compose: every one visited before (applied compositions only) and the ones of this change.
     @Suppress("UNCHECKED_CAST")
-    (layers as List<K>).forEach { visited += it }
+    val visited =
+        LinkedHashSet<K>(memory.visited).apply {
+            add(selected)
+            addAll(layers as List<K>)
+        }
     val back by rememberUpdatedState(onBackToFirst)
     val canBack = rememberUpdatedState(selected != order.first())
     val scope = LocalNbBackScope.current
     val target = remember(transition, scope) { SectionBackTarget(transition, scope, memory, canBack, side) { back() } }
-    target.side = side
+    SideEffect {
+        memory.selected = selected
+        memory.first = order.first()
+        memory.visited.addAll(visited)
+        target.side = side
+        transition.hasContent = { it in memory.withContent }
+    }
     RegisterBackTarget(target)
+    LaunchedEffect(transition.settled) {
+        if (!transition.running && transition.takeQueuedBack() && target.enabled()) target.back()
+    }
+    // A deferred Back to the first section (R9) shows its target in the fixed elements (the bar) from its start, as a
+    // tap on the bar does.
+    @Suppress("UNCHECKED_CAST")
+    val shownSelection = (transition.committedTo as? K) ?: selected
     Layout(
         modifier = modifier.onSizeChanged { memory.width = it.width.toFloat() },
         content = {
             visited.forEach { section ->
                 key(section) {
-                    val active = remember(section) { { memory.selected == section } }
+                    val active = remember(section) { { memory.selected == section && !transition.deferred } }
                     val child = rememberChildScope(active)
                     val shown = section in layers
                     val shift = remember(section) { SectionShift(transition, section) }
@@ -327,14 +390,15 @@ fun <K : Any> NbSectionHost(
                         modifier =
                             Modifier
                                 .layoutId(section)
+                                .evictFocus(hidden = !(shown && section == selected))
                                 .poseLayer(transition, section, shift, parked = if (shown) null else id)
-                                .blockInput { memory.selected != section || transition.gesture }
+                                .blockInput { memory.selected != section || transition.inputBlocked }
                                 .then(if (shown && section == selected) Modifier else Hidden),
                     ) {
                         CompositionLocalProvider(
                             LocalNbBackScope provides child,
                             LocalSectionShift provides shift,
-                            LocalSectionSelected provides selected,
+                            LocalSectionSelected provides shownSelection,
                         ) {
                             holder.SaveableStateProvider(section.toString()) { content(section, active) }
                         }
@@ -366,6 +430,9 @@ private class SectionMemory<K : Any> {
     var selected: K? = null
     var first: K? = null
 
+    /** Every section shown so far (ADR 0006: they stay composed), written after each applied composition. */
+    val visited = LinkedHashSet<K>()
+
     /** Sections that have content to draw (rule R8). */
     val withContent = HashSet<Any>()
 
@@ -393,12 +460,16 @@ private class SectionBackTarget<K : Any>(
         touchX: Float,
     ) {
         finger.start(edge, touchX)
-        val shown = memory.selected
+        val landed = transition.land()
+        val shown = if (landed) memory.first else memory.selected
         val first = memory.first
         // Tab: the direction comes from the bar order, whatever the edge (the first section is always at the start).
-        if (shown != null && first != null && shown != first) {
-            token = transition.beginGesture(shown, first, NbKind.Tab, toIsUpper = false, e = side)
-        }
+        token =
+            if (shown != null && first != null && shown != first) {
+                transition.beginGesture(shown, first, NbKind.Tab, toIsUpper = false, e = side)
+            } else {
+                -1
+            }
     }
 
     override fun progress(move: NbBackMove) = transition.drag(token, finger.share(move, memory.width), move.timeMillis)
@@ -408,12 +479,19 @@ private class SectionBackTarget<K : Any>(
     }
 
     override fun commit() {
-        if (!transition.gesture) return
-        onBack()
-        transition.release(token, commit = true)
+        if (token == -1) back() else transition.release(token, commit = true, then = onBack)
+        token = -1
     }
 
-    override fun back() = onBack()
+    override fun back() {
+        val shown = memory.selected
+        val first = memory.first
+        if (shown == null || first == null || shown == first) {
+            onBack()
+            return
+        }
+        transition.goBack(shown, first, NbKind.Tab, toIsUpper = false, e = side, then = onBack)
+    }
 
     override fun abort() = transition.abort()
 }
@@ -436,42 +514,49 @@ fun <T : Any> NbSwitcher(
 ) {
     val transition = rememberTransition(id)
     val side = layoutSide()
-    val memory = remember { HostMemory() }
-    val values = remember { HashMap<Any, T>() }
+    val memory = remember { HostMemory<T>() }
     val k = key(value)
-    values[k] = value
     val previous = memory.top
     val router = LocalNbBackRouter.current
+    var handoff: Long? = null
     if (previous != null && previous != k) {
-        val old = values[previous]
+        val old = memory.values[previous]
         if (order != null && old != null) {
             val forward = sign(order.compare(value, old).toFloat()).toInt().takeIf { it != 0 } ?: 1
-            // A step made by a swipe continues with the swipe's speed (p per second over this pager's width).
-            val speed = router?.stepHandoff?.take() ?: 0f
+            // A step made by a swipe continues with the swipe's speed (p per second over this pager's width). Read
+            // here, consumed once the composition is applied (V4: a destructive read in composition lost it when the
+            // composition was discarded or ran again).
+            val step = router?.stepHandoff?.peek()
+            handoff = step?.first
+            val speed = step?.second ?: 0f
             val v0 = if (memory.width > 0f) speed / memory.width else 0f
             transition.go(previous, k, NbKind.Pager, toIsUpper = true, e = forward * side, v0 = v0)
         } else {
             transition.go(previous, k, NbKind.Swap, toIsUpper = true, e = side)
         }
     }
-    SideEffect { memory.top = k }
-    if (memory.top == null) memory.top = k
-    transition.hasContent = { it in memory.withContent }
+    SideEffect {
+        memory.top = k
+        memory.values[k] = value
+        handoff?.let { router?.stepHandoff?.consume(it) }
+        transition.hasContent = { it in memory.withContent }
+    }
     RunPending(transition, transition.runId)
     @Suppress("UNUSED_VARIABLE")
     val version = transition.version
     val layers = transition.layers(k)
-    LaunchedEffect(transition.settled) { values.keys.retainAll(layers.toSet() + k) }
+    LaunchedEffect(transition.settled) { memory.values.keys.retainAll(layers.toSet() + k) }
     Box(modifier.onSizeChanged { memory.width = it.width.toFloat() }.then(if (layers.size > 1) Modifier.clipToBounds() else Modifier)) {
         layers.forEach { layer ->
             key(layer) {
-                val v = values[layer]
+                val v = if (layer == k) value else memory.values[layer]
                 // Each layer is its own back branch: a leaving layer's hosts are no back target (ADR 0011 R4).
                 val child = rememberChildScope { memory.top == layer }
                 NbLayer(
                     onContent = { has -> if (has) memory.withContent += layer else memory.withContent -= layer },
                     modifier =
                         Modifier
+                            .evictFocus(hidden = layer != k)
                             .zIndex(if (layer == k) 1f else 0f)
                             .poseLayer(transition, layer)
                             .blockInput { memory.top != layer }

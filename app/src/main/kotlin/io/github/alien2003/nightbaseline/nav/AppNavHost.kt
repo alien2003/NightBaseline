@@ -64,6 +64,7 @@ import io.github.alien2003.nightbaseline.ui.interaction.nbKeyIntents
 import io.github.alien2003.nightbaseline.ui.interaction.nbReproject
 import io.github.alien2003.nightbaseline.ui.interaction.nbStepArea
 import io.github.alien2003.nightbaseline.ui.interaction.page
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbBack
 import io.github.alien2003.nightbaseline.ui.interaction.rememberNbLazyListState
 import io.github.alien2003.nightbaseline.ui.interaction.rememberNbNavController
 import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
@@ -346,8 +347,8 @@ fun AppNavHost(
                 }
 
                 AppSheet.NotRecorded -> {
-                    InfoPanel(layout, sheetTitle) {
-                        InfoParagraphs(listOf(stringResource(R.string.detail_not_provided_body, sheetSource)), it)
+                    InfoPanel(layout, sheetTitle) { modifier, inner ->
+                        InfoParagraphs(listOf(stringResource(R.string.detail_not_provided_body, sheetSource)), inner, modifier)
                     }
                 }
 
@@ -452,7 +453,7 @@ private fun NavGraphBuilder.graph(
                     layout.forDetail(),
                     actions =
                         NightDetailActions(
-                            onBack = { navController.popBackStack() },
+                            onBack = rememberNbBack { navController.popBackStack() },
                             onPrevious = vm::show,
                             onNext = vm::show,
                             onMetric = { m ->
@@ -507,7 +508,7 @@ private fun NavGraphBuilder.graph(
                     layout.forDetail(),
                     actions =
                         MetricDetailActions(
-                            onBack = { navController.popBackStack() },
+                            onBack = rememberNbBack { navController.popBackStack() },
                             onPeriod = {
                                 selection = null
                                 vm.setPeriod(it)

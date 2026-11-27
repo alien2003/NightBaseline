@@ -83,6 +83,7 @@ import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import io.github.alien2003.nightbaseline.ui.theme.ShellDimens
 import io.github.alien2003.nightbaseline.ui.theme.ShellTokens
 import io.github.alien2003.nightbaseline.ui.theme.dataType
 
@@ -714,7 +715,7 @@ fun ModalScope.RangeExplainerPanel(
     sideLine: String?,
 ) {
     val text = rememberUiText()
-    InfoPanel(layout, text.string(R.string.explainer_title)) { ExplainerBody(sideLine, it) }
+    InfoPanel(layout, text.string(R.string.explainer_title)) { modifier, inner -> ExplainerBody(sideLine, inner, modifier) }
 }
 
 /** The [ModalKind] of an [InfoPanel] in [layout]: a sheet on phone-like windows, a centred dialog from Medium up. */
@@ -734,7 +735,7 @@ fun infoModalKind(layout: LayoutSpec): ModalKind =
 fun ModalScope.InfoPanel(
     layout: LayoutSpec,
     title: String,
-    body: @Composable ColumnScope.(Modifier) -> Unit,
+    body: @Composable ColumnScope.(Modifier, PaddingValues) -> Unit,
 ) {
     val maxHeight =
         when (layout.mode) {
@@ -752,8 +753,10 @@ fun ModalScope.InfoPanel(
             }
         }
     if (state.kind == ModalKind.Sheet) {
-        GlassSheet(title, modifier = Modifier.heightIn(max = maxHeight)) {
-            body(Modifier.weight(1f, fill = false))
+        // The body's scroll container spans the panel edge to edge, its side margin inside it (V2-7: a flick that
+        // started in the margin did not scroll).
+        GlassSheet(title, modifier = Modifier.heightIn(max = maxHeight), edgeToEdge = true) {
+            body(Modifier.weight(1f, fill = false), PaddingValues(horizontal = ShellDimens.toolbarMargin))
         }
     } else {
         val fold = layout.verticalFold
@@ -770,7 +773,7 @@ private const val SHEET_SHARE = 0.85f
 private fun ModalScope.InfoDialog(
     title: String,
     maxHeight: Dp,
-    body: @Composable ColumnScope.(Modifier) -> Unit,
+    body: @Composable ColumnScope.(Modifier, PaddingValues) -> Unit,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
@@ -781,11 +784,11 @@ private fun ModalScope.InfoDialog(
             .modalPanel(state)
             .shellSurface(ShellMaterial.Dialog, NbShapes.dialog)
             .semantics { paneTitle = title }
-            .padding(NbSpace.s7),
+            .padding(vertical = NbSpace.s7),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s4),
     ) {
         // Centred dialog title (conformance H1 / T7) with the round close button; the leading spacer keeps it centred.
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = NbSpace.s7), verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.size(NbDimens.targetMin))
             NbText(
                 title,
@@ -795,7 +798,8 @@ private fun ModalScope.InfoDialog(
             )
             ShellRoundButton(NbIcons.Close, text.string(R.string.a11y_close), onClick = { dismiss() })
         }
-        body(Modifier.weight(1f, fill = false))
+        // The body scrolls edge to edge, its side margin inside the scroll container (V2-7).
+        body(Modifier.weight(1f, fill = false), PaddingValues(horizontal = NbSpace.s7))
     }
 }
 
@@ -803,10 +807,11 @@ private fun ModalScope.InfoDialog(
 @Composable
 fun InfoParagraphs(
     paragraphs: List<String>,
+    inner: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
     val colors = NbTheme.colors
-    Column(modifier.nbVerticalScroll(rememberNbScrollState(), id = "metric-8")) {
+    Column(modifier.nbVerticalScroll(rememberNbScrollState(), id = "metric-8", contentPadding = inner)) {
         NbCard(Modifier.fillMaxWidth()) {
             paragraphs.forEach { NbText(it, style = NbTheme.typography.body, color = colors.textPrimary) }
         }
@@ -817,11 +822,12 @@ fun InfoParagraphs(
 @Composable
 private fun ExplainerBody(
     sideLine: String?,
+    inner: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
-    Column(modifier.nbVerticalScroll(rememberNbScrollState(), id = "metric-9")) {
+    Column(modifier.nbVerticalScroll(rememberNbScrollState(), id = "metric-9", contentPadding = inner)) {
         NbCard(Modifier.fillMaxWidth()) {
             listOfNotNull(
                 text.string(R.string.explainer_range),

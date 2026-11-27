@@ -4,10 +4,13 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 
 /**
  * The root of the interaction framework (ADR 0011), installed once by the theme: the motion configuration, the one
@@ -27,11 +30,20 @@ fun NbInteractionRoot(
     val indication = remember(pressed, reduced) { NbPressIndication(pressed, reduced) }
     val overscroll = remember(density, reduced) { if (reduced) null else NbOverscrollFactory(density) }
     val router = remember { NbBackRouter() }
+    val clickScope = rememberCoroutineScope()
+    SideEffect { router.scope = clickScope }
+    // The display's frame period: the longest first step of a run from rest (R7, NbPlayClock).
+    val view = LocalView.current
+    SideEffect {
+        val rate = view.display?.refreshRate ?: 0f
+        if (rate >= MIN_REFRESH_HZ) NbClock.framePeriodNanos = (NANOS_PER_SECOND / rate).toLong()
+    }
     CompositionLocalProvider(
         LocalNbMotion provides config,
         LocalIndication provides indication,
         LocalOverscrollFactory provides overscroll,
         LocalNbBackRouter provides router,
+        LocalNbClickScope provides clickScope,
     ) {
         NbBackRoot(router)
         content()
@@ -62,3 +74,8 @@ suspend fun nbReproject(
         router.reprojectDepth--
     }
 }
+
+/** Below this the display reports no usable rate (Hz). */
+private const val MIN_REFRESH_HZ = 10f
+
+private const val NANOS_PER_SECOND = 1e9f

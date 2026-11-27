@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -115,11 +116,18 @@ class ModalState internal constructor(
 
     internal var onDismiss: () -> Unit = {}
 
-    /** Start velocity (p / s) of the next hide, from a fling or a released gesture. */
-    internal var releaseVelocity: Float = 0f
+    /** Start velocity (p / s) of the next hide, from a fling or a released gesture (snapshot state, V4). */
+    internal var releaseVelocity: Float by mutableFloatStateOf(0f)
 
-    /** [NbClock.nowNanos] of the last open or close request: the time origin of its run (ADR 0011 R7). */
-    internal var requestAt: Long? = null
+    /**
+     * [NbClock.nowNanos] of the last open or close request, or the frame a released gesture last drew: the time origin
+     * of its run (ADR 0011 R7). Set for every open and every close, whoever asks for it (review V1: a close by the
+     * caller, without [dismiss], ran from the open request seconds earlier and snapped shut).
+     */
+    internal var requestAt: Long? by mutableStateOf(null)
+
+    /** True from a [dismiss] until the host composes the close it asked for (its origin is then already set). */
+    internal var dismissing: Boolean by mutableStateOf(false)
 
     /** The branch of the composition the modal was opened in (its Back is enabled only while that branch is shown). */
     internal var branch: NbBackScope = NbBackScope(0) { true }
@@ -144,37 +152,53 @@ class ModalState internal constructor(
 
     /** Asks the caller to close (scrim, Back, drag, close button, a chosen option). Animated out by the host. */
     fun dismiss(velocity: Float = 0f) {
+        dismissFrom(velocity, NbClock.nowNanos())
+    }
+
+    /** [dismiss] whose hide continues a motion last drawn at [origin] (a released back gesture, R7). */
+    internal fun dismissFrom(
+        velocity: Float,
+        origin: Long,
+    ) {
         if (!target) return
         releaseVelocity = velocity
-        requestAt = NbClock.nowNanos()
+        requestAt = origin
+        dismissing = true
         onDismiss()
     }
 
     /**
      * Opens (or continues opening) the panel. Rule R8: a panel opening from hidden waits, at p = 0 (invisible), until
-     * it has been measured (its content composed and laid out), at most [NbPhysics.ENTER_WAIT_MS]; its time origin is
-     * then the frame after that, so the cost of its first composition never shows as a jump of the motion. Otherwise
-     * the origin is the request (R7).
+     * it has been measured (its content composed and laid out), at most [NbPhysics.ENTER_WAIT_MS] after the request.
+     * Its first frame of motion is at most one display frame into the spring (R7, [NbPlayClock]), so the cost of its
+     * first composition never shows as a jump of the motion, waited or not (review V2, V2-3). Reopened while it hides,
+     * it continues from (p, v).
      */
     internal suspend fun show() {
         job?.cancel()
         var origin = requestAt
+        val v = driver.v
         if (driver.p == 0f && panelHeight <= 0f && !reduced) {
+            val asked = origin ?: NbClock.nowNanos()
+            val budget = (NbPhysics.ENTER_WAIT_MS * NANOS_PER_MS - (NbClock.nowNanos() - asked)).coerceAtLeast(0L)
             var first = Long.MIN_VALUE
             while (true) {
                 val frame = withFrameNanos { it }
                 if (first == Long.MIN_VALUE) first = frame
-                if (panelHeight > 0f || frame - first >= NbPhysics.ENTER_WAIT_MS * NANOS_PER_MS) break
+                if (panelHeight > 0f || frame - first >= budget) break
             }
             origin = NbClock.nowNanos()
+        } else if (v != 0f) {
+            origin = driver.continueOrigin()
         }
-        driver.run(1f, NbRelease.startVelocity(driver.p, driver.v, 1f, NbPhysics.Nav, visibleTarget = true), origin)
+        driver.run(1f, NbRelease.startVelocity(driver.p, v, 1f, NbPhysics.Nav, visibleTarget = true), origin)
     }
 
     internal suspend fun hide() {
         job?.cancel()
         val v = releaseVelocity
         releaseVelocity = 0f
+        dismissing = false
         driver.run(0f, NbRelease.startVelocity(driver.p, v, 0f, NbPhysics.Nav, visibleTarget = false), requestAt)
     }
 
@@ -219,6 +243,7 @@ class ModalState internal constructor(
     }
 
     private var gestureFrom = 1f
+    private var gestureOn = false
     private val finger = NbBackFinger()
 
     /**
@@ -240,33 +265,49 @@ class ModalState internal constructor(
                 driver.resetTracking()
                 finger.start(edge, touchX)
                 gestureFrom = driver.p
+                gestureOn = true
             }
 
             override fun progress(move: NbBackMove) {
-                if (!target || reduced) return
-                // p = p0 (1 - g) with g the finger's travel share over the window, the same law as a page (ADR 0011:
-                // every back gesture follows the finger's travel, never the platform's shaped progress).
+                if (!gestureOn || !target || reduced) return
+                // The panel's hide share moves by exactly the finger's travel share g over the window, from wherever
+                // the panel is (review V5: p0 (1 - g) moved a panel caught mid-show by p0 g only), the same law as a
+                // page (ADR 0011: every back gesture follows the finger's travel, never the platform's progress).
                 val g = finger.share(move, hostWidth)
-                val next = (gestureFrom * (1f - g)).coerceIn(0f, 1f)
-                scope?.launch(start = CoroutineStart.UNDISPATCHED) { driver.track(next, move.timeMillis) }
+                val next = 1f - NbGestureMap.linear(g, 1f - gestureFrom)
+                scope?.launch(start = CoroutineStart.UNDISPATCHED) { driver.track(next, move.timeMillis, finger = g, slope = -1f) }
             }
 
             override fun cancel() {
+                if (!gestureOn) return
+                gestureOn = false
                 val at = NbClock.nowNanos()
                 job = scope?.launch(start = CoroutineStart.UNDISPATCHED) { driver.release(1f, visibleTarget = true, at = at) }
             }
 
             override fun commit() {
+                if (!gestureOn) {
+                    dismiss()
+                    return
+                }
+                gestureOn = false
                 val at = NbClock.nowNanos()
-                val velocity = driver.releaseVelocity(at)
-                val origin = driver.releaseOrigin(at)
-                dismiss(velocity)
                 // The hide continues the finger's motion (R7), not a new start at the dismiss request.
-                requestAt = origin
+                dismissFrom(driver.releaseVelocity(at), driver.releaseOrigin(at))
             }
 
             override fun back() {
                 dismiss()
+            }
+
+            // A fold or unfold during the gesture (R6): the gesture is void and the panel is at rest where it was
+            // asked to be (review V12: the modal kept the gesture running while every page dropped its own).
+            override fun abort() {
+                if (!gestureOn) return
+                gestureOn = false
+                job?.cancel()
+                driver.resetTracking()
+                scope?.launch(start = CoroutineStart.UNDISPATCHED) { driver.snapTo(if (target) 1f else 0f) }
             }
         }
 
@@ -333,6 +374,7 @@ const val MODAL_PANEL_TAG: String = "nb-modal-panel"
  * where it is. The scrim's alpha is p; it takes touches only while the panel is wanted open. The overscroll is off
  * inside the panel.
  */
+@Suppress("CyclomaticComplexMethod") // One host: open and close requests, their origins, the panel and the scrim.
 @Composable
 fun <T : Any> ModalHost(
     value: T?,
@@ -343,19 +385,24 @@ fun <T : Any> ModalHost(
 ) {
     val reduced = LocalNbMotion.current.reduced
     val scope = rememberCoroutineScope()
-    val state = remember { ModalState(kind, reduced, 0f, scope) }
+    val dismissNow by rememberUpdatedState(onDismiss)
+    val state = remember { ModalState(kind, reduced, 0f, scope).also { it.onDismiss = { dismissNow() } } }
+    // Snapshot state only in composition (V4): a discarded composition rolls these writes back.
     if (value != null) {
         state.kind = kind
         state.reduced = reduced
     }
-    val dismissNow by rememberUpdatedState(onDismiss)
-    state.onDismiss = { dismissNow() }
     val retained = remember { RetainedValue<T>() }
     if (value != null) retained.value = value
     val wanted = value != null
-    if (wanted && !state.target) state.requestAt = NbClock.nowNanos()
+    // Every open and every close takes its origin now, unless a recent dismiss already gave the close its own (V1).
+    val asked = state.requestAt
+    val fresh = state.dismissing && asked != null && NbClock.nowNanos() - asked <= NbPhysics.ENTER_WAIT_MS * MODAL_NANOS_PER_MS
+    if (wanted != state.target && (wanted || !fresh)) state.requestAt = NbClock.nowNanos()
+    if (!wanted && state.target) state.dismissing = false
     state.target = wanted
-    state.branch = LocalNbBackScope.current
+    val branch = LocalNbBackScope.current
+    SideEffect { state.branch = branch }
     LaunchedEffect(state, wanted) {
         if (wanted) {
             state.show()
@@ -453,9 +500,9 @@ fun Modifier.sheetNestedScroll(state: ModalState): Modifier {
     return nestedScroll(nested)
 }
 
-/** The last non-null value, kept for the exit animation; plain (not state): it never drives recomposition. */
+/** The last non-null value, kept for the exit animation (snapshot state: a discarded composition rolls it back). */
 private class RetainedValue<T : Any> {
-    var value: T? = null
+    var value: T? by mutableStateOf(null)
 }
 
 /** A panel drawn at rest outside a host (component catalog, previews). */
@@ -467,3 +514,6 @@ fun StaticModal(
     val scope = remember(kind) { ModalScope(ModalState(kind, reduced = false, initial = 1f, scope = null)) }
     scope.content()
 }
+
+/** ns per ms. */
+private const val MODAL_NANOS_PER_MS = 1_000_000L

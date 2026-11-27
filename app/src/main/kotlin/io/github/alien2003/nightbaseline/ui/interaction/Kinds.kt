@@ -200,9 +200,26 @@ object NbGestureMap {
         return (1f - s).coerceIn(0f, 1f)
     }
 
-    /** A back gesture on a modal that starts at [p0] of its hide: the panel follows the finger linearly. */
+    /** The slope d[stackPop] / dg at ([g], [p0]): the release velocity of p is the finger's velocity times it. */
+    fun stackPopSlope(
+        g: Float,
+        p0: Float,
+    ): Float {
+        val u0 = 1f - (1f - p0.coerceIn(0f, 1f)).pow(NbPhysics.PAGE_GAMMA)
+        val rest = (1f - (u0 + g.coerceIn(0f, 1f))).coerceAtLeast(MIN_REST)
+        return rest.pow(1f / NbPhysics.PAGE_GAMMA - 1f) / NbPhysics.PAGE_GAMMA
+    }
+
+    /** The smallest remaining travel share the slope is taken at (the map is vertical at the end). */
+    private const val MIN_REST = 1e-3f
+
+    /**
+     * A linear gesture that starts at [p0]: the value moves by exactly the finger's travel share [g] from wherever it
+     * is, `p0 + g` (a modal's hide share under a back gesture; review V5: `p0 + (1 - p0) g` scaled the finger by
+     * `1 - p0` when a gesture caught a running show or hide, the defect `stackPop` had).
+     */
     fun linear(
         g: Float,
         p0: Float,
-    ): Float = (p0 + (1f - p0) * g.coerceIn(0f, 1f)).coerceIn(0f, 1f)
+    ): Float = (p0.coerceIn(0f, 1f) + g.coerceIn(0f, 1f)).coerceIn(0f, 1f)
 }

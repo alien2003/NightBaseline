@@ -24,6 +24,29 @@ while IFS= read -r pattern; do
     fail=1
   done
 done < tools/interaction-forbidden.txt
+# Registration (review V10): every scroll container of the app passes a literal id (the key the sweeps enumerate and
+# InteractionReachTest checks for reach), and no id is used twice.
+ids=$(for f in "${files[@]}"; do
+  [[ "$f" == "$framework"* ]] && continue
+  [[ -f "$f" ]] || continue
+  awk -v f="$f" '
+    /(nbVerticalScroll|nbHorizontalScroll|NbLazyColumn)\(/ { pending = 6; at = FNR }
+    pending > 0 {
+      if (match($0, /id = "[^"]+"/)) { print substr($0, RSTART + 6, RLENGTH - 7); pending = 0; next }
+      pending--
+      if (pending == 0) print "MISSING:" f ":" at
+    }' "$f"
+done)
+if grep -q '^MISSING:' <<<"$ids"; then
+  echo "scroll container without a literal id (ADR 0011 registration):"
+  grep '^MISSING:' <<<"$ids"
+  fail=1
+fi
+dups=$(grep -v '^MISSING:' <<<"$ids" | sort | uniq -d)
+if [[ -n "$dups" ]]; then
+  echo "scroll container id used twice: $dups"
+  fail=1
+fi
 # The framework does not depend on screens.
 rev=$(git ls-files "$framework*.kt" | xargs -r grep -nE 'import io\.github\.alien2003\.nightbaseline\.(nav|ui\.(home|history|night|metric|settings|onboarding|learning))\.' || true)
 if [[ -n "$rev" ]]; then

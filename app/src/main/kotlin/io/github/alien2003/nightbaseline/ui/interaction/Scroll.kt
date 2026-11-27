@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -72,16 +73,18 @@ fun rememberNbLazyListState(): LazyListState = rememberLazyListState()
 
 /**
  * A vertically scrolling container of the framework: the one fling, the one overscroll (from the theme), and the
- * container key for tests. The only way to scroll a column in the app.
+ * container key for tests. The only way to scroll a column in the app. [contentPadding] is applied inside the
+ * container, so a margin scrolls with the content and a flick that starts in it scrolls (V2-7).
  */
 @Composable
 fun Modifier.nbVerticalScroll(
     state: ScrollState,
     enabled: Boolean = true,
     id: String,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
 ): Modifier {
     val fling = rememberNbFling(id)
-    return semantics { nbScrollContainer = id }.verticalScroll(state, enabled, flingBehavior = fling)
+    return semantics { nbScrollContainer = id }.verticalScroll(state, enabled, flingBehavior = fling).padding(contentPadding)
 }
 
 /** A horizontally scrolling container of the framework (the calendar's transposed grid). */

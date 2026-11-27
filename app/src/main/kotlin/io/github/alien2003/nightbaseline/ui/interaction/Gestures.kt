@@ -146,10 +146,12 @@ fun Modifier.nbStepArea(
     val previous by rememberUpdatedState(onPrevious)
     val next by rememberUpdatedState(onNext)
     val router = LocalNbBackRouter.current
+    val branch = LocalNbBackScope.current
     return nbStepSwipe(onPrevious, onNext).nbKeyIntents { intent ->
         val delta = intent.stepDelta() ?: return@nbKeyIntents false
-        // The same rule as the router: an open modal takes the navigation keys.
-        if (router?.modalOpen() == true) return@nbKeyIntents false
+        // The same rules as the router: an open modal takes the navigation keys, and a sequence whose branch is not
+        // the shown one steps nothing (review V6: focus left inside a parked page still stepped it).
+        if (router?.modalOpen() == true || !branch.active()) return@nbKeyIntents false
         val step = if (delta < 0) previous else next
         step?.invoke()
         step != null

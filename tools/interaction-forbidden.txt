@@ -34,6 +34,13 @@ import androidx\.compose\.ui\.input\.key\.
 # Scrolling, fling, overscroll, indication
 \b(verticalScroll|horizontalScroll|rememberScrollState|LazyColumn|LazyRow|LazyVerticalGrid|rememberLazyListState)\s*[({]
 \b(nestedScroll|overscroll|flingBehavior)\b
+# Lists and pagers that bring their own fling, snap or layout animation (review V11)
+\b(LazyHorizontalGrid|LazyVerticalStaggeredGrid|LazyHorizontalStaggeredGrid|HorizontalPager|VerticalPager|rememberPagerState|PagerState)\b
+import androidx\.compose\.foundation\.pager\.
+\bbasicMarquee\b
+import android\.view\.animation\.
+\bandroid\.view\.animation\.
+\b(pointerInteropFilter|motionEventSpy)\b
 \b(animateScrollTo|animateScrollBy|animateScrollToItem|scrollToItem|scrollTo|scrollBy|dispatchRawDelta|stopScroll)\(
 \.indication\(
 \b(LocalOverscrollFactory|LocalIndication)\b

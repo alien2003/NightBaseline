@@ -19,8 +19,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -335,8 +338,76 @@ fun Modifier.nbClickable(
             enabled = enabled,
             role = role,
             onClickLabel = onClickLabel,
-            onClick = onClick,
+            onClick = rememberPressFirst(onClick),
         )
+}
+
+/**
+ * The scope clicks run in ([rememberPressFirst]): the root's, so a click is never lost when its element leaves the
+ * composition in the frame that shows its press. Null outside [NbInteractionRoot]: clicks run at once.
+ */
+internal val LocalNbClickScope = staticCompositionLocalOf<CoroutineScope?> { null }
+
+/**
+ * Rule P1 of ADR 0011 (round 3): a click runs after the frame that shows its press has been drawn, as a platform
+ * view posts its click after showing the pressed state. A tap whose click composes a whole page (a push, a tab) used
+ * to change nothing on screen until that composition was done, 170 to 600 ms on the emulator, with no frame of press
+ * feedback in between (V2-5): now the press is on screen first, and the change follows one frame later. Clicks keep
+ * their order with every other input: a Back or a navigation key runs the clicks still waiting first
+ * ([NbPendingClicks.flush]).
+ */
+@Composable
+internal fun rememberPressFirst(onClick: () -> Unit): () -> Unit {
+    val scope = LocalNbClickScope.current
+    val current by rememberUpdatedState(onClick)
+    return remember(scope) {
+        {
+            if (scope == null) {
+                current()
+            } else {
+                // The action of the element as it was tapped (a recomposition before the click runs cannot retarget it).
+                val action = current
+                val click: () -> Unit = { action() }
+                NbPendingClicks.add(click)
+                scope.launch {
+                    // The frame that draws the press; the click runs at the start of the next one, so its state
+                    // change is composed in that next frame, after the press is on screen.
+                    withFrameNanos { }
+                    withFrameNanos { }
+                    NbPendingClicks.run(click)
+                }
+            }
+        }
+    }
+}
+
+/** The clicks that wait for their press frame (P1), in input order; main thread only. */
+internal object NbPendingClicks {
+    private val queue = ArrayDeque<() -> Unit>()
+
+    fun add(click: () -> Unit) {
+        queue.addLast(click)
+    }
+
+    /** Runs [click] and every click before it, in order (nothing when a flush already ran it). */
+    fun run(click: () -> Unit) {
+        if (click !in queue) return
+        while (queue.isNotEmpty()) {
+            val next = queue.removeFirst()
+            next()
+            if (next === click) return
+        }
+    }
+
+    /**
+     * Runs every waiting click now, in order: input that comes after them (Back, keys) must find their result.
+     * Returns true when one ran (its state change is composed in the next frame).
+     */
+    fun flush(): Boolean {
+        val any = queue.isNotEmpty()
+        while (queue.isNotEmpty()) queue.removeFirst()()
+        return any
+    }
 }
 
 /** The colours of [nbClickable]'s feedback. */
@@ -457,6 +528,28 @@ private fun CoroutineScope.retarget(
 ): Job {
     previous?.cancel()
     return launch(start = CoroutineStart.UNDISPATCHED) { anim.pressTo(target, spec, sample, owner) }
+}
+
+/** True while this press value runs from 0 and no frame has drawn it yet. */
+private fun Animatable<Float, AnimationVector1D>.unseen(): Boolean = value == 0f && isRunning
+
+/**
+ * A press that ended before any frame drew it: [anim] is drawn at full level in the next frame (a snap, reported),
+ * then runs out on [out] (rule P1: every tap shows its press for at least one frame, before its click).
+ */
+private fun CoroutineScope.flashThenOut(
+    previous: Job?,
+    anim: Animatable<Float, AnimationVector1D>,
+    out: AnimationSpec<Float>,
+    sample: NbPressSample,
+    owner: Any,
+): Job {
+    previous?.cancel()
+    return launch(start = CoroutineStart.UNDISPATCHED) {
+        anim.pressTo(1f, null, sample, owner)
+        withFrameNanos { }
+        anim.pressTo(0f, out, sample, owner)
+    }
 }
 
 /**
@@ -744,6 +837,7 @@ private class PressFeedbackNode(
                 else -> 0f
             }
 
+    @Suppress("ReturnCount") // Nothing to do, the unseen press (P1), the normal retarget.
     private fun syncHighlight(animate: Boolean) {
         val target = highlightGoal
         if (target == highlightTarget) return
@@ -763,7 +857,13 @@ private class PressFeedbackNode(
                 target > 0f -> spec.motion.stateLayer<Float>(spec.row)
                 else -> spec.motion.stateLayerOut(spec.row)
             }
-        highlightJob = coroutineScope.retarget(highlightJob, anim, target, animation)
+        if (animation != null && target == 0f && anim.unseen()) {
+            // P1: a press released before any frame drew it (a quick tap in a scroll container, whose press and
+            // release arrive together) is drawn lit for one frame, then fades; its click follows that frame.
+            highlightJob = coroutineScope.flashThenOut(highlightJob, anim, animation, NbPressSample.Highlight, this)
+            return
+        }
+        highlightJob = coroutineScope.retarget(highlightJob, anim, target, animation, NbPressSample.Highlight, this)
     }
 
     private fun glowIn(position: Offset) {
@@ -979,7 +1079,14 @@ class NbPressIndication(
                 }
             val motion = NbMotionConfig(reduced)
             val spec = if (next > anim.value) motion.stateLayer<Float>() else motion.stateLayerOut()
-            levelJob = coroutineScope.retarget(levelJob, anim, next, if (snap) null else spec)
+            val animated = !snap && !reduced
+            if (animated && next == 0f && anim.unseen()) {
+                // P1: a press released before any frame drew it is drawn lit for one frame, then fades.
+                levelJob = coroutineScope.flashThenOut(levelJob, anim, spec, NbPressSample.Highlight, this)
+                return
+            }
+            // Reported like every other press value (review V13: the default indication was invisible to the probe).
+            levelJob = coroutineScope.retarget(levelJob, anim, next, if (snap) null else spec, NbPressSample.Highlight, this)
         }
 
         override fun onDetach() {

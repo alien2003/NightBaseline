@@ -1,7 +1,5 @@
 package io.github.alien2003.nightbaseline.ui.interaction
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationEndReason
 import androidx.compose.foundation.OverscrollEffect
 import androidx.compose.foundation.OverscrollFactory
 import androidx.compose.runtime.mutableFloatStateOf
@@ -207,7 +205,10 @@ class NbOverscrollEffect(
         jobY = null
     }
 
-    /** Runs the return spring of [axis] from its offset with [velocity] px/s; a throw stops at the limit and returns. */
+    /**
+     * Runs the return spring of [axis] from its offset with [velocity] px/s; a throw stops at the limit and returns.
+     * The one spring loop of the framework ([nbRunSpring], R7 clock; review V3: it ran on a bare `Animatable`).
+     */
     private suspend fun returnTo(
         axis: Axis,
         velocity: Float,
@@ -216,14 +217,14 @@ class NbOverscrollEffect(
         if (start == 0f && velocity == 0f) return
         returning++
         val limit = maxOffset
-        val anim = Animatable(start, NbPhysics.OVERSCROLL_EPS_PX).apply { updateBounds(-limit, limit) }
-        val write: Animatable<Float, *>.() -> Unit = { if (axis == Axis.X) offsetX = value else offsetY = value }
+        val write: (Float, Float, Long) -> Unit = { x, _, _ -> if (axis == Axis.X) offsetX = x else offsetY = x }
+        val eps = NbPhysics.OVERSCROLL_EPS_PX
         try {
-            val result = anim.animateTo(0f, NbPhysics.Overscroll.spec(NbPhysics.OVERSCROLL_EPS_PX), velocity, write)
-            if (result.endReason ==
-                AnimationEndReason.BoundReached
-            ) {
-                anim.animateTo(0f, NbPhysics.Overscroll.spec(NbPhysics.OVERSCROLL_EPS_PX), 0f, write)
+            val origin = NbClock.nowNanos()
+            val end = nbRunSpring(NbPhysics.Overscroll, eps, start, 0f, velocity, origin, -limit, limit, write)
+            if (end == NbRunEnd.Bound) {
+                val from = if (axis == Axis.X) offsetX else offsetY
+                nbRunSpring(NbPhysics.Overscroll, eps, from, 0f, 0f, NbClock.nowNanos(), -limit, limit, write)
             }
             if (axis == Axis.X) offsetX = 0f else offsetY = 0f
         } finally {

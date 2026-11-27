@@ -14,6 +14,9 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * Something Back can close (ADR 0011 R4): a stack level, a section, a modal. The router hands one gesture to one
@@ -122,7 +125,9 @@ class NbBackRouter {
     }
 
     /** Back without a gesture through the same targets (Esc, Alt+Left); false when nothing took it. */
+    @Suppress("ReturnCount") // Deferred, nothing to take it, taken.
     fun back(): Boolean {
+        if (afterPendingClicks { back() }) return true
         val target = top() ?: return false
         target.back()
         return true
@@ -149,12 +154,34 @@ class NbBackRouter {
      * than every page, so while one is open ([modalOpen]) a step key reaches nothing behind it, exactly as Back closes
      * the modal instead of popping the page (review: the arrows used to step the night behind an open sheet).
      */
+    @Suppress("ReturnCount") // Deferred, Back, a step.
     fun key(intent: NbKeyIntent): Boolean {
+        if (afterPendingClicks { key(intent) }) return true
         if (intent == NbKeyIntent.Back) return back()
         val delta = intent.stepDelta()
         var best: NbStepTarget? = null
         if (delta != null && !modalOpen()) for (t in steps) if (t.enabled() && (best == null || t.depth >= best.depth)) best = t
         return delta != null && best?.step?.invoke(if (delta < 0) -1 else 1) == true
+    }
+
+    /** The root's scope (input that waits for the composition of a click's state change runs in it). */
+    internal var scope: CoroutineScope? = null
+
+    /**
+     * Input in order (P1): a click still waiting for its press frame runs first, and [then] (this input) runs once
+     * that click's state change has been composed (two frames: the one that composes it, then the one after its
+     * effects), so a Back right after a tap goes back from what the tap opened. True when it was deferred.
+     */
+    @Suppress("ReturnCount") // No scope, no click waiting, deferred.
+    private fun afterPendingClicks(then: () -> Unit): Boolean {
+        val scope = scope ?: return false
+        if (!NbPendingClicks.flush()) return false
+        scope.launch {
+            withFrameNanos { }
+            withFrameNanos { }
+            then()
+        }
+        return true
     }
 
     /** True while an enabled modal (a sheet or dialog of the shown branch) is open. */
@@ -174,16 +201,25 @@ class NbBackRouter {
     /** Tests: the targets that could take Back now (one per shown branch level). */
     internal fun enabledTargets(): Int = targets.count { it.enabled() }
 
+    /** Runs whenever a target is added or removed (the root handler updates its enabled state at once). */
+    internal var onTargetsChanged: (() -> Unit)? = null
+
     internal fun add(target: NbBackTarget) {
         targets += target
+        onTargetsChanged?.invoke()
     }
 
     internal fun remove(target: NbBackTarget) {
         targets -= target
+        onTargetsChanged?.invoke()
     }
 }
 
-/** A step swipe's release speed, handed to the Pager change the step makes (the swipe and the pager are apart). */
+/**
+ * A step swipe's release speed, handed to the Pager change the step makes (the swipe and the pager are apart). Written
+ * by the swipe (an input event) and consumed after the composition that set the change up was applied: the
+ * composition only reads it ([peek]), so a discarded or repeated composition never loses it (review V4).
+ */
 internal class NbStepHandoff {
     private var speed = 0f
     private var at = Long.MIN_VALUE
@@ -195,15 +231,20 @@ internal class NbStepHandoff {
     }
 
     /**
-     * The speed (px/s) of the step swipe that caused the Pager change starting now, once (0 when there is none, or when
-     * the change comes later than [NbPhysics.ENTER_WAIT_MS] after the release: it was caused by something else).
+     * The hand-over of the step swipe that caused the Pager change starting now, as (its id, its speed in px/s), or
+     * null when there is none or it came longer than [NbPhysics.ENTER_WAIT_MS] ago (the change has another cause). A
+     * pure read: call it in composition and [consume] the id once that composition is applied.
      */
-    fun take(): Float {
+    fun peek(): Pair<Long, Float>? {
         val fresh = at != Long.MIN_VALUE && NbClock.nowNanos() - at <= NbPhysics.ENTER_WAIT_MS * NANOS_PER_MS
-        val value = if (fresh) speed else 0f
+        return if (fresh) at to speed else null
+    }
+
+    /** The hand-over [id] (from [peek]) was used: it is cleared, unless a newer swipe replaced it. */
+    fun consume(id: Long) {
+        if (at != id) return
         speed = 0f
         at = Long.MIN_VALUE
-        return value
     }
 
     private companion object {
@@ -237,6 +278,12 @@ internal fun NbBackRoot(router: NbBackRouter) {
     val owner = LocalOnBackPressedDispatcherOwner.current ?: return
     val callback = remember(router) { RootBackCallback(router) { reduced } }
     SideEffect { callback.isEnabled = enabled }
+    // A target registered or removed takes effect at once, not one composition of the root later: a Back right
+    // after a modal opened (within a frame of its click, P1) reached nothing while the handler was still disabled.
+    DisposableEffect(router, callback) {
+        router.onTargetsChanged = { callback.isEnabled = router.hasTarget }
+        onDispose { router.onTargetsChanged = null }
+    }
     DisposableEffect(owner, callback) {
         owner.onBackPressedDispatcher.addCallback(callback)
         onDispose { callback.remove() }
@@ -251,6 +298,8 @@ private class RootBackCallback(
     private var target: NbBackTarget? = null
 
     override fun handleOnBackStarted(backEvent: BackEventCompat) {
+        // A tap's click still waiting for its press frame (P1) comes first: the gesture goes back from its result.
+        NbPendingClicks.flush()
         target = if (reduced()) null else router.top()?.also { it.start(backEvent.swipeEdge, backEvent.touchX) }
     }
 
@@ -267,7 +316,7 @@ private class RootBackCallback(
     override fun handleOnBackPressed() {
         val t = target
         target = null
-        if (t != null) t.commit() else router.top()?.back()
+        if (t != null) t.commit() else router.back()
     }
 }
 
@@ -275,6 +324,18 @@ private class RootBackCallback(
 private fun eventTime(event: BackEventCompat): Long {
     val frame = runCatching { event.frameTimeMillis }.getOrDefault(0L)
     return if (frame > 0L) frame else SystemClock.uptimeMillis()
+}
+
+/**
+ * A Back button's action: the router's Back (the same path as Esc, Alt+Left and the gesture, so the same motion and
+ * the same deferred state change, R9), or [fallback] when no target takes it. Only for a control whose [fallback] is
+ * not itself a host's `onBack` (that would ask the router again).
+ */
+@Composable
+fun rememberNbBack(fallback: () -> Unit): () -> Unit {
+    val router = LocalNbBackRouter.current
+    val current by rememberUpdatedState(fallback)
+    return remember(router) { { if (router?.back() != true) current() } }
 }
 
 /** A child branch of [LocalNbBackScope] that is active while [active] says so. */

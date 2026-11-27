@@ -327,6 +327,7 @@ fun rememberPaneScrollState(): ScrollState {
 fun ModalScope.GlassSheet(
     title: String,
     modifier: Modifier = Modifier,
+    edgeToEdge: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = NbTheme.colors
@@ -390,7 +391,7 @@ fun ModalScope.GlassSheet(
             }
         }
         Column(
-            Modifier.padding(horizontal = ShellDimens.toolbarMargin),
+            Modifier.padding(horizontal = if (edgeToEdge) 0.dp else ShellDimens.toolbarMargin),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
             Spacer(Modifier.height(NbDimens.focusRingWidth))

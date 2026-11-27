@@ -306,7 +306,7 @@ fun Modifier.shellClickable(
             enabled = enabled,
             role = role,
             onClickLabel = onClickLabel,
-            onClick = onClick,
+            onClick = rememberPressFirst(onClick),
         )
 }
 
