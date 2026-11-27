@@ -44,8 +44,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.alien2003.nightbaseline.R
-import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
-import io.github.alien2003.nightbaseline.ui.material.nbClickable
+import io.github.alien2003.nightbaseline.ui.interaction.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.StatusTone

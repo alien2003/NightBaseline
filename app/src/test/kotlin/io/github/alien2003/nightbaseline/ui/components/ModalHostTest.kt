@@ -26,6 +26,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
+import io.github.alien2003.nightbaseline.ui.interaction.MODAL_PANEL_TAG
+import io.github.alien2003.nightbaseline.ui.interaction.MODAL_SCRIM_TAG
+import io.github.alien2003.nightbaseline.ui.interaction.ModalHost
 import io.github.alien2003.nightbaseline.ui.material.EffectsDecision
 import io.github.alien2003.nightbaseline.ui.theme.NightBaselineTheme
 import org.junit.Assert.assertEquals

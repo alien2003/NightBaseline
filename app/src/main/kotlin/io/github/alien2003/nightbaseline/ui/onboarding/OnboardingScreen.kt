@@ -21,8 +21,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.cardTag
+import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.material.solidCard
@@ -67,7 +67,7 @@ fun OnboardingScreen(
     layout: LayoutSpec,
     modifier: Modifier = Modifier,
     actions: OnboardingActions = OnboardingActions(),
-    scroll: ScrollState = rememberScrollState(),
+    scroll: ScrollState = rememberNbScrollState(),
 ) {
     val colors = NbTheme.colors
     val fontScale = LocalDensity.current.fontScale
@@ -139,7 +139,7 @@ private fun ScrollingStep(
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .nbVerticalScroll(scroll)
             .padding(horizontal = layout.gutter, vertical = NbSpace.s5),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s4),
     ) {
@@ -164,7 +164,7 @@ private fun CompactStep(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .padding(horizontal = layout.gutter)
                 .padding(top = NbSpace.s7, bottom = NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s5),
@@ -216,7 +216,7 @@ private fun BalancedColumns(
             Modifier
                 .fillMaxWidth()
                 .focusRingRoom()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .padding(FocusRingRoom)
                 .heightIn(min = minHeight)
                 .padding(vertical = NbSpace.s7),
@@ -276,7 +276,7 @@ private fun CardStep(
                     Modifier
                         .weight(1f, fill = false)
                         .focusRingRoom()
-                        .verticalScroll(scroll)
+                        .nbVerticalScroll(scroll)
                         .padding(FocusRingRoom),
                     verticalArrangement = Arrangement.spacedBy(NbSpace.s5),
                 ) {
@@ -306,7 +306,7 @@ private fun TabletopStep(
                 .height(fold - NbDimens.hingeClearance)
                 .widthIn(max = TextColumnMax)
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState()),
+                .nbVerticalScroll(rememberNbScrollState()),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s4, Alignment.CenterVertically),
         ) {
             StepIndicator(state.step)
@@ -320,7 +320,7 @@ private fun TabletopStep(
                 .widthIn(max = TextColumnMax)
                 .fillMaxWidth()
                 .focusRingRoom()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .padding(FocusRingRoom)
                 .padding(bottom = NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s4),

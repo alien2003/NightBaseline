@@ -1,13 +1,16 @@
-package io.github.alien2003.nightbaseline.ui.material
+package io.github.alien2003.nightbaseline.ui.interaction
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.Interaction
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,65 +33,115 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.github.alien2003.nightbaseline.ui.motion.NbDurations
-import io.github.alien2003.nightbaseline.ui.motion.NbEasing
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import io.github.alien2003.nightbaseline.ui.theme.ShellDimens
 import io.github.alien2003.nightbaseline.ui.theme.ShellTokens
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlin.math.hypot
 import kotlin.math.min
 
 /** Press scale of small shell controls (round buttons, dialog buttons): `coloros17-glass.md` 4.4. */
-const val SHELL_PRESS_SCALE_SMALL: Float = 0.96f
+const val SHELL_PRESS_SCALE_SMALL: Float = NbPhysics.PRESS_SCALE_SMALL
 
 /** Press scale of large shell surfaces (the bar, the rail, a sheet handle). */
-const val SHELL_PRESS_SCALE_LARGE: Float = 0.98f
+const val SHELL_PRESS_SCALE_LARGE: Float = NbPhysics.PRESS_SCALE_LARGE
 
-private const val PRESS_IN_DAMPING = 1f
-private const val PRESS_IN_STIFFNESS = 632f
-private const val RELEASE_DAMPING = 0.6f
-private const val RELEASE_STIFFNESS = 400f
-
-/** Release speed (dp/s) that maps to one unit of scale velocity in the rebound spring. */
-private const val RELEASE_SPEED_PER_UNIT = 2000f
-private const val MAX_RELEASE_VELOCITY = 3f
+/** Strength of the static highlight that replaces the glow under reduced motion. */
 private const val REDUCED_GLOW = 0.6f
 
 /**
- * State of the shell press feedback: scale, glow strength and the glow centre. Input ([shellPressInput]) and visual
- * ([shellPressVisual]) are separate modifiers so a 48 dp target can drive the light on its 40 dp visible circle.
+ * State of the shell press feedback: scale, glow strength and the glow centre, driven by the press interactions of
+ * [source] (and of any source the element [follows][FollowPresses]). The visuals ([shellPressScale],
+ * [shellPressGlow]) are separate modifiers so a 48 dp target can drive the light on its 40 dp visible circle.
  */
 @Stable
 class ShellPressState internal constructor(
     internal val scope: CoroutineScope,
+    /** The interaction source of the element's clickable. */
+    val source: MutableInteractionSource,
 ) {
     internal val scale = Animatable(1f).apply { updateBounds(upperBound = 1f) }
     internal val glow = Animatable(0f)
     internal var center by mutableStateOf<Offset?>(null)
+    private val presses = HashSet<PressInteraction.Press>()
+    private var scaleJob: Job? = null
+    private var glowJob: Job? = null
+
+    /** Applies a press interaction (ADR 0011: the same press node rules as every other control). */
+    internal fun onInteraction(
+        interaction: Interaction,
+        pressedScale: Float,
+        reduced: Boolean,
+    ) {
+        val before = presses.isNotEmpty()
+        when (interaction) {
+            is PressInteraction.Press -> {
+                presses += interaction
+                center = interaction.pressPosition
+            }
+
+            is PressInteraction.Release -> {
+                presses -= interaction.press
+            }
+
+            is PressInteraction.Cancel -> {
+                presses -= interaction.press
+            }
+        }
+        val pressed = presses.isNotEmpty()
+        if (pressed != before) animate(pressed, pressedScale, reduced)
+    }
+
+    private fun animate(
+        pressed: Boolean,
+        pressedScale: Float,
+        reduced: Boolean,
+    ) {
+        glowJob?.cancel()
+        scaleJob?.cancel()
+        glowJob =
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                if (reduced) {
+                    glow.snapTo(if (pressed) REDUCED_GLOW else 0f)
+                } else if (pressed) {
+                    glow.animateTo(1f, tween(NbPhysics.GLOW_IN_MS, easing = NbEasing.Standard))
+                } else {
+                    glow.animateTo(0f, tween(NbPhysics.GLOW_OUT_MS, easing = NbEasing.Exit))
+                }
+            }
+        if (reduced) return
+        scaleJob =
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                if (pressed) {
+                    scale.animateTo(pressedScale, NbPhysics.PressIn.specOf())
+                } else {
+                    scale.animateTo(1f, NbPhysics.PressOut.specOf())
+                }
+            }
+    }
 }
 
-/** Remembers a [ShellPressState]. */
+/** Remembers a [ShellPressState] with its own interaction source. */
 @Composable
 fun rememberShellPressState(): ShellPressState {
     val scope = rememberCoroutineScope()
-    return remember(scope) { ShellPressState(scope) }
+    return remember(scope) { ShellPressState(scope, MutableInteractionSource()) }
 }
 
 /**
- * Press input of the shell (`coloros17-glass.md` 4.4, "Living Flow" light and elastic feedback): on press the visual
- * shrinks to [pressedScale] on a critically damped spring and rebounds on a livelier spring whose start velocity
- * follows the finger's release speed (clamped, never above 1.0); the touch-following glow appears in 110 ms under the
- * finger, follows it, and fades over 480 ms after release ([shellPressScale] and [shellPressGlow] draw it). Observes
- * pointers without consuming them, so children stay clickable (the bar scales as a whole while its items handle the
- * taps). Under reduced motion: no scale, and the glow is a static highlight with a short fade.
+ * Press feedback of the shell (`coloros17-glass.md` 4.4, "Living Flow" light and elastic feedback) on the framework's
+ * press rules (ADR 0011): it follows the clickable's press interactions, so the press starts after the tap timeout
+ * inside a scrolling container and is cancelled as soon as a scroll takes the gesture, exactly like every other
+ * control. The visual shrinks to [pressedScale] on `PressIn` and returns on `PressOut` (clamped at 1.0); the glow
+ * appears in 110 ms under the finger, follows it, and fades over 480 ms. Pointer events are only observed (the glow
+ * centre), never consumed. Under reduced motion: no scale, a static highlight that snaps.
  */
 @Composable
 fun Modifier.shellPressInput(
@@ -96,50 +149,30 @@ fun Modifier.shellPressInput(
     pressedScale: Float = SHELL_PRESS_SCALE_SMALL,
     enabled: Boolean = true,
 ): Modifier {
-    val reduced = NbTheme.motion.reduced
-    return pointerInput(state, enabled, reduced, pressedScale) {
-        if (!enabled) return@pointerInput
+    FollowPresses(state, state.source, pressedScale)
+    val reduced = LocalNbMotion.current.reduced
+    return pointerInput(state, enabled, reduced) {
+        if (!enabled || reduced) return@pointerInput
         awaitPointerEventScope {
             while (true) {
-                val down = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed } ?: continue
-                val tracker = VelocityTracker()
-                tracker.addPosition(down.uptimeMillis, down.position)
-                state.center = down.position
-                state.scope.launch {
-                    if (reduced) {
-                        state.glow.snapTo(REDUCED_GLOW)
-                    } else {
-                        state.glow.animateTo(1f, tween(NbDurations.GLOW_IN, easing = NbEasing.Standard))
-                    }
-                }
-                if (!reduced) state.scope.launch { state.scale.animateTo(pressedScale, spring(PRESS_IN_DAMPING, PRESS_IN_STIFFNESS)) }
-                var speedDp = 0f
-                try {
-                    var up = false
-                    while (!up) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: event.changes.first()
-                        tracker.addPosition(change.uptimeMillis, change.position)
-                        if (!reduced) state.center = change.position
-                        up = event.changes.none { it.pressed }
-                    }
-                    val velocity = tracker.calculateVelocity()
-                    speedDp = hypot(velocity.x, velocity.y) / density
-                } finally {
-                    // Also when the gesture is cancelled or the input restarts mid-press: never leave the light on.
-                    state.scope.launch {
-                        state.glow.animateTo(
-                            0f,
-                            if (reduced) tween(NbDurations.REDUCED) else tween(NbDurations.GLOW_OUT, easing = NbEasing.Exit),
-                        )
-                    }
-                    state.scope.launch {
-                        val start = (speedDp / RELEASE_SPEED_PER_UNIT).coerceAtMost(MAX_RELEASE_VELOCITY)
-                        state.scale.animateTo(1f, spring(RELEASE_DAMPING, RELEASE_STIFFNESS), initialVelocity = start)
-                    }
-                }
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val change = event.changes.firstOrNull { it.pressed } ?: continue
+                if (state.glow.value > 0f) state.center = change.position
             }
         }
+    }
+}
+
+/** Drives [state] from the press interactions of another [source] too (the items of the bar light the whole bar). */
+@Composable
+fun FollowPresses(
+    state: ShellPressState,
+    source: InteractionSource,
+    pressedScale: Float = SHELL_PRESS_SCALE_SMALL,
+) {
+    val reduced = LocalNbMotion.current.reduced
+    LaunchedEffect(state, source, pressedScale, reduced) {
+        source.interactions.collect { state.onInteraction(it, pressedScale, reduced) }
     }
 }
 

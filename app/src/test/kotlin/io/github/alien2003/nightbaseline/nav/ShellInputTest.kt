@@ -24,6 +24,7 @@ import androidx.navigation.toRoute
 import io.github.alien2003.nightbaseline.data.hc.HcPermissions
 import io.github.alien2003.nightbaseline.testing.TestApp
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.interaction.NbPageNavigator
 import io.github.alien2003.nightbaseline.ui.layout.LayoutInputs
 import io.github.alien2003.nightbaseline.ui.layout.resolveLayout
 import io.github.alien2003.nightbaseline.ui.material.EffectsDecision
@@ -87,7 +88,7 @@ class ShellInputTest {
 
     private fun routes(): List<String> =
         nav.currentBackStack.value
-            .filter { it.destination.navigatorName == "composable" }
+            .filter { it.destination.navigatorName == NbPageNavigator.NAME }
             .map { it.topLevelTab()?.let { tab -> "${tab.name}Route" } ?: it.destination.route.orEmpty() }
 
     /** Two taps at the centre of the first clickable node described by [text], two frames apart (no idle between). */

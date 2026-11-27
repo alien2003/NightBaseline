@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.ui.components.GroupPosition
 import io.github.alien2003.nightbaseline.ui.components.NightRow
+import io.github.alien2003.nightbaseline.ui.interaction.ForcedInteraction
 import io.github.alien2003.nightbaseline.ui.model.NightState
 import io.github.alien2003.nightbaseline.ui.sample.SampleData
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme

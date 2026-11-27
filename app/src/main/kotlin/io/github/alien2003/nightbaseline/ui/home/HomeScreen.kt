@@ -25,8 +25,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -63,6 +61,10 @@ import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.components.withEnd
 import io.github.alien2003.nightbaseline.ui.history.CompactNightSummary
+import io.github.alien2003.nightbaseline.ui.interaction.NbReveal
+import io.github.alien2003.nightbaseline.ui.interaction.NbSwitcher
+import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.metric.MetricDetailActions
@@ -99,7 +101,7 @@ fun HomeScreen(
     actions: HomeActions = HomeActions(),
     onSelectTab: (TopLevel) -> Unit = actions.onSelectTab,
     debugAction: (@Composable () -> Unit)? = null,
-    scrollState: ScrollState = rememberScrollState(),
+    scrollState: ScrollState = rememberNbScrollState(),
 ) {
     CountComposition("HomeScreen")
     CompositionLocalProvider(LocalManualCheck provides state.check) {
@@ -321,7 +323,7 @@ private fun ColumnScope.HomeBlocks(
         )
     }
     if (blocks.night) {
-        state.banner?.let {
+        NbReveal(state.banner) {
             InlineBanner(
                 it,
                 state.source,
@@ -419,7 +421,7 @@ private fun SinglePaneHome(
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .padding(padding)
                 .padding(horizontal = layout.gutter)
                 .belowTopBar(barHeight, bottom = NbSpace.s5),
@@ -474,7 +476,7 @@ private fun TwoPaneHome(
                 .padding(start = layout.gutter)
                 .width(listWidth)
                 .fillMaxHeight()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -485,12 +487,15 @@ private fun TwoPaneHome(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .verticalScroll(rememberPaneScrollState())
+                .nbVerticalScroll(rememberPaneScrollState())
                 .padding(end = if (supporting) 0.dp else endGutter)
                 .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
-            DetailPaneContent(state, actions, layout)
+            // Another metric in the detail pane is an unordered peer of the shown one: the Swap kind (ADR 0011).
+            NbSwitcher(state, key = { it.detailMetric ?: Unit }, id = "home-detail") { shown ->
+                Column(verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) { DetailPaneContent(shown, actions, layout) }
+            }
         }
         if (supporting) {
             Spacer(Modifier.width(PANE_SPACER))
@@ -498,7 +503,7 @@ private fun TwoPaneHome(
                 Modifier
                     .width(SUPPORTING_PANE)
                     .fillMaxHeight()
-                    .verticalScroll(rememberPaneScrollState())
+                    .nbVerticalScroll(rememberPaneScrollState())
                     .padding(end = layout.gutter)
                     .belowTopBar(barHeight, bottom),
                 verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
@@ -579,7 +584,7 @@ private fun WideShortHome(
             Modifier
                 .width(WIDE_SHORT_START)
                 .fillMaxHeight()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -589,7 +594,7 @@ private fun WideShortHome(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .verticalScroll(rememberPaneScrollState())
+                .nbVerticalScroll(rememberPaneScrollState())
                 .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -657,7 +662,7 @@ private fun TabletopHome(
                 .fillMaxSize()
                 .offset(y = foldY + NbDimens.hingeClearance)
                 .padding(bottom = foldY + NbDimens.hingeClearance)
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .padding(bottom = padding.calculateBottomPadding() + NbSpace.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -678,7 +683,7 @@ private fun ColumnScope.TabletopControls(
     maxWidth: Dp,
 ) {
     val night = state.night
-    state.banner?.let {
+    NbReveal(state.banner) {
         InlineBanner(
             it,
             state.source,

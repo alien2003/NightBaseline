@@ -21,14 +21,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +51,11 @@ import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
 import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.interaction.NbLazyColumn
+import io.github.alien2003.nightbaseline.ui.interaction.NbSwitcher
+import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbLazyListState
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.layout.NavigationKind
@@ -98,7 +99,7 @@ fun HistoryScreen(
     modifier: Modifier = Modifier,
     actions: HistoryActions = HistoryActions(),
     onSelectTab: (TopLevel) -> Unit = {},
-    listState: LazyListState = rememberLazyListState(),
+    listState: LazyListState = rememberNbLazyListState(),
     nightPreview: NightPreviewSlot = { night, interactive ->
         HistoryNightPreview(night, state.source, interactive, onOpen = { actions.onOpenNight(night.wakeDate) })
     },
@@ -411,7 +412,7 @@ private fun HistoryList(
     modifier: Modifier = Modifier,
     calendarMinHeight: Dp = 0.dp,
 ) {
-    LazyColumn(
+    NbLazyColumn(
         modifier = modifier,
         state = listState,
         contentPadding = contentPadding,
@@ -509,11 +510,17 @@ private fun TwoPaneHistory(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
+                .nbVerticalScroll(rememberNbScrollState())
                 .padding(end = layout.gutter + padding.calculateRightPadding(LayoutDirection.Ltr), top = NbSpace.s3, bottom = bottom),
         ) {
             val night = content.state.selectedNight
-            if (night != null && !content.state.loading) content.nightPreview(night, true)
+            if (night != null && !content.state.loading) {
+                // Selecting another night (row, day, previous / next in the pane) is one change of the shown night: the
+                // Pager kind, newer nights from the end side (ADR 0011).
+                NbSwitcher(night, key = { it.wakeDate }, id = "history-detail", order = compareBy { it.wakeDate }) {
+                    content.nightPreview(it, true)
+                }
+            }
         }
     }
 }
@@ -534,7 +541,7 @@ private fun TabletopHistory(
             Modifier
                 .height(topHalf)
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
+                .nbVerticalScroll(rememberNbScrollState())
                 .padding(WindowInsets.statusBars.asPaddingValues())
                 .padding(horizontal = layout.gutter, vertical = NbSpace.s4),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -566,7 +573,7 @@ private fun GlanceHistory(
     listState: LazyListState,
 ) {
     val colors = NbTheme.colors
-    LazyColumn(
+    NbLazyColumn(
         Modifier.fillMaxSize().padding(padding).padding(WindowInsets.statusBars.asPaddingValues()),
         state = listState,
         contentPadding = PaddingValues(horizontal = NbDimens.gutterGlance, vertical = NbSpace.s3),

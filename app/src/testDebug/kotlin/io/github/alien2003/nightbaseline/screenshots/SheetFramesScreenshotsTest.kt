@@ -32,10 +32,10 @@ import io.github.alien2003.nightbaseline.nav.NightRoute
 import io.github.alien2003.nightbaseline.nav.SystemActions
 import io.github.alien2003.nightbaseline.nav.toTop
 import io.github.alien2003.nightbaseline.testing.TestApp
-import io.github.alien2003.nightbaseline.ui.components.MODAL_PANEL_TAG
-import io.github.alien2003.nightbaseline.ui.components.MODAL_SCRIM_TAG
-import io.github.alien2003.nightbaseline.ui.components.ModalKind
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.interaction.MODAL_PANEL_TAG
+import io.github.alien2003.nightbaseline.ui.interaction.MODAL_SCRIM_TAG
+import io.github.alien2003.nightbaseline.ui.interaction.ModalKind
 import io.github.alien2003.nightbaseline.ui.layout.FoldInfo
 import io.github.alien2003.nightbaseline.ui.layout.LayoutInputs
 import io.github.alien2003.nightbaseline.ui.layout.resolveLayout

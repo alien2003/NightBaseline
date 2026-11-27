@@ -47,7 +47,6 @@ import io.github.alien2003.nightbaseline.ui.components.LearningCard
 import io.github.alien2003.nightbaseline.ui.components.LearningProgress
 import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
 import io.github.alien2003.nightbaseline.ui.components.MetricRangeTile
-import io.github.alien2003.nightbaseline.ui.components.ModalKind
 import io.github.alien2003.nightbaseline.ui.components.MonthCalendar
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbText
@@ -64,13 +63,14 @@ import io.github.alien2003.nightbaseline.ui.components.SettingsGroup
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
-import io.github.alien2003.nightbaseline.ui.components.StaticModal
 import io.github.alien2003.nightbaseline.ui.components.StatsRow
 import io.github.alien2003.nightbaseline.ui.components.StatusLabel
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.TrendChart
 import io.github.alien2003.nightbaseline.ui.components.tone
-import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.interaction.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.interaction.ModalKind
+import io.github.alien2003.nightbaseline.ui.interaction.StaticModal
 import io.github.alien2003.nightbaseline.ui.material.LocalHazeState
 import io.github.alien2003.nightbaseline.ui.model.BannerKind
 import io.github.alien2003.nightbaseline.ui.model.ChartPeriod

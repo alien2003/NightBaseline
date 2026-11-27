@@ -1,12 +1,13 @@
-package io.github.alien2003.nightbaseline.ui.components
+package io.github.alien2003.nightbaseline.ui.interaction
 
-import androidx.activity.compose.PredictiveBackHandler
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.calculateTargetValue
+import androidx.compose.animation.splineBasedDecay
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,13 +26,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -39,14 +39,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Velocity
 import io.github.alien2003.nightbaseline.R
-import io.github.alien2003.nightbaseline.ui.motion.NB_BACK_SCALE
-import io.github.alien2003.nightbaseline.ui.motion.NbDurations
-import io.github.alien2003.nightbaseline.ui.motion.NbMotionScheme
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /** Presentation phase of a sheet or dialog in a [ModalHost]; derived, never stored, so it cannot drift. */
 enum class ModalPhase {
@@ -63,25 +61,27 @@ enum class ModalPhase {
     Hiding,
 }
 
-/** How a [ModalHost] places and moves its panel. */
+/** How a [ModalHost] places its panel; the motion is the framework kind of the same name. */
 enum class ModalKind(
     /** Where the panel sits in the window. */
     val alignment: Alignment,
+    /** The framework kind. */
+    val kind: NbKind,
 ) {
-    /** Bottom sheet: slides up from the bottom edge on `spring.sheet`, leaves on `spring.sheetHide`. */
-    Sheet(Alignment.BottomCenter),
+    /** Bottom sheet. */
+    Sheet(Alignment.BottomCenter, NbKind.Sheet),
 
-    /** Centred dialog: scale 0.8 -> 1 with a fade. */
-    Dialog(Alignment.Center),
+    /** Centred dialog. */
+    Dialog(Alignment.Center, NbKind.Dialog),
 
-    /** Dialog docked at the bottom on phone widths: slides up with a fade. */
-    DockedDialog(Alignment.BottomCenter),
+    /** Dialog docked at the bottom on phone widths. */
+    DockedDialog(Alignment.BottomCenter, NbKind.DockedDialog),
 }
 
 /**
- * The state of one modal panel (`coloros-conformance.md` G1–G3, H1–H2): a single [progress] (0 = hidden, 1 = at
- * rest) drives the panel's offset or scale **and** the scrim's alpha, so the two never run on separate timelines.
- * The open intent is the host's `value` ([target]); [phase] is derived from the intent and [progress].
+ * The state of one modal panel (ADR 0011, kinds Sheet / Dialog / DockedDialog): one scalar p (0 hidden, 1 at rest) on
+ * the Nav spring drives the panel's pose **and** the scrim's alpha. Show, hide, a drag release, a return, a back
+ * gesture and its cancel are all the same spring, continued from (p, v).
  */
 @Stable
 class ModalState internal constructor(
@@ -94,12 +94,16 @@ class ModalState internal constructor(
     var kind: ModalKind by mutableStateOf(kind)
         internal set
 
-    /** Reduced motion: fades only, no drag. */
+    /** Reduced motion: every change snaps, no drag. */
     var reduced: Boolean by mutableStateOf(reduced)
         internal set
 
-    /** 0 = hidden, 1 = at rest. Never above 1: the panel never moves above its resting top. */
-    val progress: Animatable<Float, *> = Animatable(initial)
+    internal val driver = NbDriver(NbPhysics.Nav) { this.reduced }
+
+    /** 0 = hidden, 1 = at rest; snapshot state (read in layer lambdas). */
+    val p: Float get() = if (staticP >= 0f) staticP else driver.p
+
+    private val staticP: Float = if (scope == null) initial else -1f
 
     /** True while the caller wants the panel open. */
     var target: Boolean by mutableStateOf(initial > 0f)
@@ -108,23 +112,22 @@ class ModalState internal constructor(
     /** Panel height in px, measured by the panel. */
     var panelHeight: Float by mutableFloatStateOf(0f)
 
-    /** Predictive back progress 0..1 while the system back gesture runs (scales the panel like ColorOS). */
-    var backProgress: Float by mutableFloatStateOf(0f)
-        internal set
-
     internal var onDismiss: () -> Unit = {}
 
-    /** Initial velocity (progress units / s) for the next hide, from a fling. */
+    /** Start velocity (p / s) of the next hide, from a fling or a released gesture. */
     internal var releaseVelocity: Float = 0f
+
+    private var job: Job? = null
+    private var dragging = false
 
     /** The derived phase. */
     val phase: ModalPhase
         get() {
-            val p = progress.value
+            val v = p
             return when {
-                target && p >= 1f && !progress.isRunning -> ModalPhase.Shown
+                target && v >= 1f && !driver.isRunning -> ModalPhase.Shown
                 target -> ModalPhase.Showing
-                p > 0f -> ModalPhase.Hiding
+                v > 0f -> ModalPhase.Hiding
                 else -> ModalPhase.Hidden
             }
         }
@@ -136,52 +139,94 @@ class ModalState internal constructor(
         onDismiss()
     }
 
+    internal suspend fun show() {
+        job?.cancel()
+        driver.run(1f, NbRelease.startVelocity(driver.p, driver.v, 1f, NbPhysics.Nav, visibleTarget = true))
+    }
+
+    internal suspend fun hide() {
+        job?.cancel()
+        val v = releaseVelocity
+        releaseVelocity = 0f
+        driver.run(0f, NbRelease.startVelocity(driver.p, v, 0f, NbPhysics.Nav, visibleTarget = false))
+    }
+
     /** Moves the panel down by [deltaPx] (negative = up, never above rest); used by drags. Returns the consumed px. */
     internal fun dragBy(deltaPx: Float): Float {
         val height = panelHeight
-        val current = progress.value
+        val current = driver.p
         val next = if (!target || reduced || height <= 0f) current else (current - deltaPx / height).coerceIn(0f, 1f)
-        if (next != current) scope?.launch(start = CoroutineStart.UNDISPATCHED) { progress.snapTo(next) }
+        if (next != current) {
+            dragging = true
+            job?.cancel()
+            scope?.launch(start = CoroutineStart.UNDISPATCHED) { driver.track(next, android.os.SystemClock.uptimeMillis()) }
+        }
         return (current - next) * height
     }
 
-    /** Release of a drag with [velocityPx] (down positive): dismiss past half the height or on a fling, else return. */
+    /**
+     * Release of a drag with [velocityPx] (down positive). Decided like a scroll: the platform fling decay projects
+     * where the panel would come to rest; past half its height (or a fling faster than the minimum fling velocity
+     * downwards) it hides, else it returns, both on the Nav spring from (p, v).
+     */
     internal fun settle(
         velocityPx: Float,
         density: Density,
     ) {
         if (!target) return
+        dragging = false
         val height = panelHeight.coerceAtLeast(1f)
         val perSecond = -velocityPx / height
-        val downDp = with(density) { velocityPx.toDp().value }
-        if (1f - progress.value > DISMISS_FRACTION || downDp > FLING_DISMISS_DP) {
+        val offset = (1f - driver.p) * height
+        val projected = splineBasedDecay<Float>(density).calculateTargetValue(offset, velocityPx)
+        val fling = velocityPx > MIN_FLING_DP * density.density
+        if (projected > height / 2 || fling) {
             dismiss(perSecond)
-        } else if (progress.value < 1f) {
-            scope?.launch { progress.animateTo(1f, returnSpec(), perSecond) }
+        } else if (driver.p < 1f) {
+            job =
+                scope?.launch {
+                    driver.run(1f, NbRelease.startVelocity(driver.p, perSecond, 1f, NbPhysics.Nav, visibleTarget = true))
+                }
         }
     }
 
-    internal fun onBackProgress(fraction: Float) {
-        if (!target) return
-        backProgress = fraction
-        if (!reduced) scope?.launch(start = CoroutineStart.UNDISPATCHED) { progress.snapTo(1f - BACK_TRAVEL * fraction) }
-    }
+    private var gestureFrom = 1f
 
-    internal fun onBackCancelled() {
-        if (!target) return
-        scope?.launch {
-            launch { Animatable(backProgress).animateTo(0f, returnSpec()) { backProgress = value } }
-            progress.animateTo(1f, returnSpec())
+    /** The modal's Back target (depth above every page). */
+    internal val backTarget: NbBackTarget =
+        object : NbBackTarget {
+            override val depth: Int = MODAL_DEPTH
+
+            override fun enabled(): Boolean = target
+
+            override fun start(edge: Int) {
+                job?.cancel()
+                driver.resetTracking()
+                gestureFrom = driver.p
+            }
+
+            override fun progress(
+                fraction: Float,
+                timeMillis: Long,
+            ) {
+                if (!target || reduced) return
+                // p = 1 - g: the panel follows the back gesture towards hidden (ADR 0011 Sheet / Dialog row).
+                val next = (gestureFrom * (1f - fraction.coerceIn(0f, 1f))).coerceIn(0f, 1f)
+                scope?.launch(start = CoroutineStart.UNDISPATCHED) { driver.track(next, timeMillis) }
+            }
+
+            override fun cancel() {
+                job = scope?.launch { driver.release(1f, visibleTarget = true) }
+            }
+
+            override fun commit() {
+                dismiss(driver.trackedVelocity())
+            }
+
+            override fun back() {
+                dismiss()
+            }
         }
-    }
-
-    internal fun showSpec(): FiniteAnimationSpec<Float> = motion.let { if (kind == ModalKind.Sheet) it.sheet() else it.enter() }
-
-    internal fun hideSpec(): FiniteAnimationSpec<Float> = motion.let { if (kind == ModalKind.Sheet) it.sheetExit() else it.exit() }
-
-    private fun returnSpec(): FiniteAnimationSpec<Float> = if (reduced) tween(NbDurations.REDUCED) else motion.sheetReturn()
-
-    private val motion get() = NbMotionScheme(reduced)
 
     /** Content scrolling inside the panel: pulling down at the top moves the panel; pushing up restores it first. */
     internal fun nestedScroll(density: Density): NestedScrollConnection =
@@ -190,7 +235,7 @@ class ModalState internal constructor(
                 available: Offset,
                 source: NestedScrollSource,
             ): Offset =
-                if (available.y < 0f && progress.value < 1f && source == NestedScrollSource.UserInput) {
+                if (available.y < 0f && driver.p < 1f && source == NestedScrollSource.UserInput) {
                     Offset(0f, -dragBy(available.y))
                 } else {
                     Offset.Zero
@@ -203,24 +248,15 @@ class ModalState internal constructor(
             ): Offset = if (available.y > 0f && source == NestedScrollSource.UserInput) Offset(0f, -dragBy(available.y)) else Offset.Zero
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                if (!target || progress.value >= 1f) return Velocity.Zero
+                if (!target || driver.p >= 1f) return Velocity.Zero
                 settle(available.y, density)
                 return available
             }
         }
 
     internal companion object {
-        /** Share of its height a sheet must be dragged down to dismiss on release (`coloros-conformance.md` G1). */
-        const val DISMISS_FRACTION = 0.5f
-
-        /** A downward fling faster than this (dp/s) dismisses. */
-        const val FLING_DISMISS_DP = 1000f
-
-        /** Share of the height the panel follows a full predictive back gesture. */
-        const val BACK_TRAVEL = 0.12f
-
-        /** Scale at a full predictive back gesture (the same token as the pages' preview, ADR 0009). */
-        const val BACK_SCALE = NB_BACK_SCALE
+        /** A downward fling faster than this (dp/s) hides the panel (the platform's minimum fling velocity, 50 dp/s x 20). */
+        const val MIN_FLING_DP = 1000f
     }
 }
 
@@ -234,6 +270,10 @@ class ModalScope internal constructor(
     fun dismiss() = state.dismiss()
 }
 
+/** The two states of a modal in [NbFrame]s. */
+private const val MODAL_SHOWN = "shown"
+private const val MODAL_HIDDEN = "hidden"
+
 /** Test tag of a [ModalHost]'s scrim. */
 const val MODAL_SCRIM_TAG: String = "nb-modal-scrim"
 
@@ -241,14 +281,13 @@ const val MODAL_SCRIM_TAG: String = "nb-modal-scrim"
 const val MODAL_PANEL_TAG: String = "nb-modal-panel"
 
 /**
- * The one host for sheets and dialogs (`screens.md` "Sheets"). Open while [value] is non-null: the caller owns the
- * intent, the host owns the presentation. A request to close from inside (scrim tap, system Back or the predictive
- * back gesture, a drag down or fling, the close button, a chosen option via [ModalScope.dismiss]) calls [onDismiss],
- * the caller clears [value], and the host animates out with the last value still composed. Once the panel is back at
- * 0 the phase is [ModalPhase.Hidden] and nothing of the panel or the scrim stays in the composition. Re-opening while
- * it leaves reverses from where it is. The scrim is drawn by the host over everything composed before it (the
- * floating bar and rail included, so they dim with it), its alpha is the panel's progress, and it takes touches only
- * while the panel is wanted open. The custom overscroll is off inside the panel.
+ * The one host for sheets and dialogs (`screens.md` "Sheets", ADR 0011). Open while [value] is non-null: the caller
+ * owns the intent, the host owns the presentation. A request to close from inside (scrim tap, Back or the back
+ * gesture through the app's router, a drag down or fling, the close button, a chosen option via [ModalScope.dismiss])
+ * calls [onDismiss], the caller clears [value], and the host animates out with the last value still composed; once p
+ * is back at 0 nothing of the panel or the scrim stays in the composition. Re-opening while it leaves continues from
+ * where it is. The scrim's alpha is p; it takes touches only while the panel is wanted open. The overscroll is off
+ * inside the panel.
  */
 @Composable
 fun <T : Any> ModalHost(
@@ -258,7 +297,7 @@ fun <T : Any> ModalHost(
     kind: ModalKind = ModalKind.Sheet,
     content: @Composable ModalScope.(T) -> Unit,
 ) {
-    val reduced = NbTheme.motion.reduced
+    val reduced = LocalNbMotion.current.reduced
     val scope = rememberCoroutineScope()
     val state = remember { ModalState(kind, reduced, 0f, scope) }
     if (value != null) {
@@ -273,29 +312,16 @@ fun <T : Any> ModalHost(
     state.target = wanted
     LaunchedEffect(state, wanted) {
         if (wanted) {
-            state.progress.animateTo(1f, state.showSpec())
+            state.show()
         } else {
-            val velocity = state.releaseVelocity
-            state.releaseVelocity = 0f
-            state.progress.animateTo(0f, state.hideSpec(), velocity)
-            state.backProgress = 0f
+            state.hide()
             retained.value = null
         }
     }
-    val present by remember(state) { derivedStateOf { state.target || state.progress.value > 0f } }
+    val present by remember(state) { derivedStateOf { state.target || state.p > 0f } }
     val shown = value ?: retained.value
     if (!present || shown == null) return
-    if (wanted) {
-        PredictiveBackHandler { events ->
-            try {
-                events.collect { state.onBackProgress(it.progress) }
-                state.dismiss()
-            } catch (e: CancellationException) {
-                state.onBackCancelled()
-                throw e
-            }
-        }
-    }
+    if (wanted) RegisterBackTarget(state.backTarget)
     val close = stringResource(R.string.a11y_close)
     val modalScope = remember(state) { ModalScope(state) }
     CompositionLocalProvider(LocalOverscrollFactory provides null) {
@@ -304,7 +330,7 @@ fun <T : Any> ModalHost(
                 Modifier
                     .matchParentSize()
                     .testTag(MODAL_SCRIM_TAG)
-                    .graphicsLayer { alpha = state.progress.value.coerceIn(0f, 1f) }
+                    .graphicsLayer { alpha = state.p.coerceIn(0f, 1f) }
                     .background(NbTheme.colors.scrim)
                     .then(
                         if (wanted) {
@@ -325,62 +351,48 @@ fun <T : Any> ModalHost(
 }
 
 /**
- * The panel's own modifier, applied by [GlassSheet] / [GlassDialog] right outside their surface: measures the panel,
- * moves it from the host's single progress (sheet: offset by its height, scaled by the predictive back gesture from
- * the bottom centre; dialog: scale 0.8 -> 1 with a fade that is complete at 35 % of the motion; docked dialog: offset
- * and the same fade; reduced motion: fade only) and, while it leaves, swallows touches on the panel so an option
- * cannot be chosen twice.
+ * The panel's own modifier, applied by the sheet and dialog surfaces right outside them: measures the panel, draws
+ * its pose from the host's p ([NbPoses.modal]; reduced motion: the snap makes it binary) and, while it leaves,
+ * swallows touches on the panel so an option cannot be chosen twice.
  */
 fun Modifier.modalPanel(state: ModalState): Modifier =
     this
         .onSizeChanged { state.panelHeight = it.height.toFloat() }
         .graphicsLayer {
-            val p = state.progress.value.coerceIn(0f, 1f)
-            if (state.reduced) {
-                alpha = p
-                return@graphicsLayer
+            val p = state.p
+            val pose = NbPoses.modal(state.kind.kind, p, size.height)
+            if (p > 0f && p < 1f) {
+                NbMotionProbe.frames?.invoke(
+                    NbFrame("modal", state.kind.kind, NbPhysics.Nav, p, MODAL_SHOWN, MODAL_HIDDEN, pose, NbLayerPose.Rest, false, size.width),
+                )
             }
-            when (state.kind) {
-                ModalKind.Sheet -> {
-                    translationY = (1f - p) * size.height
-                    val s = 1f - (1f - ModalState.BACK_SCALE) * state.backProgress
-                    scaleX = s
-                    scaleY = s
-                    transformOrigin = BottomCentre
-                }
-
-                ModalKind.Dialog -> {
-                    alpha = (p / DIALOG_OPAQUE_AT).coerceAtMost(1f)
-                    val s = DIALOG_START_SCALE + (1f - DIALOG_START_SCALE) * p
-                    scaleX = s
-                    scaleY = s
-                }
-
-                ModalKind.DockedDialog -> {
-                    alpha = (p / DIALOG_OPAQUE_AT).coerceAtMost(1f)
-                    translationY = (1f - p) * size.height
-                }
-            }
+            translationY = pose.ty
+            scaleX = pose.scale
+            scaleY = pose.scale
+            alpha = pose.alpha
         }.testTag(MODAL_PANEL_TAG)
-        .then(if (state.target) Modifier else SwallowTouches)
+        .blockInput { !state.target }
 
-private val SwallowTouches: Modifier =
-    Modifier.pointerInput(Unit) {
-        awaitPointerEventScope {
-            while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
-        }
-    }
+/** The drag handle of a sheet: follows the finger, released by [ModalState.settle]. */
+@Composable
+fun Modifier.sheetDrag(state: ModalState): Modifier {
+    val density = LocalDensity.current
+    val drag = rememberDraggableState { delta -> state.dragBy(delta) }
+    return draggable(
+        drag,
+        Orientation.Vertical,
+        enabled = !state.reduced && state.target,
+        onDragStopped = { velocity -> state.settle(velocity, density) },
+    )
+}
 
-private const val DIALOG_START_SCALE = 0.8f
-
-/** The sheet scales towards its bottom edge during the predictive back gesture. */
-private val BottomCentre = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 1f)
-
-/**
- * A dialog is fully opaque from this share of its motion on (the scale and the scrim keep going): a half-transparent
- * panel would show the page through its text mid-animation.
- */
-private const val DIALOG_OPAQUE_AT = 0.35f
+/** Content scrolling inside a sheet moves the sheet at its top (velocity and distance conserved: content + sheet). */
+@Composable
+fun Modifier.sheetNestedScroll(state: ModalState): Modifier {
+    val density = LocalDensity.current
+    val nested = remember(state, density) { state.nestedScroll(density) }
+    return nestedScroll(nested)
+}
 
 /** The last non-null value, kept for the exit animation; plain (not state): it never drives recomposition. */
 private class RetainedValue<T : Any> {

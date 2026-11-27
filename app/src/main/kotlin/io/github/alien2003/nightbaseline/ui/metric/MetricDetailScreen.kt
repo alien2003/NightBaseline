@@ -26,8 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,9 +50,6 @@ import io.github.alien2003.nightbaseline.ui.components.DASH
 import io.github.alien2003.nightbaseline.ui.components.DisclaimerFooter
 import io.github.alien2003.nightbaseline.ui.components.GlassSheet
 import io.github.alien2003.nightbaseline.ui.components.MetricGlyphIcon
-import io.github.alien2003.nightbaseline.ui.components.ModalHost
-import io.github.alien2003.nightbaseline.ui.components.ModalKind
-import io.github.alien2003.nightbaseline.ui.components.ModalScope
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
@@ -68,10 +63,15 @@ import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.chartPoint
 import io.github.alien2003.nightbaseline.ui.components.chartSummary
-import io.github.alien2003.nightbaseline.ui.components.modalPanel
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.components.tone
 import io.github.alien2003.nightbaseline.ui.components.withEnd
+import io.github.alien2003.nightbaseline.ui.interaction.ModalHost
+import io.github.alien2003.nightbaseline.ui.interaction.ModalKind
+import io.github.alien2003.nightbaseline.ui.interaction.ModalScope
+import io.github.alien2003.nightbaseline.ui.interaction.modalPanel
+import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.material.ShellMaterial
@@ -109,7 +109,7 @@ fun MetricDetailScreen(
     layout: LayoutSpec,
     modifier: Modifier = Modifier,
     actions: MetricDetailActions = MetricDetailActions(),
-    scroll: ScrollState = rememberScrollState(),
+    scroll: ScrollState = rememberNbScrollState(),
     onSelectTab: (TopLevel) -> Unit = {},
 ) {
     val text = rememberUiText()
@@ -216,7 +216,7 @@ private fun SingleColumn(
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .nbVerticalScroll(scroll)
             .padding(padding)
             .padding(horizontal = layout.gutter)
             .padding(top = top, bottom = NbSpace.s5),
@@ -302,7 +302,7 @@ private fun WideColumn(
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .nbVerticalScroll(scroll)
             .padding(padding)
             .padding(horizontal = layout.gutter)
             .padding(top = top, bottom = NbSpace.s5),
@@ -377,7 +377,7 @@ private fun WideShortDetail(
             Modifier
                 .weight(1f - WIDE_SHORT_CHART_SHARE)
                 .fillMaxHeight()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .padding(top = top, bottom = NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -457,7 +457,7 @@ private fun TabletopDetail(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .then(sides)
                 .padding(bottom = padding.calculateBottomPadding() + NbSpace.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -561,7 +561,7 @@ private fun BookDetail(
             Modifier
                 .width(startWidth)
                 .fillMaxHeight()
-                .verticalScroll(rememberPaneScrollState())
+                .nbVerticalScroll(rememberPaneScrollState())
                 .padding(start = layout.gutter, top = top, bottom = padding.calculateBottomPadding() + NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -579,7 +579,7 @@ private fun BookDetail(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .padding(end = layout.gutter + padding.calculateEndPadding(direction), top = top)
                 .padding(bottom = padding.calculateBottomPadding() + NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
@@ -613,7 +613,7 @@ private fun GlanceDetail(
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .nbVerticalScroll(scroll)
             .padding(padding)
             .padding(WindowInsets.statusBars.asPaddingValues())
             .padding(horizontal = NbDimens.gutterGlance, vertical = NbSpace.s3),
@@ -806,7 +806,7 @@ fun InfoParagraphs(
     modifier: Modifier = Modifier,
 ) {
     val colors = NbTheme.colors
-    Column(modifier.verticalScroll(rememberScrollState())) {
+    Column(modifier.nbVerticalScroll(rememberNbScrollState())) {
         NbCard(Modifier.fillMaxWidth()) {
             paragraphs.forEach { NbText(it, style = NbTheme.typography.body, color = colors.textPrimary) }
         }
@@ -821,7 +821,7 @@ private fun ExplainerBody(
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
-    Column(modifier.verticalScroll(rememberScrollState())) {
+    Column(modifier.nbVerticalScroll(rememberNbScrollState())) {
         NbCard(Modifier.fillMaxWidth()) {
             listOfNotNull(
                 text.string(R.string.explainer_range),

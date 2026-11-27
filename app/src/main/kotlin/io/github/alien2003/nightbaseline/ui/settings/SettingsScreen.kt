@@ -1,8 +1,5 @@
 package io.github.alien2003.nightbaseline.ui.settings
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.SeekableTransitionState
-import androidx.compose.animation.core.rememberTransition
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,14 +22,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -45,9 +38,6 @@ import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.ui.components.GlassDialog
 import io.github.alien2003.nightbaseline.ui.components.GroupCard
-import io.github.alien2003.nightbaseline.ui.components.ModalHost
-import io.github.alien2003.nightbaseline.ui.components.ModalKind
-import io.github.alien2003.nightbaseline.ui.components.ModalScope
 import io.github.alien2003.nightbaseline.ui.components.NbCard
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
@@ -56,22 +46,21 @@ import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
+import io.github.alien2003.nightbaseline.ui.interaction.ModalHost
+import io.github.alien2003.nightbaseline.ui.interaction.ModalKind
+import io.github.alien2003.nightbaseline.ui.interaction.ModalScope
+import io.github.alien2003.nightbaseline.ui.interaction.NbStackHost
+import io.github.alien2003.nightbaseline.ui.interaction.NbSwitcher
+import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
-import io.github.alien2003.nightbaseline.ui.shell.BackPreview
-import io.github.alien2003.nightbaseline.ui.shell.BackPreviewHandler
-import io.github.alien2003.nightbaseline.ui.shell.BackSettle
 import io.github.alien2003.nightbaseline.ui.shell.CountComposition
-import io.github.alien2003.nightbaseline.ui.shell.ReleaseBackPreviewOnDispose
-import io.github.alien2003.nightbaseline.ui.shell.backPreviewPage
-import io.github.alien2003.nightbaseline.ui.shell.rememberPageTransitions
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import io.github.alien2003.nightbaseline.ui.theme.ShellDimens
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 private const val LIST_PANE_MIN = 320f
 private const val LIST_PANE_MAX = 400f
@@ -93,8 +82,8 @@ fun SettingsScreen(
     actions: SettingsActions = SettingsActions(),
     onSelectTab: (TopLevel) -> Unit = {},
     onMore: () -> Unit = {},
-    scroll: ScrollState = rememberScrollState(),
-    systemBack: SettingsSystemBack? = null,
+    scroll: ScrollState = rememberNbScrollState(),
+    rootPage: SettingsPage? = null,
     setupAgain: SetupAgainConfirm = SetupAgainConfirm(),
 ) {
     CountComposition("SettingsScreen")
@@ -102,10 +91,9 @@ fun SettingsScreen(
     val singlePane = !twoPanes && layout.mode != LayoutMode.Glance && layout.mode != LayoutMode.Tabletop
     val page = if (twoPanes) SettingsPage.Main else state.page
     val scrolls = remember(scroll) { PageScrolls(scroll) }
-    // Sub-pages push and pop like screens (coloros-conformance.md P2) on a seekable transition, so a predictive back
-    // gesture can hold the pop at its start: the parent page waits under the previewing one (ADR 0009).
-    val (pages, seek) = rememberSeekablePages(page)
-    if (systemBack != null) SettingsBackHandler(systemBack, state.page, layout, twoPanes, seek)
+    // Sub-pages are a stack of pages (ADR 0011, relation Depth) in every layout: the same push, pop and back gesture
+    // as a pushed screen.
+    val stack = pagePath(page, rootPage)
     val dialogs: @Composable () -> Unit = {
         SourceChangeDialog(state, layout, actions)
         SetupAgainDialog(setupAgain, layout)
@@ -114,7 +102,7 @@ fun SettingsScreen(
         // Every page is a whole shell page (top bar, content and, on the list, the bar): a pushed sub-page and the
         // back preview move its title and back button with it, as a pushed screen does.
         Box(modifier.fillMaxSize()) {
-            SinglePanePages(state, layout, actions, page, scrolls, pages, seek, systemBack?.preview, onSelectTab)
+            SinglePanePages(state, layout, actions, page, stack, scrolls, onSelectTab)
             dialogs()
         }
         return
@@ -132,15 +120,15 @@ fun SettingsScreen(
     ) { padding ->
         when {
             layout.mode == LayoutMode.Glance -> {
-                GlanceSettings(state, actions, padding, scroll, onMore)
+                GlanceSettings(state, actions, padding, stack, scrolls, onMore)
             }
 
             layout.mode == LayoutMode.Tabletop -> {
-                TabletopSettings(state, layout, actions, padding, scroll)
+                TabletopSettings(state, layout, actions, padding, stack, scrolls)
             }
 
             else -> {
-                TwoPaneSettings(state, layout, actions, padding, scroll, systemBack?.preview)
+                TwoPaneSettings(state, layout, actions, padding, scroll)
             }
         }
     }
@@ -165,97 +153,22 @@ class SetupAgainConfirm(
 )
 
 /**
- * System Back for the Settings sub-pages (ADR 0009): the screen registers a previewing Back handler while a sub-page
- * is open (single pane), or while Licenses is open in the detail pane (two panes), and runs [onBack] on a commit.
- *
- * @property preview the app's back preview.
- * @property active false while the Settings section is hidden behind another top-level section.
+ * The pages from the stack's root to [page]: the list (or a pushed route's [root]) first, then each sub-page's parent
+ * chain (`About -> Licenses`).
  */
-@Stable
-class SettingsSystemBack(
-    val preview: BackPreview,
-    val active: () -> Boolean,
-    val onBack: () -> Unit,
-)
-
-/**
- * Holds the single-pane page transition for a back gesture: [edge] is the swipe edge while a gesture holds it (read
- * by the transition spec), null otherwise.
- */
-private class PredictiveSeek(
-    private val pages: SeekableTransitionState<SettingsPage>,
-    private val scope: CoroutineScope,
-) {
-    var edge: Int? = null
-
-    /** The current page, kept by [rememberSeekablePages]. */
-    var page: SettingsPage = pages.currentState
-
-    /** A gesture started from [swipeEdge]: hold the pop to the parent at its start. */
-    fun hold(swipeEdge: Int) {
-        edge = swipeEdge
-        val target = page.parent() ?: SettingsPage.Main
-        scope.launch { pages.seekTo(0f, target) }
-    }
-
-    /** The gesture was cancelled (the page is back at rest): drop the held pop. */
-    fun release() {
-        val current = page
-        scope.launch { pages.snapTo(current) }
-        edge = null
-    }
-}
-
-/** The seekable page transition and its [PredictiveSeek]; animates to [page] whenever it changes. */
-@Composable
-private fun rememberSeekablePages(page: SettingsPage): Pair<SeekableTransitionState<SettingsPage>, PredictiveSeek> {
-    val pages = remember { SeekableTransitionState(page) }
-    val scope = rememberCoroutineScope()
-    val seek = remember { PredictiveSeek(pages, scope) }
-    seek.page = page
-    LaunchedEffect(page) {
-        if (pages.currentState != page || pages.targetState != page) pages.animateTo(page)
-        seek.edge = null
-    }
-    return pages to seek
-}
-
-/** Key of the two-pane detail pane in the back preview: its content changes in place. */
-internal object DetailPaneBackKey
-
-/**
- * The previewing Back handler of the sub-pages; [active] is read in this small scope only. A single-pane gesture holds
- * the pop at its start through [seek] and drops it when cancelled.
- */
-@Composable
-private fun SettingsBackHandler(
-    back: SettingsSystemBack,
+internal fun pagePath(
     page: SettingsPage,
-    layout: LayoutSpec,
-    twoPanes: Boolean,
-    seek: PredictiveSeek,
-) {
-    val active = back.active()
-    val singlePane = !layout.twoPanes && page != SettingsPage.Main
-    val detail = twoPanes && page == SettingsPage.Licenses
-    // The AnimatedContent single pane (Glance and Tabletop show sub-pages without a page transition: no preview).
-    val seekable = singlePane && !twoPanes && layout.mode != LayoutMode.Glance && layout.mode != LayoutMode.Tabletop
-    BackPreviewHandler(
-        preview = back.preview,
-        enabled = active && (singlePane || detail),
-        key = if (detail) DetailPaneBackKey else page,
-        settle = if (seekable) BackSettle.Leave else BackSettle.InPlace,
-        onStarted = { edge -> if (seekable) seek.hold(edge) },
-        onCancelled = { if (seekable) seek.release() },
-        onBack = back.onBack,
-    )
+    root: SettingsPage?,
+): List<SettingsPage> {
+    val path = generateSequence(page) { it.parent() }.toList().reversed()
+    val start = root?.let { r -> path.indexOf(r).takeIf { it >= 0 } } ?: 0
+    return path.drop(start)
 }
 
 /**
- * The single-pane pages: sub-pages push and pop like screens; depth decides the direction. Each page is a whole,
- * opaque shell page (the covered page never shows through the incoming one, its top bar included), scrolls on its own
- * state and lays out with its own shell padding. A page a back gesture previews draws its pose, top bar included, and
- * keeps it while it leaves.
+ * The single-pane pages as a framework stack (ADR 0011): each page is a whole, opaque shell page (top bar, content
+ * and, on the list, the bar), so a push, a pop and a back gesture move its title and back button with it, exactly as
+ * a pushed screen. Each page scrolls on its own state and lays out with its own shell padding.
  */
 @Suppress("LongParameterList")
 @Composable
@@ -264,27 +177,19 @@ private fun SinglePanePages(
     layout: LayoutSpec,
     actions: SettingsActions,
     page: SettingsPage,
+    stack: List<SettingsPage>,
     scrolls: PageScrolls,
-    pages: SeekableTransitionState<SettingsPage>,
-    seek: PredictiveSeek,
-    preview: BackPreview?,
     onSelectTab: (TopLevel) -> Unit,
 ) {
-    val transitions = rememberPageTransitions()
-    rememberTransition(pages, label = "settingsPage").AnimatedContent(
-        transitionSpec = {
-            transitions.content(forward = depth(targetState) > depth(initialState), predictiveEdge = seek.edge)
-        },
-    ) { shown ->
+    NbStackHost(stack = stack, key = { it }, onBack = actions.onBack, id = "settings") { shown ->
         val scroll = scrolls.of(shown)
         ShellPage(
             layout = layout,
             tab = TopLevel.Settings,
             title = stringResource(pageTitle(shown)),
             scroll = scroll,
-            modifier = if (preview != null) Modifier.backPreviewPage(preview, shown) else Modifier,
             onSelectTab = onSelectTab,
-            // A leaving sub-page keeps its back button until it is gone; only the shown page acts on it.
+            // The root of the stack shows the bar (the list) or the back button of a pushed route.
             onBack = if (shown == SettingsPage.Main) null else ({ if (shown == page) actions.onBack() }),
             column = titleColumn(layout),
         ) { padding ->
@@ -292,7 +197,6 @@ private fun SinglePanePages(
                 PageContent(state, actions, shown, inlineSensitivity(layout))
             }
         }
-        if (preview != null) ReleaseBackPreviewOnDispose(preview, shown)
     }
 }
 
@@ -313,14 +217,6 @@ private fun pageTitle(page: SettingsPage): Int =
         SettingsPage.About -> R.string.settings_about
         SettingsPage.Licenses -> R.string.about_licenses
         SettingsPage.Privacy -> R.string.setup_privacy_policy
-    }
-
-/** Navigation depth of a page: the list 0, its sub-pages 1, licenses 2. */
-private fun depth(page: SettingsPage): Int =
-    when (page) {
-        SettingsPage.Main -> 0
-        SettingsPage.Licenses -> 2
-        else -> 1
     }
 
 private fun inlineSensitivity(layout: LayoutSpec): Boolean = layout.mode == LayoutMode.Medium || layout.mode == LayoutMode.WideShort
@@ -375,7 +271,7 @@ private fun SinglePaneColumn(
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .nbVerticalScroll(scroll)
             .padding(padding)
             .padding(horizontal = layout.gutter),
         horizontalAlignment = alignment,
@@ -403,7 +299,6 @@ private fun TwoPaneSettings(
     actions: SettingsActions,
     padding: PaddingValues,
     scroll: ScrollState,
-    preview: BackPreview?,
 ) {
     val direction = LocalLayoutDirection.current
     val start = padding.calculateStartPadding(direction)
@@ -414,27 +309,33 @@ private fun TwoPaneSettings(
             Modifier
                 .width(listWidth + layout.gutter)
                 .fillMaxHeight()
-                .verticalScroll(rememberPaneScrollState())
+                .nbVerticalScroll(rememberPaneScrollState())
                 .padding(start = layout.gutter, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding()),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
         ) {
             SectionList(state, actions)
         }
         Spacer(Modifier.width(if (fold != null) NbDimens.hingeClearance * 2 else NbDimens.gutterMedium))
-        Column(
-            Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                // Two panes: only the detail pane previews a back gesture (Licenses -> About), never the window.
-                .then(if (preview != null) Modifier.backPreviewPage(preview, DetailPaneBackKey) else Modifier)
-                .verticalScroll(scroll)
-                .padding(
-                    end = layout.gutter + padding.calculateEndPadding(direction),
-                    top = padding.calculateTopPadding(),
-                    bottom = padding.calculateBottomPadding(),
-                ),
-        ) {
-            SettingsContainer { DetailContent(state, actions) }
+        // The detail pane: a section is an unordered peer of the others (Swap); a sub-page of a section (Licenses
+        // under About) is a page deeper in the pane's own stack (Page), with its back gesture (ADR 0011).
+        val section = state.page.section ?: state.section
+        NbSwitcher(section, key = { it }, modifier = Modifier.weight(1f).fillMaxHeight(), id = "settings-section") { shown ->
+            val stack = if (shown == section && state.page == SettingsPage.Licenses) DETAIL_LICENSES else DETAIL_SECTION
+            NbStackHost(stack = stack, key = { it }, onBack = actions.onBack, id = "settings-detail") { detail ->
+                val paneScroll = if (detail == DetailPage.Section) scroll else rememberNbScrollState()
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .nbVerticalScroll(paneScroll)
+                        .padding(
+                            end = layout.gutter + padding.calculateEndPadding(direction),
+                            top = padding.calculateTopPadding(),
+                            bottom = padding.calculateBottomPadding(),
+                        ),
+                ) {
+                    SettingsContainer { DetailContent(state, actions, shown, licenses = detail == DetailPage.Licenses) }
+                }
+            }
         }
     }
 }
@@ -467,14 +368,22 @@ private fun SectionList(
     }
 }
 
-/** Content of the detail pane: the selected section, or its sub-page (licenses, privacy policy) with a back row. */
+/** The pages of the detail pane's stack. */
+private enum class DetailPage { Section, Licenses }
+
+private val DETAIL_SECTION = listOf(DetailPage.Section)
+
+private val DETAIL_LICENSES = listOf(DetailPage.Section, DetailPage.Licenses)
+
+/** Content of the detail pane: [section], or its sub-page (licenses) with a back row. */
 @Composable
 private fun DetailContent(
     state: SettingsState,
     actions: SettingsActions,
+    section: SettingsSection,
+    licenses: Boolean,
 ) {
-    val section = state.page.section ?: state.section
-    if (state.page == SettingsPage.Licenses) {
+    if (licenses) {
         BackRow(stringResource(pageTitle(SettingsPage.Licenses)), actions.onBack)
         LicensesContent(state)
         return
@@ -533,7 +442,8 @@ private fun TabletopSettings(
     layout: LayoutSpec,
     actions: SettingsActions,
     padding: PaddingValues,
-    scroll: ScrollState,
+    stack: List<SettingsPage>,
+    scrolls: PageScrolls,
 ) {
     val fold = layout.horizontalFold?.positionDp?.dp ?: (layout.heightDp / 2).dp
     val direction = LocalLayoutDirection.current
@@ -569,18 +479,26 @@ private fun TabletopSettings(
             }
         }
         Spacer(Modifier.height(NbDimens.hingeClearance * 2))
-        Column(
-            Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(scroll)
-                .then(horizontal)
-                .padding(bottom = padding.calculateBottomPadding()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            SettingsContainer {
-                if (state.page != SettingsPage.Main) BackRow(stringResource(pageTitle(state.page)), actions.onBack)
-                PageContent(state, actions, state.page, inlineSensitivity(layout))
+        // The bottom half is the page stack (ADR 0011): a sub-page pushes over the groups like everywhere else.
+        NbStackHost(
+            stack = stack,
+            key = { it },
+            onBack = actions.onBack,
+            modifier = Modifier.weight(1f),
+            id = "settings-tabletop",
+        ) { shown ->
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .nbVerticalScroll(scrolls.of(shown))
+                    .then(horizontal)
+                    .padding(bottom = padding.calculateBottomPadding()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                SettingsContainer {
+                    if (shown != SettingsPage.Main) BackRow(stringResource(pageTitle(shown)), actions.onBack)
+                    PageContent(state, actions, shown, inlineSensitivity(layout))
+                }
             }
         }
     }
@@ -592,32 +510,46 @@ private fun GlanceSettings(
     state: SettingsState,
     actions: SettingsActions,
     padding: PaddingValues,
+    stack: List<SettingsPage>,
+    scrolls: PageScrolls,
+    onMore: () -> Unit,
+) {
+    // Each page is a whole glance page in the framework's stack (ADR 0011): pushes, pops and the back gesture.
+    NbStackHost(stack = stack, key = { it }, onBack = actions.onBack, id = "settings-glance") { shown ->
+        GlancePage(state, actions, padding, shown, scrolls.of(shown), onMore)
+    }
+}
+
+@Composable
+private fun GlancePage(
+    state: SettingsState,
+    actions: SettingsActions,
+    padding: PaddingValues,
+    page: SettingsPage,
     scroll: ScrollState,
     onMore: () -> Unit,
 ) {
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .nbVerticalScroll(scroll)
             .padding(padding)
             .padding(horizontal = NbDimens.gutterGlance),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (state.page !=
-                SettingsPage.Main
-            ) {
+            if (page != SettingsPage.Main) {
                 ShellRoundButton(NbIcons.ArrowBack, stringResource(R.string.a11y_back), onClick = actions.onBack)
             }
             NbText(
-                stringResource(pageTitle(state.page)),
+                stringResource(pageTitle(page)),
                 style = NbTheme.typography.title,
                 color = NbTheme.colors.textPrimary,
                 modifier = Modifier.weight(1f).padding(start = NbSpace.s2).semantics { heading() },
             )
             ShellRoundButton(NbIcons.MoreVertical, stringResource(R.string.action_more), onClick = onMore)
         }
-        when (state.page) {
+        when (page) {
             SettingsPage.Main -> {
                 SourceGroup(state, actions)
                 NotificationsGroup(state, actions)
@@ -625,7 +557,7 @@ private fun GlanceSettings(
             }
 
             else -> {
-                PageContent(state, actions, state.page)
+                PageContent(state, actions, page)
             }
         }
     }
@@ -704,7 +636,7 @@ private fun <T : Any> ConfirmDialog(
         // Scrolls when the window is too short for the dialog (cover screen, tabletop half, 200 % font).
         BoxWithConstraints(Modifier.fillMaxSize().then(placement)) {
             Box(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
+                Modifier.fillMaxSize().nbVerticalScroll(rememberNbScrollState()).heightIn(min = maxHeight),
                 contentAlignment = alignment,
             ) {
                 dialog(

@@ -18,18 +18,17 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import io.github.alien2003.nightbaseline.testing.TestApp
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.interaction.NbFrame
+import io.github.alien2003.nightbaseline.ui.interaction.NbKind
+import io.github.alien2003.nightbaseline.ui.interaction.NbMotionProbe
+import io.github.alien2003.nightbaseline.ui.interaction.NbPhysics
 import io.github.alien2003.nightbaseline.ui.layout.LayoutInputs
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.layout.resolveLayout
 import io.github.alien2003.nightbaseline.ui.material.EffectsDecision
-import io.github.alien2003.nightbaseline.ui.motion.NB_BACK_CORNER_DP
-import io.github.alien2003.nightbaseline.ui.motion.NB_BACK_SCALE
-import io.github.alien2003.nightbaseline.ui.motion.NB_BACK_TRAVEL
+import io.github.alien2003.nightbaseline.ui.onboarding.OnboardingStep
 import io.github.alien2003.nightbaseline.ui.sample.SampleData
-import io.github.alien2003.nightbaseline.ui.settings.DetailPaneBackKey
 import io.github.alien2003.nightbaseline.ui.settings.SettingsPage
-import io.github.alien2003.nightbaseline.ui.shell.BackPose
-import io.github.alien2003.nightbaseline.ui.shell.BackPreviewProbe
 import io.github.alien2003.nightbaseline.ui.shell.PerfProbe
 import io.github.alien2003.nightbaseline.ui.theme.NightBaselineTheme
 import org.junit.After
@@ -46,15 +45,18 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.abs
+import kotlin.math.pow
 
 /**
- * Predictive back for screens (ADR 0009, `coloros-conformance.md` P3), driven through the activity's
- * OnBackPressedDispatcher with BackEventCompat start / progress / cancel / commit as the system sends them: the page
- * that a gesture would leave scales, rounds its corners and follows the finger in the draw layer (read here through
- * [BackPreviewProbe]), the page underneath is composed in its covered pose, a cancel restores the rest pose exactly
- * and keeps the destination, a commit goes back one level, and at the root nothing takes Back (the system's
- * back-to-home animation plays).
+ * Predictive back on the interaction framework (ADR 0011), driven through the activity's OnBackPressedDispatcher
+ * with BackEventCompat start / progress / cancel / commit as the system sends them. Every level (pushed page, section,
+ * settings sub-page, onboarding step, detail pane) is the same Page geometry on the same p: the page leaving stays
+ * exactly under the finger (`tx = e W g`), the page underneath comes from a third of the width (`tx = -e W/3 s`,
+ * `s = (1 - g)^(1/gamma)`), a cancel brings everything back to rest, a commit goes back one level, and at the root
+ * nothing takes Back (the system's back-to-home). Read through [NbMotionProbe].
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, qualifiers = "en-rUS-w412dp-h915dp-port-420dpi")
@@ -68,21 +70,18 @@ class PredictiveBackTest {
     private lateinit var nav: NavHostController
     private lateinit var activity: ComponentActivity
     private val layout = mutableStateOf(compact)
-    private val poses = ConcurrentHashMap<Any, BackPose>()
-    private val unders = ConcurrentHashMap<Any, Float>()
+    private val frames = CopyOnWriteArrayList<NbFrame>()
     private val counts = ConcurrentHashMap<String, AtomicInteger>()
 
     @Before
     fun setUp() {
-        BackPreviewProbe.sink = { key, pose -> poses[key] = pose }
-        BackPreviewProbe.underSink = { key, under -> unders[key] = under }
+        NbMotionProbe.frames = { frames += it }
         PerfProbe.sink = { name -> counts.getOrPut(name) { AtomicInteger() }.incrementAndGet() }
     }
 
     @After
     fun tearDown() {
-        BackPreviewProbe.sink = null
-        BackPreviewProbe.underSink = null
+        NbMotionProbe.frames = null
         PerfProbe.sink = null
     }
 
@@ -119,6 +118,7 @@ class PredictiveBackTest {
     private val back get() = activity.onBackPressedDispatcher
 
     private fun startGesture(edge: Int = BackEventCompat.EDGE_LEFT) {
+        frames.clear()
         back.dispatchOnBackStarted(BackEventCompat(0f, TOUCH_Y, 0f, edge))
         idle()
     }
@@ -151,21 +151,33 @@ class PredictiveBackTest {
 
     private fun shown(text: String): Boolean = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
 
-    /** The pose of [key] at [progress] with a finger moving right (a swipe from the left edge). */
-    private fun assertPose(
-        key: Any,
-        progress: Float,
-        direction: Int = 1,
-    ) {
-        assertNotNull("no pose for $key", poses[key])
-        val pose = poses.getValue(key)
-        assertEquals("scale of $key", 1f - (1f - NB_BACK_SCALE) * progress, pose.scale, EPS)
-        assertEquals("travel of $key", direction * NB_BACK_TRAVEL * progress, pose.travel, EPS)
-        assertEquals("corner of $key", NB_BACK_CORNER_DP * progress, pose.cornerDp, EPS)
-    }
+    private fun last(host: String): NbFrame? = frames.lastOrNull { it.host == host }
 
-    private fun assertRest(key: Any) {
-        assertEquals("$key back at rest", BackPose.Rest, poses[key])
+    /**
+     * The last frame of [host] is a back gesture at finger [g] from [leaving] to [under]: the leaving page exactly
+     * under the finger, the page underneath at `-e W/3 s`.
+     */
+    private fun assertUnderFinger(
+        host: String,
+        leaving: Any,
+        under: Any,
+        g: Float,
+        e: Int = 1,
+        kind: NbKind = NbKind.Page,
+    ) {
+        val frame = last(host)
+        assertNotNull("no frame of $host", frame)
+        frame!!
+        assertEquals("kind of $host", kind, frame.kind)
+        assertTrue("$host is driven by the finger", frame.gesture)
+        assertTrue("same spring object for every kind", frame.spring === NbPhysics.Nav)
+        assertEquals("leaving page of $host", leaving, frame.from)
+        assertEquals("page under $host", under, frame.to)
+        val w = frame.width
+        assertEquals("the leaving page is under the finger", e * w * g, frame.fromPose.tx, PX)
+        val s = (1f - g).pow(1f / NbPhysics.PAGE_GAMMA)
+        assertEquals("the page underneath in its covered pose", -e * w * NbPhysics.PARALLAX * s, frame.toPose.tx, PX)
+        assertEquals("no scale", 1f, frame.fromPose.scale, 0f)
     }
 
     private fun openNight(): String {
@@ -176,30 +188,29 @@ class PredictiveBackTest {
     }
 
     @Test
-    fun `detail route previews the pop, cancel restores it exactly, commit pops`() {
+    fun `detail route follows the finger, cancel restores it exactly, commit pops`() {
         launch()
         val home = nav.currentBackStackEntry!!.id
         val night = openNight()
         assertTrue("Back is taken on a pushed page", back.hasEnabledCallbacks())
-        poses.clear()
+        val backButton = hasContentDescription("Back") and hasClickAction()
+        val rest = compose.onNode(backButton).fetchSemanticsNode().boundsInRoot
         startGesture()
         progress(0.25f)
         val screens = count("NightDetailScreen") + count("HomeScreen")
         progress(0.5f)
         progress(0.75f)
-        assertPose(night, 0.75f)
+        assertUnderFinger("pages", night, home, 0.75f)
         assertEquals("progress frames recompose no page content", screens, count("NightDetailScreen") + count("HomeScreen"))
-        // The page underneath is composed for the preview (in its covered pose, from the pop transition).
-        assertRest(home)
         assertTrue(route(), route().contains("NightRoute"))
         cancel()
-        assertRest(night)
+        assertEquals("back at rest exactly", rest, compose.onNode(backButton).fetchSemanticsNode().boundsInRoot)
         assertTrue(route(), route().contains("NightRoute"))
         assertTrue(back.hasEnabledCallbacks())
         // Again, from the right edge: the page follows the finger to the left; this time it is committed.
         startGesture(BackEventCompat.EDGE_RIGHT)
         progress(0.4f, BackEventCompat.EDGE_RIGHT)
-        assertPose(night, 0.4f, direction = -1)
+        assertUnderFinger("pages", night, home, 0.4f, e = -1)
         commit()
         assertTrue(route(), route().contains("HomeRoute"))
         assertFalse("at the root nothing takes Back (system back-to-home)", back.hasEnabledCallbacks())
@@ -214,7 +225,7 @@ class PredictiveBackTest {
         val metric = nav.currentBackStackEntry!!.id
         startGesture()
         progress(0.5f)
-        assertPose(metric, 0.5f)
+        assertEquals(metric, last("pages")?.from)
         // Commit and start the next gesture before the pop has settled.
         compose.mainClock.autoAdvance = false
         back.onBackPressed()
@@ -229,10 +240,9 @@ class PredictiveBackTest {
         compose.mainClock.autoAdvance = true
         idle()
         assertTrue(route(), route().contains("NightRoute"))
-        assertRest(night)
         startGesture()
         progress(0.6f)
-        assertPose(night, 0.6f)
+        assertEquals(night, last("pages")?.from)
         commit()
         assertTrue(route(), route().contains("HomeRoute"))
     }
@@ -248,16 +258,18 @@ class PredictiveBackTest {
         val depth = nav.currentBackStack.value.size
         startGesture()
         progress(0.5f)
-        assertPose(night, 0.5f)
+        assertEquals(night, last("pages")?.from)
         // Cancel, and start the next gesture while the page is still on its way back to rest: the History section
-        // underneath is composed for the preview, and its own tab -> Home handler must not take this gesture.
+        // underneath is composed, and its own tab -> Home target must not take this gesture.
         compose.mainClock.autoAdvance = false
         back.dispatchOnBackCancelled()
         compose.mainClock.advanceTimeBy(48)
+        frames.clear()
         back.dispatchOnBackStarted(BackEventCompat(0f, TOUCH_Y, 0f, BackEventCompat.EDGE_LEFT))
         back.dispatchOnBackProgressed(BackEventCompat(400f, TOUCH_Y, 0.4f, BackEventCompat.EDGE_LEFT))
         compose.mainClock.advanceTimeBy(32)
-        assertTrue("the second gesture previews the Night page", poses[night]?.atRest == false)
+        assertTrue("the second gesture moves the Night page", frames.any { it.host == "pages" && it.gesture && it.from == night })
+        assertTrue("the section host does not take it", frames.none { it.host == "sections" })
         back.onBackPressed()
         compose.mainClock.autoAdvance = true
         idle()
@@ -272,23 +284,21 @@ class PredictiveBackTest {
         openNight()
         compose.runOnIdle { nav.navigate(MetricRoute("respiratory_rate", SampleData.LAST_WAKE.toString(), TopLevel.Home.name)) }
         idle()
-        val metric = nav.currentBackStackEntry!!.id
         startGesture()
         progress(0.8f)
-        assertPose(metric, 0.8f)
         compose.mainClock.autoAdvance = false
         back.dispatchOnBackCancelled()
         compose.mainClock.advanceTimeBy(32)
-        val during = poses.getValue(metric).progress
-        assertTrue("on its way back: $during", during > 0.05f && during < 0.8f)
+        val during = last("pages")!!.p
+        assertTrue("on its way back: $during", during > 0.05f && during < 0.95f)
         back.dispatchOnBackStarted(BackEventCompat(0f, TOUCH_Y, 0f, BackEventCompat.EDGE_LEFT))
         back.dispatchOnBackProgressed(BackEventCompat(0f, TOUCH_Y, 0f, BackEventCompat.EDGE_LEFT))
         compose.mainClock.advanceTimeByFrame()
-        val resumed = poses.getValue(metric).progress
-        assertTrue("no jump back to rest: $resumed after $during", resumed >= during - 0.1f && resumed > 0.05f)
+        val resumed = last("pages")!!.p
+        assertEquals("no jump: the gesture starts where the page is", during, resumed, 0.05f)
         back.dispatchOnBackProgressed(BackEventCompat(1080f, TOUCH_Y, 1f, BackEventCompat.EDGE_LEFT))
         compose.mainClock.advanceTimeByFrame()
-        assertEquals("the end of the gesture is the end of the preview", 1f, poses.getValue(metric).progress, EPS)
+        assertEquals("the end of the gesture is the end of the pop", 1f, last("pages")!!.p, 1e-4f)
         back.onBackPressed()
         compose.mainClock.autoAdvance = true
         idle()
@@ -296,7 +306,7 @@ class PredictiveBackTest {
     }
 
     @Test
-    fun `tab to Home previews the section over Home in its covered pose`() {
+    fun `tab to Home is the same Page geometry as a pop`() {
         launch()
         assertFalse("Home: no handler", back.hasEnabledCallbacks())
         compose.onAllNodesWithText("History")[0].performClick()
@@ -307,49 +317,42 @@ class PredictiveBackTest {
         progress(0.3f)
         val home = count("HomeScreen")
         progress(0.6f)
-        assertPose(TopLevel.History, 0.6f)
-        assertEquals("Home waits in the covered pose", 1f, unders[TopLevel.Home])
+        assertUnderFinger("sections", TopLevel.History, TopLevel.Home, 0.6f, kind = NbKind.Tab)
         assertEquals("no recomposition per progress frame", home, count("HomeScreen"))
         cancel()
-        assertRest(TopLevel.History)
         assertTrue(route(), route().contains("HistoryRoute"))
-        startGesture()
-        progress(0.5f)
+        // A right-edge swipe still moves the section the bar-order way (Home is at the start).
+        startGesture(BackEventCompat.EDGE_RIGHT)
+        progress(0.5f, BackEventCompat.EDGE_RIGHT)
+        assertUnderFinger("sections", TopLevel.History, TopLevel.Home, 0.5f, kind = NbKind.Tab)
         commit()
         assertTrue(route(), route().contains("HomeRoute"))
-        assertRest(TopLevel.History)
-        assertEquals("Home at rest after the commit", 0f, unders[TopLevel.Home])
         assertFalse(back.hasEnabledCallbacks())
     }
 
     @Test
-    fun `settings sub-page previews over the list and goes back to it`() {
+    fun `settings sub-page follows the finger over the list and goes back to it`() {
         launch()
         compose.onAllNodesWithText("Settings")[0].performClick()
         idle()
         compose.onNode(hasText("Balanced") and hasClickAction()).performScrollTo().performClick()
         idle()
         assertTrue(shown("Fewer notes"))
-        poses.clear()
         startGesture()
         progress(0.5f)
-        assertPose(SettingsPage.Sensitivity, 0.5f)
-        // The list is composed under the sub-page for the preview.
-        assertRest(SettingsPage.Main)
-        assertTrue("the section itself does not preview", poses[TopLevel.Settings]?.atRest != false)
+        assertUnderFinger("settings", SettingsPage.Sensitivity, SettingsPage.Main, 0.5f)
+        assertTrue("the section does not move", frames.none { it.host == "sections" })
         cancel()
-        assertRest(SettingsPage.Sensitivity)
         assertTrue(shown("Fewer notes"))
         startGesture()
         progress(0.5f)
         commit()
         assertEquals(TopLevel.Settings, nav.currentBackStackEntry?.topLevelTab())
         assertFalse("the sub-page is closed", shown("Fewer notes"))
-        assertRest(SettingsPage.Main)
     }
 
     @Test
-    fun `settings sub-page previews its top bar with the page`() {
+    fun `settings sub-page moves its top bar with the page`() {
         launch()
         compose.onAllNodesWithText("Settings")[0].performClick()
         idle()
@@ -359,16 +362,14 @@ class PredictiveBackTest {
         val rest = compose.onNode(backButton).fetchSemanticsNode().boundsInRoot
         startGesture()
         progress(0.5f)
-        assertPose(SettingsPage.Sensitivity, 0.5f)
-        val moved = compose.onNode(backButton).fetchSemanticsNode().boundsInRoot
+        val moved = compose.onNode(backButton, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue("the back button moves with the page: $rest -> $moved", moved.left > rest.left + 1f)
-        assertTrue("and scales with it", moved.width < rest.width)
         cancel()
         assertEquals(rest, compose.onNode(backButton).fetchSemanticsNode().boundsInRoot)
     }
 
     @Test
-    fun `onboarding step goes back to the previous step with the preview`() {
+    fun `onboarding step goes back to the previous step under the finger`() {
         launch(app = TestApp(nights = 0), onboardingDone = false)
         assertFalse("first step: nothing to go back to", back.hasEnabledCallbacks())
         compose.onAllNodesWithText("Get started")[0].performClick()
@@ -376,49 +377,45 @@ class PredictiveBackTest {
         assertFalse(shown("Get started"))
         startGesture()
         progress(0.5f)
-        assertPose(OnboardingBackKey, 0.5f)
+        assertUnderFinger("onboarding", OnboardingStep.HowItWorks, OnboardingStep.Welcome, 0.5f)
         cancel()
-        assertRest(OnboardingBackKey)
         assertFalse(shown("Get started"))
         startGesture()
         progress(0.5f)
         commit()
         assertTrue("back on the first step", shown("Get started"))
-        assertRest(OnboardingBackKey)
     }
 
     @Test
     @Config(qualifiers = "en-rUS-w1000dp-h800dp-land-420dpi")
-    fun `two panes - only the detail pane previews`() {
+    fun `two panes - the detail pane's own stack goes back, not the window`() {
         launch(start = expanded)
         compose.runOnIdle { nav.navigate(SettingsRoute(SettingsPage.Licenses.name)) }
         idle()
-        val entry = nav.currentBackStackEntry!!.id
         assertTrue("Licenses open in the pane", shown(LICENSE))
         startGesture()
         progress(0.5f)
-        assertPose(DetailPaneBackKey, 0.5f)
-        assertTrue("the window does not preview", poses[entry]?.atRest != false)
+        assertTrue("the pane's stack moves", frames.any { it.host == "settings-detail" && it.gesture })
+        assertTrue("the window does not", frames.none { it.host == "pages" && it.gesture })
         cancel()
-        assertRest(DetailPaneBackKey)
         startGesture()
         progress(0.5f)
         commit()
         assertTrue("still in Settings", route().contains("SettingsRoute"))
         assertFalse("Licenses closed: About in the pane", shown(LICENSE))
-        assertRest(DetailPaneBackKey)
     }
 
     @Test
-    fun `a window change during the gesture drops the preview`() {
+    fun `a window change during the gesture drops it`() {
         launch()
-        val night = openNight()
+        openNight()
         startGesture()
         progress(0.5f)
-        assertPose(night, 0.5f)
         compose.runOnIdle { layout.value = resolveLayout(LayoutInputs(500f, 915f)) }
         idle()
-        assertRest(night)
+        frames.clear()
+        compose.mainClock.advanceTimeByFrame()
+        assertTrue("nothing is moving", frames.isEmpty())
         // The rest of the dropped gesture does nothing.
         commit()
         assertTrue(route(), route().contains("NightRoute"))
@@ -432,10 +429,10 @@ class PredictiveBackTest {
     @Test
     fun `reduced motion - no preview, Back goes back at once`() {
         launch(reducedMotion = true)
-        val night = openNight()
+        openNight()
         startGesture()
         progress(0.5f)
-        assertTrue("no pose under reduced motion", poses[night]?.atRest != false)
+        assertTrue("no gesture frame under reduced motion", frames.none { it.gesture })
         commit()
         assertTrue(route(), route().contains("HomeRoute"))
     }
@@ -449,8 +446,40 @@ class PredictiveBackTest {
         assertFalse(back.hasEnabledCallbacks())
     }
 
+    @Test
+    fun `a back gesture during a push reverses it continuously and never draws the old leave`() {
+        launch()
+        val home = nav.currentBackStackEntry!!.id
+        for (delay in longArrayOf(32, 48, 160, 304, 496)) {
+            frames.clear()
+            compose.mainClock.autoAdvance = false
+            compose.runOnIdle { nav.navigate(NightRoute(SampleData.LAST_WAKE.minusDays(3).toString(), TopLevel.Home.name)) }
+            compose.mainClock.advanceTimeBy(delay)
+            val night = nav.currentBackStackEntry!!.id
+            val before = frames.lastOrNull { it.host == "pages" }
+            back.dispatchOnBackStarted(BackEventCompat(0f, TOUCH_Y, 0f, BackEventCompat.EDGE_LEFT))
+            back.dispatchOnBackProgressed(BackEventCompat(0f, TOUCH_Y, 0f, BackEventCompat.EDGE_LEFT))
+            compose.mainClock.advanceTimeByFrame()
+            val after = frames.last { it.host == "pages" }
+            assertEquals("$delay ms: the gesture holds the Night page", night, after.from)
+            if (before != null && before.to == night) {
+                // The same pose in the frame the gesture takes over (R1): the page does not jump.
+                assertEquals("$delay ms: continuous", before.toPose.tx, after.fromPose.tx, abs(before.p - after.p) * after.width + PX)
+            }
+            back.onBackPressed()
+            compose.mainClock.autoAdvance = true
+            idle()
+            assertEquals("$delay ms: back on Home", home, nav.currentBackStackEntry!!.id)
+            val leave = frames.filter { it.host == "pages" && it.from == night }
+            assertTrue("$delay ms: the leaving page only ever moves towards the end edge", leave.all { it.fromPose.tx >= -PX })
+            frames.clear()
+            compose.mainClock.advanceTimeByFrame()
+            assertTrue("$delay ms: nothing is drawn after the settle", frames.none { it.host == "pages" })
+        }
+    }
+
     private companion object {
-        const val EPS = 1e-4f
+        const val PX = 0.75f
         const val LICENSE = "Jetpack Compose and Material 3"
         const val TOUCH_Y = 900f
         const val WIDTH_PX = 1080f

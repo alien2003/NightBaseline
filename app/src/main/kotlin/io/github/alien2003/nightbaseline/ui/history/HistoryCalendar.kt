@@ -1,7 +1,5 @@
 package io.github.alien2003.nightbaseline.ui.history
 
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -14,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,9 +26,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CollectionInfo
@@ -50,6 +45,11 @@ import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.cardTag
+import io.github.alien2003.nightbaseline.ui.interaction.NbSwitcher
+import io.github.alien2003.nightbaseline.ui.interaction.nbHorizontalScroll
+import io.github.alien2003.nightbaseline.ui.interaction.nbKeys
+import io.github.alien2003.nightbaseline.ui.interaction.nbStepSwipe
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.NightUi
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
@@ -127,14 +127,15 @@ fun HistoryCalendar(
         Column(
             Modifier
                 .fillMaxWidth()
-                .monthSwipe(month, rtl, onPrevious = { if (canPrevious) onMonth(month.minusMonths(1)) }, onNext = {
-                    if (canNext) onMonth(month.plusMonths(1))
-                })
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    val from = focused ?: return@onPreviewKeyEvent false
+                .nbStepSwipe(
+                    SWIPE_DP.dp,
+                    onPrevious = { onMonth(month.minusMonths(1)) }.takeIf { canPrevious },
+                    onNext = { onMonth(month.plusMonths(1)) }.takeIf { canNext },
+                ).nbKeys { event ->
+                    if (event.type != KeyEventType.KeyDown) return@nbKeys false
+                    val from = focused ?: return@nbKeys false
                     val target = keyTarget(event.key, from, nights, today, keyStep(event.key, transposed, rtl))
-                    if (target == null && !event.key.isCalendarKey()) return@onPreviewKeyEvent false
+                    if (target == null && !event.key.isCalendarKey()) return@nbKeys false
                     move(target)
                     true
                 },
@@ -145,52 +146,35 @@ fun HistoryCalendar(
                 onPrevious = { onMonth(month.minusMonths(1)) }.takeIf { canPrevious },
                 onNext = { onMonth(month.plusMonths(1)) }.takeIf { canNext },
             )
-            val weeks = weeksOf(month, firstDay)
-            val cell: @Composable (LocalDate?, Int, Int, Modifier) -> Unit = { date, row, column, cellModifier ->
-                DaySlot(date, today, cellModifier) { day ->
-                    val requester = requesters.getOrPut(day) { FocusRequester() }
-                    CalendarCell(
-                        date = day,
-                        night = nights[day],
-                        onClick = { onDay(day) },
-                        today = day == today,
-                        selected = day == selected,
-                        modifier =
-                            cellModifier
-                                .onFocusChanged { if (it.isFocused) focused = day }
-                                .focusRequester(requester)
-                                .semantics { collectionItemInfo = CollectionItemInfo(row, 1, column, 1) },
-                    )
+            // Months are a sequence: a month change (buttons, swipe, keys) is the Pager kind (ADR 0011).
+            NbSwitcher(month, key = { it }, id = "month", order = naturalOrder()) { shownMonth ->
+                val weeks = weeksOf(shownMonth, firstDay)
+                val cell: @Composable (LocalDate?, Int, Int, Modifier) -> Unit = { date, row, column, cellModifier ->
+                    DaySlot(date, today, cellModifier) { day ->
+                        val requester = requesters.getOrPut(day) { FocusRequester() }
+                        CalendarCell(
+                            date = day,
+                            night = nights[day],
+                            onClick = { onDay(day) },
+                            today = day == today,
+                            selected = day == selected,
+                            modifier =
+                                cellModifier
+                                    .onFocusChanged { if (it.isFocused) focused = day }
+                                    .focusRequester(requester)
+                                    .semantics { collectionItemInfo = CollectionItemInfo(row, 1, column, 1) },
+                        )
+                    }
                 }
-            }
-            if (transposed) {
-                TransposedGrid(weeks, firstDay, cell, scrolls = !fits)
-            } else {
-                WeekGrid(weeks, firstDay, cell)
+                if (transposed) {
+                    TransposedGrid(weeks, firstDay, cell, scrolls = !fits)
+                } else {
+                    WeekGrid(weeks, firstDay, cell)
+                }
             }
         }
     }
 }
-
-/** A horizontal swipe of at least 64 dp moves to the next (towards the start) or previous month. */
-private fun Modifier.monthSwipe(
-    month: YearMonth,
-    rtl: Boolean,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-): Modifier =
-    pointerInput(month, rtl) {
-        var total = 0f
-        detectHorizontalDragGestures(
-            onDragStart = { total = 0f },
-            onDragEnd = {
-                if (abs(total) > SWIPE_DP.dp.toPx()) {
-                    val forward = if (rtl) total > 0 else total < 0
-                    if (forward) onNext() else onPrevious()
-                }
-            },
-        ) { _, delta -> total += delta }
-    }
 
 /** Weeks of [month] as 7 slots each (null before the first and after the last day), starting at [firstDay]. */
 private fun weeksOf(
@@ -264,7 +248,7 @@ private fun TransposedGrid(
     val text = rememberUiText()
     Column(
         Modifier
-            .then(if (scrolls) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
+            .then(if (scrolls) Modifier.nbHorizontalScroll(rememberNbScrollState()) else Modifier)
             .semantics { collectionInfo = CollectionInfo(DAYS, weeks.size) },
         verticalArrangement = Arrangement.spacedBy(CELL_GAP),
     ) {

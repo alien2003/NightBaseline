@@ -38,7 +38,7 @@ import io.github.alien2003.nightbaseline.ui.components.NbIcon
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.RangeBand
-import io.github.alien2003.nightbaseline.ui.material.nbClickable
+import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.MetricUi
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText

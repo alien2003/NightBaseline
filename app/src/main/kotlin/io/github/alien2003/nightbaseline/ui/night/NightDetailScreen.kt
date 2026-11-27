@@ -1,7 +1,6 @@
 package io.github.alien2003.nightbaseline.ui.night
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,8 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -35,9 +32,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -72,6 +67,12 @@ import io.github.alien2003.nightbaseline.ui.home.contentWidth
 import io.github.alien2003.nightbaseline.ui.home.tileColumns
 import io.github.alien2003.nightbaseline.ui.home.tileTitleColumn
 import io.github.alien2003.nightbaseline.ui.home.topInset
+import io.github.alien2003.nightbaseline.ui.interaction.NbReveal
+import io.github.alien2003.nightbaseline.ui.interaction.NbSwitcher
+import io.github.alien2003.nightbaseline.ui.interaction.nbKeys
+import io.github.alien2003.nightbaseline.ui.interaction.nbStepSwipe
+import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.model.NightState
@@ -99,7 +100,7 @@ fun NightDetailScreen(
     layout: LayoutSpec,
     modifier: Modifier = Modifier,
     actions: NightDetailActions = NightDetailActions(),
-    scrollState: ScrollState = rememberScrollState(),
+    scrollState: ScrollState = rememberNbScrollState(),
 ) {
     CountComposition("NightDetailScreen")
     val text = rememberUiText()
@@ -228,7 +229,7 @@ private fun Modifier.nightKeys(
     val onPrevious by rememberUpdatedState(state.previous?.let { date -> { actions.onPrevious(date) } })
     val onNext by rememberUpdatedState(state.next?.let { date -> { actions.onNext(date) } })
     val onBack by rememberUpdatedState(actions.onBack)
-    return onPreviewKeyEvent { event ->
+    return nbKeys { event ->
         val handler =
             when {
                 event.type != KeyEventType.KeyDown -> null
@@ -242,31 +243,25 @@ private fun Modifier.nightKeys(
     }
 }
 
-/** A horizontal swipe on the night block steps to the neighbouring night (start-to-end = previous). */
+/**
+ * A horizontal swipe on the night block steps to the neighbouring night (start-to-end = previous), on the framework's
+ * axis rule and fling projection (ADR 0011); the step itself runs the Pager kind like the buttons and the arrow keys.
+ */
 @Composable
 private fun Modifier.swipeNights(
     state: NightDetailState,
     actions: NightDetailActions,
 ): Modifier {
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val previous by rememberUpdatedState(state.previous)
-    val next by rememberUpdatedState(state.next)
     val current by rememberUpdatedState(actions)
-    return pointerInput(rtl) {
-        val threshold = SWIPE_THRESHOLD.toPx()
-        var total = 0f
-        detectHorizontalDragGestures(
-            onDragStart = { total = 0f },
-            onHorizontalDrag = { _, delta -> total += if (rtl) -delta else delta },
-            onDragEnd = {
-                when {
-                    total > threshold -> previous?.let(current.onPrevious)
-                    total < -threshold -> next?.let(current.onNext)
-                }
-            },
-        )
-    }
+    return nbStepSwipe(
+        SWIPE_THRESHOLD,
+        onPrevious = state.previous?.let { date -> { current.onPrevious(date) } },
+        onNext = state.next?.let { date -> { current.onNext(date) } },
+    )
 }
+
+/** Nights are a sequence: a change of the shown night is the Pager kind, newer nights come from the end side. */
+private val ByWakeDate: Comparator<NightDetailState> = compareBy { it.night.wakeDate }
 
 /** Banner, night block, measurements heading and window note, tiles, "Not recorded by" row, footer. */
 @Composable
@@ -280,7 +275,7 @@ private fun ColumnScope.NightBlocks(
     footer: Boolean = true,
 ) {
     if (night) {
-        state.shownBanner?.let {
+        NbReveal(state.shownBanner) {
             InlineBanner(
                 it,
                 state.source,
@@ -346,16 +341,19 @@ private fun SinglePaneNight(
         Column(
             Modifier
                 .fillMaxSize()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .padding(padding)
                 .padding(horizontal = layout.gutter)
                 .padding(top = topInset(barHeight), bottom = NbSpace.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             val maxWidth = if (columns > 1) NbDimens.chartMax else NbDimens.textMax
-            // One container for every block (review round 4): same width cap and start edge.
-            Column(Modifier.widthIn(max = maxWidth).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
-                NightBlocks(state, actions, columns, maxWidth)
+            // One container for every block (review round 4): same width cap and start edge. Previous / next (button,
+            // swipe, arrow key) is one change of the shown night: the Pager kind (ADR 0011).
+            NbSwitcher(state, key = { it.night.wakeDate }, id = "night", order = ByWakeDate) { shown ->
+                Column(Modifier.widthIn(max = maxWidth).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
+                    NightBlocks(shown, actions, columns, maxWidth)
+                }
             }
         }
     }
@@ -383,7 +381,7 @@ private fun BookNight(
                 .padding(start = layout.gutter)
                 .width(startWidth)
                 .fillMaxHeight()
-                .verticalScroll(rememberPaneScrollState())
+                .nbVerticalScroll(rememberPaneScrollState())
                 .padding(top = top, bottom = bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -394,7 +392,7 @@ private fun BookNight(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .padding(end = NbSpace.s5, top = top, bottom = bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -451,7 +449,7 @@ private fun TabletopNight(
                 .fillMaxSize()
                 .offset(y = foldY + NbDimens.hingeClearance)
                 .padding(bottom = foldY + NbDimens.hingeClearance)
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .padding(bottom = padding.calculateBottomPadding() + NbSpace.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -472,7 +470,7 @@ private fun ColumnScope.TabletopNightControls(
 ) {
     val night = state.night
     PrevNextButtons(state, actions, Modifier.widthIn(max = maxWidth))
-    state.shownBanner?.let {
+    NbReveal(state.shownBanner) {
         InlineBanner(
             it,
             state.source,

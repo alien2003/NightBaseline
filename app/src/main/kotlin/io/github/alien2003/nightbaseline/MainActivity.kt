@@ -50,14 +50,11 @@ import io.github.alien2003.nightbaseline.nav.rememberWindowLayoutInputs
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
+import io.github.alien2003.nightbaseline.ui.interaction.NbStackHost
 import io.github.alien2003.nightbaseline.ui.layout.resolveLayout
 import io.github.alien2003.nightbaseline.ui.material.GlassPreference
 import io.github.alien2003.nightbaseline.ui.material.rememberPlatformEffectsInputs
 import io.github.alien2003.nightbaseline.ui.material.resolveEffectsMode
-import io.github.alien2003.nightbaseline.ui.shell.BackPreviewHandler
-import io.github.alien2003.nightbaseline.ui.shell.BackSettle
-import io.github.alien2003.nightbaseline.ui.shell.backPreviewPage
-import io.github.alien2003.nightbaseline.ui.shell.rememberBackPreview
 import io.github.alien2003.nightbaseline.ui.theme.DarkNbColors
 import io.github.alien2003.nightbaseline.ui.theme.LightNbColors
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
@@ -167,17 +164,27 @@ class MainActivity : ComponentActivity() {
         NightBaselineTheme(darkTheme = dark, effects = resolveEffectsMode(rememberPlatformEffectsInputs(glass))) {
             var showCatalog by rememberSaveable { mutableStateOf(false) }
             val catalog = DebugTools.catalog
-            if (showCatalog && catalog != null) {
-                // Back closes the debug catalog with the same predictive preview as a page (ADR 0009).
-                val preview = rememberBackPreview()
-                BackPreviewHandler(preview, enabled = true, key = CATALOG_BACK_KEY, settle = BackSettle.InPlace) {
-                    showCatalog = false
-                }
-                Box(Modifier.fillMaxSize().backPreviewPage(preview, CATALOG_BACK_KEY)) { catalog { showCatalog = false } }
-                return@NightBaselineTheme
-            }
             if (s == null) return@NightBaselineTheme
             val layout = resolveLayout(rememberWindowLayoutInputs(this))
+            // The debug catalog is a page pushed over the app (ADR 0011): the same push, pop and back gesture.
+            val pages = if (showCatalog && catalog != null) CATALOG_STACK else APP_STACK
+            NbStackHost(pages, key = { it }, onBack = { showCatalog = false }, id = "root") { pageKey ->
+                if (pageKey == CATALOG_PAGE && catalog != null) {
+                    catalog { showCatalog = false }
+                } else {
+                    App(s, layout, catalog?.let { { showCatalog = true } })
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun App(
+        s: io.github.alien2003.nightbaseline.nav.RootState,
+        layout: io.github.alien2003.nightbaseline.ui.layout.LayoutSpec,
+        openCatalog: (() -> Unit)?,
+    ) {
+        run {
             // Behind every page, also where a predictive back preview leaves a gap between the shrinking page and the
             // shifted page under it: the in-app background, never the window's system-theme one.
             Box(Modifier.fillMaxSize().background(NbTheme.colors.background)) {
@@ -191,12 +198,12 @@ class MainActivity : ComponentActivity() {
                     onRefresh = root::refresh,
                     onCheckNow = root::checkNow,
                     debugAction =
-                        catalog?.let {
+                        openCatalog?.let { open ->
                             {
                                 ShellRoundButton(
                                     NbIcons.MoreVertical,
                                     contentDescription = stringResource(R.string.settings_catalog),
-                                    onClick = { showCatalog = true },
+                                    onClick = open,
                                 )
                             }
                         },
@@ -256,5 +263,8 @@ internal fun Window.applySystemBarStyle(dark: Boolean) {
     if ((decorView.background as? ColorDrawable)?.color != background) setBackgroundDrawable(ColorDrawable(background))
 }
 
-/** Key of the debug catalog in its back preview. */
-private const val CATALOG_BACK_KEY: String = "catalog"
+/** The pages of the root stack: the app, and the debug catalog over it. */
+private const val APP_PAGE: String = "app"
+private const val CATALOG_PAGE: String = "catalog"
+private val APP_STACK = listOf(APP_PAGE)
+private val CATALOG_STACK = listOf(APP_PAGE, CATALOG_PAGE)

@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -23,6 +21,8 @@ import io.github.alien2003.nightbaseline.ui.components.GroupCard
 import io.github.alien2003.nightbaseline.ui.components.NbHairline
 import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.PrimaryButton
+import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.theme.NbControlDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbControlType
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
@@ -47,7 +47,7 @@ class PermissionsRationaleActivity : ComponentActivity() {
                             .fillMaxSize()
                             .background(NbTheme.colors.background)
                             .safeDrawingPadding()
-                            .verticalScroll(rememberScrollState())
+                            .nbVerticalScroll(rememberNbScrollState())
                             .padding(NbDimens.gutterCompact)
                             .widthIn(max = NbDimens.textMax),
                     verticalArrangement = Arrangement.spacedBy(NbSpace.s5),

@@ -23,9 +23,9 @@ import androidx.compose.ui.test.swipe
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import io.github.alien2003.nightbaseline.testing.TestApp
-import io.github.alien2003.nightbaseline.ui.components.MODAL_PANEL_TAG
-import io.github.alien2003.nightbaseline.ui.components.MODAL_SCRIM_TAG
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.interaction.MODAL_PANEL_TAG
+import io.github.alien2003.nightbaseline.ui.interaction.MODAL_SCRIM_TAG
 import io.github.alien2003.nightbaseline.ui.layout.LayoutInputs
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.layout.resolveLayout

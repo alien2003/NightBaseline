@@ -24,6 +24,8 @@ import io.github.alien2003.nightbaseline.ui.history.HistoryActions
 import io.github.alien2003.nightbaseline.ui.history.HistoryFilter
 import io.github.alien2003.nightbaseline.ui.history.HistorySamples
 import io.github.alien2003.nightbaseline.ui.history.HistoryScreen
+import io.github.alien2003.nightbaseline.ui.interaction.PressAnimationProbe
+import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
 import io.github.alien2003.nightbaseline.ui.layout.LayoutInputs
 import io.github.alien2003.nightbaseline.ui.layout.resolveLayout
 import io.github.alien2003.nightbaseline.ui.theme.NightBaselineTheme

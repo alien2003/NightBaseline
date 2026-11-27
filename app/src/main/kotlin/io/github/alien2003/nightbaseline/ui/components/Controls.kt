@@ -2,13 +2,6 @@ package io.github.alien2003.nightbaseline.ui.components
 
 import android.os.Build
 import android.view.HapticFeedbackConstants
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -57,8 +49,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import io.github.alien2003.nightbaseline.ui.material.nbClickable
-import io.github.alien2003.nightbaseline.ui.motion.NbEasing
+import io.github.alien2003.nightbaseline.ui.interaction.NbPhysics
+import io.github.alien2003.nightbaseline.ui.interaction.NbPoses
+import io.github.alien2003.nightbaseline.ui.interaction.animateNbFloat
+import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
 import io.github.alien2003.nightbaseline.ui.theme.NbControlDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbControlType
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
@@ -69,26 +63,15 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-/** `spring.selection` of the conformance plan: critically damped, 247 (tab underline). */
-private const val SELECTION_STIFFNESS = 247f
-
-/** `spring.switch`: the knob overshoots a little (0.7 / 247). */
-private const val SWITCH_DAMPING = 0.7f
-
-/** The knob stretches to x1.3 of its width while it travels. */
-private const val SWITCH_STRETCH = 0.3f
+/** The knob stretches to x1.3 of its width while it travels (registry token). */
+private const val SWITCH_STRETCH = NbPhysics.SWITCH_STRETCH
 
 /** Peak of the stretch along the travel (34.7 %). */
-private const val SWITCH_STRETCH_PEAK = 0.347f
+private const val SWITCH_STRETCH_PEAK = NbPhysics.SWITCH_STRETCH_PEAK
 
 /** Disabled switch and radio draw at this alpha (the position still carries the state). */
 private const val DISABLED_ALPHA = 0.3f
 private const val DISABLED_KNOB_ALPHA = 0.6f
-
-/** Radio fill: 300 ms with a 1.08 pulse. */
-private const val RADIO_FILL_MS = 300
-private const val RADIO_PULSE_MS = 200
-private const val RADIO_PULSE = 1.08f
 
 /**
  * A ColorOS-style switch (`coloros-conformance.md` L1): a 44 x 24 dp pill, an 18 dp white knob 3 dp inside, no
@@ -103,12 +86,7 @@ fun NbSwitch(
     enabled: Boolean = true,
 ) {
     val controls = NbTheme.controls
-    val reduced = NbTheme.motion.reduced
-    val position by animateFloatAsState(
-        targetValue = if (checked) 1f else 0f,
-        animationSpec = if (reduced) snap() else spring(dampingRatio = SWITCH_DAMPING, stiffness = SELECTION_STIFFNESS),
-        label = "switchKnob",
-    )
+    val position by animateNbFloat(if (checked) 1f else 0f, NbPhysics.Switch, label = "switchKnob")
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Canvas(
         modifier
@@ -151,18 +129,8 @@ fun NbRadio(
     enabled: Boolean = true,
 ) {
     val controls = NbTheme.controls
-    val reduced = NbTheme.motion.reduced
-    val fill = remember { Animatable(if (selected) 1f else 0f) }
-    LaunchedEffect(selected, reduced) {
-        val target = if (selected) 1f else 0f
-        if (reduced) {
-            fill.snapTo(target)
-        } else if (selected) {
-            fill.animateTo(target, radioFillSpec())
-        } else {
-            fill.animateTo(target, tween(RADIO_FILL_MS / 2, easing = NbEasing.Exit))
-        }
-    }
+    // The fill on the Select spring; the 1.08 pulse is a pure function of it (ADR 0011: P_radio).
+    val fill = animateNbFloat(if (selected) 1f else 0f, NbPhysics.Select, label = "radioFill")
     Canvas(modifier.size(NbControlDimens.radioBox).clearAndSetSemantics {}) {
         val alpha = if (enabled) 1f else DISABLED_ALPHA
         val disc = NbControlDimens.radioDisc.toPx() / 2
@@ -172,20 +140,13 @@ fun NbRadio(
             drawCircle(controls.radioRing, radius = disc - stroke / 2, style = Stroke(stroke), alpha = alpha * (1f - min(f, 1f)))
         }
         if (f > 0f) {
-            scale(f) {
+            scale(f * NbPoses.radio(f)) {
                 drawCircle(controls.accent, radius = disc, alpha = alpha)
                 drawCircle(controls.onFill, radius = NbControlDimens.radioDot.toPx() / 2, alpha = alpha)
             }
         }
     }
 }
-
-private fun radioFillSpec(): FiniteAnimationSpec<Float> =
-    keyframes {
-        durationMillis = RADIO_FILL_MS
-        RADIO_PULSE at RADIO_PULSE_MS using NbEasing.Flow
-        1f at RADIO_FILL_MS
-    }
 
 /**
  * The small disclosure chevron of a list row (`coloros-conformance.md` L3): a 12 x 24 dp box with a ~5 x 10 dp glyph
@@ -270,12 +231,10 @@ fun NbTabRow(
     modifier: Modifier = Modifier,
 ) {
     val controls = NbTheme.controls
-    val reduced = NbTheme.motion.reduced
     val tabs = remember { TabBounds() }
     val target = tabs.bounds[selected]
-    val spec: FiniteAnimationSpec<Float> = if (reduced) snap() else spring(stiffness = SELECTION_STIFFNESS)
-    val left by animateFloatAsState(target?.first ?: 0f, spec, label = "tabLeft")
-    val width by animateFloatAsState(target?.second ?: 0f, spec, label = "tabWidth")
+    val left by animateNbFloat(target?.first ?: 0f, NbPhysics.Select, label = "tabLeft")
+    val width by animateNbFloat(target?.second ?: 0f, NbPhysics.Select, label = "tabWidth")
     val indicator = controls.tabSelected
     Row(
         modifier

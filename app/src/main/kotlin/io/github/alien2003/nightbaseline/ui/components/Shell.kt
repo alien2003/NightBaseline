@@ -1,17 +1,7 @@
 package io.github.alien2003.nightbaseline.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -36,7 +26,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -58,7 +47,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -75,18 +63,22 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
+import io.github.alien2003.nightbaseline.ui.interaction.ModalScope
+import io.github.alien2003.nightbaseline.ui.interaction.NbEasing
+import io.github.alien2003.nightbaseline.ui.interaction.modalPanel
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
+import io.github.alien2003.nightbaseline.ui.interaction.rememberShellPressState
+import io.github.alien2003.nightbaseline.ui.interaction.sheetDrag
+import io.github.alien2003.nightbaseline.ui.interaction.sheetNestedScroll
+import io.github.alien2003.nightbaseline.ui.interaction.shellClickable
+import io.github.alien2003.nightbaseline.ui.interaction.shellPressGlow
+import io.github.alien2003.nightbaseline.ui.interaction.shellPressInput
+import io.github.alien2003.nightbaseline.ui.interaction.shellPressScale
 import io.github.alien2003.nightbaseline.ui.material.ShellMaterial
 import io.github.alien2003.nightbaseline.ui.material.extendBottom
 import io.github.alien2003.nightbaseline.ui.material.fadeOutBottom
-import io.github.alien2003.nightbaseline.ui.material.rememberShellPressState
-import io.github.alien2003.nightbaseline.ui.material.shellClickable
-import io.github.alien2003.nightbaseline.ui.material.shellPressGlow
-import io.github.alien2003.nightbaseline.ui.material.shellPressInput
-import io.github.alien2003.nightbaseline.ui.material.shellPressScale
 import io.github.alien2003.nightbaseline.ui.material.shellRim
 import io.github.alien2003.nightbaseline.ui.material.shellSurface
-import io.github.alien2003.nightbaseline.ui.motion.NbDurations
-import io.github.alien2003.nightbaseline.ui.motion.NbEasing
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
@@ -94,10 +86,6 @@ import io.github.alien2003.nightbaseline.ui.theme.ShellDimens
 import io.github.alien2003.nightbaseline.ui.theme.ShellShapes
 import io.github.alien2003.nightbaseline.ui.theme.ShellTokens
 import kotlinx.coroutines.launch
-
-/** `easing.title` (0.33, 0, 0.67, 1): the small toolbar title fading in over scroll. */
-@Suppress("MagicNumber") // Curve control points of the token.
-private val TitleEasing = CubicBezierEasing(0.33f, 0f, 0.67f, 1f)
 
 /**
  * The top bar (`coloros-conformance.md` C1–C6, measured on ColorOS Settings and Clock). It has **no background and
@@ -143,8 +131,9 @@ fun ShellTopBar(
     val total: () -> Dp = scrollOffset ?: { scroll ?: scrolledUnder }
     val blockHeight = remember { mutableStateOf(0.dp) }
     val panes = LocalPaneScrolls.current
-    // Only the material's target is derived in composition; it rests at 0 or 1 outside a 10 dp window of scroll.
-    val target by remember(total, large, motion.reduced, panes, density) {
+    // The material is a pure function of the scroll offset (ADR 0011 I11): no animation of its own, so it never lags
+    // the content. Derived in composition, it changes only inside the 10 dp window of scroll.
+    val strength by remember(total, large, motion.reduced, panes, density) {
         derivedStateOf {
             val scrolled = total()
             val ownUnder = if (large) (scrolled - blockHeight.value).coerceAtLeast(0.dp) else scrolled
@@ -154,7 +143,6 @@ fun ShellTopBar(
             if (motion.reduced) (if (fraction > 0f) 1f else 0f) else fraction
         }
     }
-    val strength by animateFloatAsState(target, motion.crossfade(), label = "topBarMaterial")
     val toolbar = if (height < ShellDimens.toolbar) height else ShellDimens.toolbar
     // Read in the title's layer only: the small title fades with the scroll without recomposing the bar.
     val smallTitle: () -> Float = {
@@ -169,7 +157,7 @@ fun ShellTopBar(
 
             else -> {
                 val fade = ShellDimens.smallTitleFadeEnd - ShellDimens.smallTitleFadeStart
-                TitleEasing.transform(((total() - ShellDimens.smallTitleFadeStart) / fade).coerceIn(0f, 1f))
+                NbEasing.Title.transform(((total() - ShellDimens.smallTitleFadeStart) / fade).coerceIn(0f, 1f))
             }
         }
     }
@@ -316,7 +304,7 @@ val LocalPaneScrolls = staticCompositionLocalOf<PaneScrolls?> { null }
 /** A saved [ScrollState] for a pane beside the main column, registered with the shell's [PaneScrolls]. */
 @Composable
 fun rememberPaneScrollState(): ScrollState {
-    val state = rememberScrollState()
+    val state = rememberNbScrollState()
     val panes = LocalPaneScrolls.current
     DisposableEffect(panes, state) {
         panes?.add(state)
@@ -343,11 +331,8 @@ fun ModalScope.GlassSheet(
 ) {
     val colors = NbTheme.colors
     val shell = ShellTokens.colors
-    val density = LocalDensity.current
     val close = stringResource(R.string.a11y_close)
     val modal = state
-    val drag = rememberDraggableState { delta -> modal.dragBy(delta) }
-    val nested = remember(modal, density) { modal.nestedScroll(density) }
     Column(
         modifier
             .windowInsetsPadding(WindowInsets.statusBars)
@@ -356,7 +341,7 @@ fun ModalScope.GlassSheet(
             .widthIn(max = NbDimens.dialogMaxWidthWide)
             .modalPanel(modal)
             .shellSurface(ShellMaterial.Sheet, ShellShapes.sheet)
-            .nestedScroll(nested)
+            .sheetNestedScroll(modal)
             .semantics {
                 paneTitle = title
                 dismiss(close) {
@@ -365,14 +350,7 @@ fun ModalScope.GlassSheet(
                 }
             },
     ) {
-        Column(
-            Modifier.draggable(
-                drag,
-                Orientation.Vertical,
-                enabled = !modal.reduced && modal.target,
-                onDragStopped = { velocity -> modal.settle(velocity, density) },
-            ),
-        ) {
+        Column(Modifier.sheetDrag(modal)) {
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -501,7 +479,7 @@ private fun DialogButton(
             .heightIn(min = NbDimens.targetMin)
             .shellPressInput(press)
             .shellPressScale(press)
-            .shellClickable(onClick = onClick, shape = NbShapes.pill),
+            .shellClickable(onClick = onClick, shape = NbShapes.pill, interactionSource = press.source),
         contentAlignment = Alignment.Center,
     ) {
         val fill =

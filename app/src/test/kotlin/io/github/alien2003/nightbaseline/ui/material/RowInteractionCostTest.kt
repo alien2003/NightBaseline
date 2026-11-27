@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.ui.components.GroupPosition
 import io.github.alien2003.nightbaseline.ui.components.NightRow
 import io.github.alien2003.nightbaseline.ui.history.HistorySamples
+import io.github.alien2003.nightbaseline.ui.interaction.PressAnimationProbe
+import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
 import io.github.alien2003.nightbaseline.ui.theme.NightBaselineTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals

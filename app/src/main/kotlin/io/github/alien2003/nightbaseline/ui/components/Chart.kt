@@ -4,15 +4,9 @@
 package io.github.alien2003.nightbaseline.ui.components
 
 import android.view.HapticFeedbackConstants
-import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,11 +43,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -77,8 +70,12 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.algo.MetricId
-import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
-import io.github.alien2003.nightbaseline.ui.material.nbClickable
+import io.github.alien2003.nightbaseline.ui.interaction.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.interaction.NbPhysics
+import io.github.alien2003.nightbaseline.ui.interaction.animateNbFloat
+import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
+import io.github.alien2003.nightbaseline.ui.interaction.nbKeys
+import io.github.alien2003.nightbaseline.ui.interaction.nbScrub
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.ChartPeriod
 import io.github.alien2003.nightbaseline.ui.model.ChartPointUi
@@ -108,9 +105,6 @@ import kotlin.math.floor
 import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.roundToInt
-
-/** The leading edge of the period thumb runs this much stiffer than `spring.selection` (247): a stretch toward the target. */
-private const val THUMB_LEAD_STIFFNESS = 600f
 
 /**
  * The 7 / 30 / 90 nights segmented control (`screens.md` 4, conformance K3): a solid neutral pill track (40 dp visual
@@ -156,11 +150,10 @@ fun PeriodSelector(
                 forward = start > lastStart
                 lastStart = start
             }
-            val lead: FiniteAnimationSpec<Float> = if (motion.reduced) snap() else spring(stiffness = THUMB_LEAD_STIFFNESS)
-            val trail = motion.selection<Float>()
+            // The edge toward the new choice runs on SelectLead, the trailing one on Select (registry, ADR 0011).
             // The animated edges are read only while drawing: the slide redraws the thumb, it never recomposes.
-            val left = animateFloatAsState(start, if (forward) trail else lead, label = "periodStart")
-            val right = animateFloatAsState(end, if (forward) lead else trail, label = "periodEnd")
+            val left = animateNbFloat(start, if (forward) NbPhysics.Select else NbPhysics.SelectLead, label = "periodStart")
+            val right = animateNbFloat(end, if (forward) NbPhysics.SelectLead else NbPhysics.Select, label = "periodEnd")
             Spacer(
                 Modifier.matchParentSize().drawWithCache {
                     val top = (trackInset + inset).toPx()
@@ -395,8 +388,8 @@ fun TrendChart(
                 }.then(
                     if (interactive) {
                         Modifier
-                            .onPreviewKeyEvent { event ->
-                                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            .nbKeys { event ->
+                                if (event.type != KeyEventType.KeyDown) return@nbKeys false
                                 when (event.key) {
                                     Key.DirectionLeft -> step(if (rtl) 1 else -1).let { true }
                                     Key.DirectionRight -> step(if (rtl) -1 else 1).let { true }
@@ -420,21 +413,8 @@ fun TrendChart(
                     .clearAndSetSemantics {}
                     .then(
                         if (interactive) {
-                            Modifier
-                                .pointerInput(points.size, rtl) {
-                                    detectTapGestures { offset ->
-                                        currentSelect(indexAt(offset.x, size.width.toFloat(), points.size, rtl, markerExtent))
-                                    }
-                                }.pointerInput(points.size, rtl) {
-                                    var last: Int? = null
-                                    detectHorizontalDragGestures(onDragStart = { last = currentSelected }) { change, _ ->
-                                        val index = indexAt(change.position.x, size.width.toFloat(), points.size, rtl, markerExtent)
-                                        // A light tick for every night the finger crosses (conformance M4, public constant).
-                                        if (index != last) view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                        last = index
-                                        currentSelect(index)
-                                    }
-                                }
+                            // Tap and scrub on the framework's rule A (a vertical scroll keeps a diagonal drag).
+                            Modifier.chartScrub(points.size, rtl, markerExtent, view, { currentSelected }, { currentSelect(it) })
                         } else {
                             Modifier
                         },
@@ -942,4 +922,31 @@ private fun DrawScope.drawDateAxis(
         val x = (plot.x(i) - label.size.width / 2f).coerceIn(0f, size.width - label.size.width)
         drawText(label, topLeft = Offset(x, size.height - label.size.height))
     }
+}
+
+/** Chart tap and scrub (`coloros-conformance.md` M4): a light tick for every night the finger crosses. */
+@Suppress("LongParameterList") // The chart's geometry and its two selection callbacks.
+private fun Modifier.chartScrub(
+    count: Int,
+    rtl: Boolean,
+    markerExtent: Float,
+    view: android.view.View,
+    selected: () -> Int?,
+    select: (Int) -> Unit,
+): Modifier {
+    var width = 0f
+    var last: Int? = null
+    return this
+        .onSizeChanged { width = it.width.toFloat() }
+        .nbScrub(
+            key = count to rtl,
+            onTap = { offset -> select(indexAt(offset.x, width, count, rtl, markerExtent)) },
+            onScrubStart = { last = selected() },
+            onScrub = { position ->
+                val index = indexAt(position.x, width, count, rtl, markerExtent)
+                if (index != last) view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                last = index
+                select(index)
+            },
+        )
 }

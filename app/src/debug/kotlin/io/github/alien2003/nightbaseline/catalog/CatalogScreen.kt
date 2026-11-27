@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -36,9 +34,11 @@ import io.github.alien2003.nightbaseline.ui.components.NbChipTab
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NbText
+import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
+import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.material.EffectsDecision
 import io.github.alien2003.nightbaseline.ui.material.grayscale
-import io.github.alien2003.nightbaseline.ui.material.nbClickable
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
@@ -85,7 +85,7 @@ fun CatalogScreen(onClose: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .verticalScroll(rememberScrollState()),
+                .nbVerticalScroll(rememberNbScrollState()),
         ) {
             Column(Modifier.padding(NbDimens.gutterCompact), verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
                 NbIconButton(NbIcons.Back, stringResource(R.string.a11y_back), onClose)

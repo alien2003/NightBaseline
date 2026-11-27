@@ -8,13 +8,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.interaction.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.interaction.rememberShellPressState
+import io.github.alien2003.nightbaseline.ui.interaction.shellClickable
+import io.github.alien2003.nightbaseline.ui.interaction.shellPressGlow
+import io.github.alien2003.nightbaseline.ui.interaction.shellPressInput
+import io.github.alien2003.nightbaseline.ui.interaction.shellPressScale
 import io.github.alien2003.nightbaseline.ui.material.convexSurface
-import io.github.alien2003.nightbaseline.ui.material.rememberShellPressState
-import io.github.alien2003.nightbaseline.ui.material.shellClickable
-import io.github.alien2003.nightbaseline.ui.material.shellPressGlow
-import io.github.alien2003.nightbaseline.ui.material.shellPressInput
-import io.github.alien2003.nightbaseline.ui.material.shellPressScale
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.ShellDimens
@@ -40,8 +40,13 @@ fun ShellRoundButton(
         modifier
             .size(NbDimens.targetMin)
             .shellPressInput(press)
-            .shellClickable(onClick = onClick, shape = NbShapes.circle, visualInset = inset, forced = forced)
-            .semantics { this.contentDescription = contentDescription },
+            .shellClickable(
+                onClick = onClick,
+                shape = NbShapes.circle,
+                visualInset = inset,
+                forced = forced,
+                interactionSource = press.source,
+            ).semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
         Box(

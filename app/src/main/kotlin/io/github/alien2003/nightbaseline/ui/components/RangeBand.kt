@@ -3,7 +3,6 @@
 
 package io.github.alien2003.nightbaseline.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +21,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
+import io.github.alien2003.nightbaseline.ui.interaction.NbPhysics
+import io.github.alien2003.nightbaseline.ui.interaction.animateNbFloat
 import io.github.alien2003.nightbaseline.ui.model.MetricState
 import io.github.alien2003.nightbaseline.ui.model.RangeUi
 import io.github.alien2003.nightbaseline.ui.theme.NbColors
@@ -65,7 +66,7 @@ fun RangeBand(
     val colors = NbTheme.colors
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val target = if (range != null && value != null) bandPosition(range, value) else null
-    val position by animateFloatAsState(target?.first ?: 0.5f, NbTheme.motion.data(), label = "marker")
+    val position by animateNbFloat(target?.first ?: 0.5f, NbPhysics.Data, label = "marker")
     Canvas(modifier.fillMaxWidth().height(height).clearAndSetSemantics {}) {
         drawRoundRect(colors.data.bandTrack, cornerRadius = CornerRadius(size.height / 2))
         if (range == null) {

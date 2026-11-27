@@ -35,7 +35,7 @@ import io.github.alien2003.nightbaseline.ui.components.NbRadio
 import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.SettingsRow
 import io.github.alien2003.nightbaseline.ui.components.SettingsTrailing
-import io.github.alien2003.nightbaseline.ui.material.nbClickable
+import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
 import io.github.alien2003.nightbaseline.ui.theme.NbControlDimens

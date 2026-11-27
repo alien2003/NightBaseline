@@ -1,4 +1,4 @@
-package io.github.alien2003.nightbaseline.ui.material
+package io.github.alien2003.nightbaseline.ui.interaction
 
 import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.Animatable
@@ -14,7 +14,11 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -59,17 +63,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.eventFlow
-import io.github.alien2003.nightbaseline.ui.motion.NB_PRESS_SCALE_LARGE
-import io.github.alien2003.nightbaseline.ui.motion.NB_PRESS_SCALE_SMALL
-import io.github.alien2003.nightbaseline.ui.motion.NbMotionScheme
-import io.github.alien2003.nightbaseline.ui.motion.NbSprings
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -104,12 +106,12 @@ fun nbPressScale(
     size: IntSize,
     density: Density,
 ): Float {
-    if (size.width <= 0 || size.height <= 0) return NB_PRESS_SCALE_SMALL
+    if (size.width <= 0 || size.height <= 0) return NbPhysics.PRESS_SCALE_SMALL
     val side = with(density) { sqrt(size.width.toFloat() * size.height).toDp() }
     val bySize = ((side - SMALL_SIDE) / (LARGE_SIDE - SMALL_SIDE)).coerceIn(0f, 1f)
     val aspect = max(size.width, size.height).toFloat() / min(size.width, size.height)
     val byAspect = ((aspect - 1f) / (WIDE_ASPECT - 1f)).coerceIn(0f, 1f)
-    return NB_PRESS_SCALE_SMALL + (NB_PRESS_SCALE_LARGE - NB_PRESS_SCALE_SMALL) * max(bySize, byAspect)
+    return NbPhysics.PRESS_SCALE_SMALL + (NbPhysics.PRESS_SCALE_LARGE - NbPhysics.PRESS_SCALE_SMALL) * max(bySize, byAspect)
 }
 
 private val SMALL_SIDE = 40.dp
@@ -316,7 +318,7 @@ private fun CoroutineScope.retarget(
 
 private data class PressScaleElement(
     val source: InteractionSource,
-    val motion: NbMotionScheme,
+    val motion: NbMotionConfig,
 ) : ModifierNodeElement<PressScaleNode>() {
     override fun create(): PressScaleNode = PressScaleNode(source, motion)
 
@@ -334,7 +336,7 @@ private data class PressScaleElement(
  */
 private class PressScaleNode(
     private var source: InteractionSource,
-    private var motion: NbMotionScheme,
+    private var motion: NbMotionConfig,
 ) : Modifier.Node(),
     LayoutModifierNode,
     CompositionLocalConsumerModifierNode {
@@ -370,7 +372,7 @@ private class PressScaleNode(
 
     fun update(
         source: InteractionSource,
-        motion: NbMotionScheme,
+        motion: NbMotionConfig,
     ) {
         this.motion = motion
         if (source != this.source) {
@@ -431,7 +433,7 @@ private data class PressFeedbackElement(
     val source: InteractionSource,
     val shape: Shape,
     val look: PressLook,
-    val motion: NbMotionScheme,
+    val motion: NbMotionConfig,
     val onGlass: Boolean,
     val row: Boolean,
     val glow: Boolean,
@@ -737,16 +739,18 @@ internal class OutlineCache {
  */
 class NbPressIndication(
     private val color: Color,
+    private val reduced: Boolean = false,
 ) : IndicationNodeFactory {
-    override fun create(interactionSource: InteractionSource): DelegatableNode = Node(interactionSource, color)
+    override fun create(interactionSource: InteractionSource): DelegatableNode = Node(interactionSource, color, reduced)
 
-    override fun equals(other: Any?): Boolean = other is NbPressIndication && other.color == color
+    override fun equals(other: Any?): Boolean = other is NbPressIndication && other.color == color && other.reduced == reduced
 
-    override fun hashCode(): Int = color.hashCode()
+    override fun hashCode(): Int = 31 * color.hashCode() + reduced.hashCode()
 
     private class Node(
         private val source: InteractionSource,
         private val color: Color,
+        private val reduced: Boolean,
     ) : Modifier.Node(),
         DrawModifierNode,
         CompositionLocalConsumerModifierNode {
@@ -804,8 +808,8 @@ class NbPressIndication(
                     level = it
                     invalidateDraw()
                 }
-            val spec = if (next > anim.value) NbSprings.HighlightIn else NbSprings.HighlightOut
-            levelJob = coroutineScope.retarget(levelJob, anim, next, if (snap) null else spec.spec())
+            val spec = if (next > anim.value) NbPhysics.HighlightIn else NbPhysics.HighlightOut
+            levelJob = coroutineScope.retarget(levelJob, anim, next, if (snap || reduced) null else spec.specOf())
         }
 
         override fun onDetach() {
@@ -825,4 +829,57 @@ class NbPressIndication(
             drawContent()
         }
     }
+}
+
+/** State of the finger-following light of one button. */
+class NbTouchLight internal constructor() {
+    /** Where the finger went down, null before the first press. */
+    var center: Offset? by mutableStateOf(null)
+        internal set
+    internal val animatable = Animatable(0f)
+    internal var forced: Boolean = false
+
+    /** Strength of the light now (snapshot state: read it while drawing). */
+    val alpha: Float get() = if (forced) 1f else animatable.value
+}
+
+/**
+ * The touch light of the primary button (`coloros17-glass.md` 4.4), driven by the press interactions of [source]:
+ * glow in 110 ms, out 480 ms, tracked per press so the end of one press never puts out another finger's light.
+ */
+@Composable
+fun rememberNbTouchLight(
+    source: MutableInteractionSource,
+    forced: Boolean,
+): NbTouchLight {
+    val motion = LocalNbMotion.current
+    val light = remember { NbTouchLight() }
+    light.forced = forced
+    LaunchedEffect(source, motion) {
+        // Tracked per press, and the latest change wins: a release never waits behind the light's fade-in, and the
+        // end of one press does not put out the light of another finger.
+        val active = mutableSetOf<PressInteraction.Press>()
+        source.interactions.filterIsInstance<PressInteraction>().collectLatest { interaction ->
+            when (interaction) {
+                is PressInteraction.Press -> {
+                    active += interaction
+                    light.center = interaction.pressPosition
+                }
+
+                is PressInteraction.Release -> {
+                    active -= interaction.press
+                }
+
+                is PressInteraction.Cancel -> {
+                    active -= interaction.press
+                }
+            }
+            if (active.isEmpty()) {
+                light.animatable.animateTo(0f, motion.glowOut())
+            } else {
+                motion.glowIn<Float>()?.let { light.animatable.animateTo(1f, it) }
+            }
+        }
+    }
+    return light
 }

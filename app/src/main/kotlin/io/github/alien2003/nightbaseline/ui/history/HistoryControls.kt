@@ -44,7 +44,7 @@ import io.github.alien2003.nightbaseline.ui.components.SectionHeader
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.cardTag
 import io.github.alien2003.nightbaseline.ui.components.tone
-import io.github.alien2003.nightbaseline.ui.material.nbClickable
+import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.NightGlyph
 import io.github.alien2003.nightbaseline.ui.model.NightState

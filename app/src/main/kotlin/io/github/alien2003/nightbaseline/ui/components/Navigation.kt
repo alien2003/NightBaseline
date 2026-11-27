@@ -1,8 +1,5 @@
 package io.github.alien2003.nightbaseline.ui.components
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,17 +29,19 @@ import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
-import io.github.alien2003.nightbaseline.ui.material.SHELL_PRESS_SCALE_LARGE
+import io.github.alien2003.nightbaseline.ui.interaction.FollowPresses
+import io.github.alien2003.nightbaseline.ui.interaction.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.interaction.NbCrossfade
+import io.github.alien2003.nightbaseline.ui.interaction.NbEasing
+import io.github.alien2003.nightbaseline.ui.interaction.SHELL_PRESS_SCALE_LARGE
+import io.github.alien2003.nightbaseline.ui.interaction.ShellPressState
+import io.github.alien2003.nightbaseline.ui.interaction.rememberShellPressState
+import io.github.alien2003.nightbaseline.ui.interaction.shellClickable
+import io.github.alien2003.nightbaseline.ui.interaction.shellPressGlow
+import io.github.alien2003.nightbaseline.ui.interaction.shellPressInput
+import io.github.alien2003.nightbaseline.ui.interaction.shellPressScale
 import io.github.alien2003.nightbaseline.ui.material.ShellMaterial
-import io.github.alien2003.nightbaseline.ui.material.rememberShellPressState
-import io.github.alien2003.nightbaseline.ui.material.shellClickable
-import io.github.alien2003.nightbaseline.ui.material.shellPressGlow
-import io.github.alien2003.nightbaseline.ui.material.shellPressInput
-import io.github.alien2003.nightbaseline.ui.material.shellPressScale
 import io.github.alien2003.nightbaseline.ui.material.shellSurface
-import io.github.alien2003.nightbaseline.ui.motion.NbDurations
-import io.github.alien2003.nightbaseline.ui.motion.NbEasing
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
@@ -88,6 +87,7 @@ fun FloatingNavBar(
                     destination = destination,
                     selected = destination == selected,
                     onClick = { onSelect(destination) },
+                    press = press,
                     showLabel = true,
                     focused = forced?.takeIf { it.first == destination }?.second == ForcedInteraction.Focus,
                     modifier = Modifier.sizeIn(minWidth = ShellDimens.barItemWidth, minHeight = ShellDimens.barItemHeight),
@@ -131,6 +131,7 @@ fun FloatingNavRail(
                 destination = destination,
                 selected = destination == selected,
                 onClick = { onSelect(destination) },
+                press = press,
                 showLabel = showLabels,
                 focused = forced?.takeIf { it.first == destination }?.second == ForcedInteraction.Focus,
                 modifier =
@@ -150,17 +151,19 @@ private fun NavItem(
     destination: TopLevel,
     selected: Boolean,
     onClick: () -> Unit,
+    press: ShellPressState,
     showLabel: Boolean,
     focused: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val shell = ShellTokens.colors
-    val motion = NbTheme.motion
     val label = stringResource(destination.label)
     val color = if (selected) shell.navSelected else shell.navUnselected
     // Labels wrap only between words (no hyphenation): the bar gives every item at least its longest word.
     val style = ShellTokens.type.navLabel.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, hyphens = Hyphens.None)
     val source = remember { MutableInteractionSource() }
+    // A press on an item is a press on the whole bar or rail (one press node, ADR 0011).
+    FollowPresses(press, source, SHELL_PRESS_SCALE_LARGE)
     Column(
         modifier
             .shellClickable(
@@ -179,12 +182,8 @@ private fun NavItem(
         verticalArrangement = if (showLabel) Arrangement.Top else Arrangement.Center,
     ) {
         if (showLabel) Spacer(Modifier.height(ShellDimens.barItemTop))
-        // Outline -> filled icon: a 100 ms crossfade (snap under reduced motion).
-        Crossfade(
-            targetState = selected,
-            animationSpec = if (motion.reduced) snap() else tween(NbDurations.MICRO, easing = NbEasing.Standard),
-            label = "navIcon",
-        ) { filled ->
+        // Outline -> filled icon: a crossfade on the Quick spring (snap under reduced motion).
+        NbCrossfade(selected) { filled ->
             NbIcon(
                 if (filled) destination.selectedIcon else destination.icon,
                 contentDescription = null,

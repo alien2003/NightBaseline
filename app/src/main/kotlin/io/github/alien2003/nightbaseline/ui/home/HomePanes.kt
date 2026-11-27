@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,7 +42,10 @@ import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.StatsRow
 import io.github.alien2003.nightbaseline.ui.components.TrendChart
 import io.github.alien2003.nightbaseline.ui.components.statusGlyph
-import io.github.alien2003.nightbaseline.ui.material.nbClickable
+import io.github.alien2003.nightbaseline.ui.interaction.NbReveal
+import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
+import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.model.BannerKind
 import io.github.alien2003.nightbaseline.ui.model.ChartPeriod
 import io.github.alien2003.nightbaseline.ui.model.MetricSeriesUi
@@ -91,14 +92,14 @@ internal fun GlanceHome(
     actions: HomeActions,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
-    scroll: ScrollState = rememberScrollState(),
+    scroll: ScrollState = rememberNbScrollState(),
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .nbVerticalScroll(scroll)
             .padding(padding)
             .padding(WindowInsets.statusBars.asPaddingValues())
             .padding(horizontal = NbDimens.gutterGlance, vertical = NbSpace.s3),
@@ -114,7 +115,7 @@ internal fun GlanceHome(
             )
             ShellRoundButton(NbIcons.MoreVertical, stringResource(R.string.action_more), onClick = actions.onMore)
         }
-        banner?.let {
+        NbReveal(banner) {
             InlineBanner(
                 it,
                 source,

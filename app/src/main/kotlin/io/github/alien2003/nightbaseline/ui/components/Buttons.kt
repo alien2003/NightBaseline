@@ -1,20 +1,15 @@
 package io.github.alien2003.nightbaseline.ui.components
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -31,8 +26,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import io.github.alien2003.nightbaseline.ui.material.ForcedInteraction
-import io.github.alien2003.nightbaseline.ui.material.nbClickable
+import io.github.alien2003.nightbaseline.ui.interaction.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbTouchLight
 import io.github.alien2003.nightbaseline.ui.theme.NbControlDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbControlType
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
@@ -40,8 +36,6 @@ import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import io.github.alien2003.nightbaseline.ui.theme.controls
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.filterIsInstance
 
 /** Disabled buttons keep their fill and label, at this alpha (`coloros-conformance.md` L4). */
 private const val DISABLED_ALPHA = 0.3f
@@ -72,7 +66,7 @@ fun PrimaryButton(
 ) {
     val controls = NbTheme.controls
     val source = remember { MutableInteractionSource() }
-    val light = touchLight(source, forced == ForcedInteraction.Pressed)
+    val light = rememberNbTouchLight(source, forced == ForcedInteraction.Pressed)
     val shape = NbShapes.pill
     Box(
         modifier =
@@ -119,51 +113,6 @@ fun PrimaryButton(
     ) {
         NbText(text, style = NbControlType.button, color = controls.onFill, textAlign = TextAlign.Center)
     }
-}
-
-/** State of the finger-following light of one button. */
-private class TouchLight {
-    var center: Offset? by mutableStateOf(null)
-    val animatable = Animatable(0f)
-    var forced: Boolean = false
-    val alpha: Float get() = if (forced) 1f else animatable.value
-}
-
-@Composable
-private fun touchLight(
-    source: MutableInteractionSource,
-    forced: Boolean,
-): TouchLight {
-    val motion = NbTheme.motion
-    val light = remember { TouchLight() }
-    light.forced = forced
-    LaunchedEffect(source, motion) {
-        // Tracked per press, and the latest change wins: a release never waits behind the light's fade-in, and the
-        // end of one press does not put out the light of another finger.
-        val active = mutableSetOf<PressInteraction.Press>()
-        source.interactions.filterIsInstance<PressInteraction>().collectLatest { interaction ->
-            when (interaction) {
-                is PressInteraction.Press -> {
-                    active += interaction
-                    light.center = interaction.pressPosition
-                }
-
-                is PressInteraction.Release -> {
-                    active -= interaction.press
-                }
-
-                is PressInteraction.Cancel -> {
-                    active -= interaction.press
-                }
-            }
-            if (active.isEmpty()) {
-                light.animatable.animateTo(0f, motion.glowOut())
-            } else {
-                motion.glowIn<Float>()?.let { light.animatable.animateTo(1f, it) }
-            }
-        }
-    }
-    return light
 }
 
 /**

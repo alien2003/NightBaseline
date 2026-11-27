@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +38,8 @@ import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
+import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
@@ -72,7 +72,7 @@ fun LearningScreen(
     modifier: Modifier = Modifier,
     actions: LearningActions = LearningActions(),
     onSelectTab: (TopLevel) -> Unit = {},
-    scroll: ScrollState = rememberScrollState(),
+    scroll: ScrollState = rememberNbScrollState(),
 ) {
     val text = rememberUiText()
     ShellPage(
@@ -119,7 +119,7 @@ private fun SinglePaneLearning(
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .nbVerticalScroll(scroll)
             .padding(padding)
             .padding(horizontal = layout.gutter),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -173,7 +173,7 @@ private fun TwoPaneLearning(
             Modifier
                 .width(listWidth + layout.gutter)
                 .fillMaxHeight()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .padding(start = layout.gutter)
                 .then(vertical),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
@@ -192,7 +192,7 @@ private fun TwoPaneLearning(
                 .padding(end = layout.gutter + padding.calculateEndPadding(direction)),
         ) {
             val columns = if (maxWidth >= TwoColumnMin) 2 else 1
-            Column(Modifier.fillMaxSize().verticalScroll(rememberPaneScrollState()).then(vertical)) {
+            Column(Modifier.fillMaxSize().nbVerticalScroll(rememberPaneScrollState()).then(vertical)) {
                 AlreadyVisible(state, columns, actions)
             }
         }
@@ -240,7 +240,7 @@ private fun TabletopLearning(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .verticalScroll(scroll)
+                .nbVerticalScroll(scroll)
                 .then(horizontal)
                 .padding(bottom = padding.calculateBottomPadding()),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -275,7 +275,7 @@ private fun GlanceLearning(
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .nbVerticalScroll(scroll)
             .padding(padding)
             .padding(horizontal = NbDimens.gutterGlance),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
