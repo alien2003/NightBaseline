@@ -55,6 +55,7 @@ class MotionTokensDocTest {
                 "PRESS_SCALE_LARGE" to NbPhysics.PRESS_SCALE_LARGE,
                 "OVERSCROLL_FOLLOW" to NbPhysics.OVERSCROLL_FOLLOW,
                 "OVERSCROLL_MAX_DP" to NbPhysics.OVERSCROLL_MAX_DP,
+                "STEP_SWIPE_DP" to NbPhysics.STEP_SWIPE_DP,
             )
         assertEquals(registry.keys, documented.keys)
         registry.forEach { (name, value) -> assertEquals(value, documented.getValue(name), 1e-6f, name) }

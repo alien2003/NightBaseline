@@ -119,15 +119,26 @@ class PredictiveBackTest {
 
     private fun startGesture(edge: Int = BackEventCompat.EDGE_LEFT) {
         frames.clear()
-        back.dispatchOnBackStarted(BackEventCompat(0f, TOUCH_Y, 0f, edge))
+        back.dispatchOnBackStarted(BackEventCompat(touchAt(0f, edge), TOUCH_Y, 0f, edge))
         idle()
     }
+
+    /** Where the finger is at [fraction] of the width: from the left edge rightwards, from the right edge leftwards. */
+    private fun touchAt(
+        fraction: Float,
+        edge: Int,
+    ): Float = if (edge == BackEventCompat.EDGE_RIGHT) widthPx * (1f - fraction) else fraction * widthPx
+
+    /** The window width in px (the pages host fills it). */
+    private val widthPx: Float get() =
+        activity.resources.displayMetrics.widthPixels
+            .toFloat()
 
     private fun progress(
         fraction: Float,
         edge: Int = BackEventCompat.EDGE_LEFT,
     ) {
-        back.dispatchOnBackProgressed(BackEventCompat(fraction * WIDTH_PX, TOUCH_Y, fraction, edge))
+        back.dispatchOnBackProgressed(BackEventCompat(touchAt(fraction, edge), TOUCH_Y, fraction, edge))
         idle()
     }
 
@@ -296,7 +307,7 @@ class PredictiveBackTest {
         compose.mainClock.advanceTimeByFrame()
         val resumed = last("pages")!!.p
         assertEquals("no jump: the gesture starts where the page is", during, resumed, 0.05f)
-        back.dispatchOnBackProgressed(BackEventCompat(1080f, TOUCH_Y, 1f, BackEventCompat.EDGE_LEFT))
+        back.dispatchOnBackProgressed(BackEventCompat(widthPx, TOUCH_Y, 1f, BackEventCompat.EDGE_LEFT))
         compose.mainClock.advanceTimeByFrame()
         assertEquals("the end of the gesture is the end of the pop", 1f, last("pages")!!.p, 1e-4f)
         back.onBackPressed()
@@ -478,7 +489,97 @@ class PredictiveBackTest {
         }
     }
 
+    @Test
+    fun `the page follows the touch position, not the platform's shaped progress`() {
+        launch()
+        val home = nav.currentBackStackEntry!!.id
+        val night = openNight()
+        startGesture()
+        // Android 14+ shapes the progress (non-linear, thresholds, smoothing): here progress = share^2 while the
+        // finger moves linearly. The page must stay under the finger (review 3: it used to follow the progress).
+        for (share in floatArrayOf(0.1f, 0.3f, 0.5f, 0.7f)) {
+            back.dispatchOnBackProgressed(BackEventCompat(share * widthPx, TOUCH_Y, share * share, BackEventCompat.EDGE_LEFT))
+            idle()
+            assertUnderFinger("pages", night, home, share)
+        }
+        cancel()
+    }
+
+    @Test
+    fun `the page below is composed ahead, so the first gesture frame composes no page`() {
+        launch()
+        openNight()
+        idle()
+        val home = count("HomeScreen")
+        assertTrue("Home is composed while Night is on top (parked below it)", home > 0)
+        startGesture()
+        progress(0.05f)
+        assertEquals("the gesture's first frames compose no page (V5, report a)", home, count("HomeScreen"))
+        cancel()
+    }
+
+    @Test
+    fun `a released gesture continues with the finger's velocity (no restart from rest)`() {
+        launch()
+        openNight()
+        idle()
+        frames.clear()
+        compose.mainClock.autoAdvance = false
+        back.dispatchOnBackStarted(BackEventCompat(0f, TOUCH_Y, 0f, BackEventCompat.EDGE_LEFT, compose.mainClock.currentTime))
+        // A fast swipe: 30 px per frame (about 1900 px/s), ten frames.
+        for (i in 1..GESTURE_FRAMES) {
+            val x = i * SWIPE_PX_PER_FRAME
+            back.dispatchOnBackProgressed(
+                BackEventCompat(x, TOUCH_Y, x / widthPx, BackEventCompat.EDGE_LEFT, compose.mainClock.currentTime),
+            )
+            // The snapshot changes are applied on the main looper; then one frame is drawn.
+            shadowOf(Looper.getMainLooper()).idle()
+            compose.mainClock.advanceTimeByFrame()
+        }
+        val gesture = frames.filter { it.host == "pages" && it.gesture }.map { it.p }.distinct()
+        assertTrue("gesture frames: $gesture ${frames.map { "${it.host} ${it.gesture} ${it.p}" }}", gesture.size >= 3)
+        val pRelease = gesture.last()
+        // The finger's velocity in p per second at the release (the last two samples).
+        val vFinger = (gesture[gesture.size - 1] - gesture[gesture.size - 2]) / (FRAME_MS / 1000f)
+        frames.clear()
+        back.onBackPressed()
+        repeat(4) {
+            shadowOf(Looper.getMainLooper()).idle()
+            compose.mainClock.advanceTimeByFrame()
+        }
+        compose.mainClock.autoAdvance = true
+        val after = frames.filter { it.host == "pages" && !it.gesture }.map { it.p }.distinct()
+        assertTrue("frames after the release: $after", after.size >= 3)
+        // The release frame draws the release p (R0: continuous), the next one follows the spring from (p, v).
+        assertEquals("the release frame is where the finger left the page", pRelease, after[0], 2e-3f)
+        val step = after[1] - after[0]
+        val fromRest = springStep(pRelease, 0f)
+        val withVelocity = springStep(pRelease, vFinger)
+        assertTrue("the finger moved fast ($vFinger p/s)", withVelocity - fromRest > 5e-3f)
+        assertEquals("the first spring frame continues with the finger's velocity", withVelocity, step, (withVelocity - fromRest) / 3f)
+        idle()
+    }
+
+    /** The step of the Nav spring towards 1 in one frame from ([p], [v] p/s): its exact closed form (overdamped). */
+    private fun springStep(
+        p: Float,
+        v: Float,
+    ): Float {
+        val z = NbPhysics.Nav.damping.toDouble()
+        val w = kotlin.math.sqrt(NbPhysics.Nav.stiffness.toDouble())
+        val r1 = -w * (z - kotlin.math.sqrt(z * z - 1))
+        val r2 = -w * (z + kotlin.math.sqrt(z * z - 1))
+        val x0 = p - 1.0
+        val a = (v - r2 * x0) / (r1 - r2)
+        val b = x0 - a
+        val t = FRAME_MS / 1000.0
+        return ((a * kotlin.math.exp(r1 * t) + b * kotlin.math.exp(r2 * t)) - x0).toFloat()
+    }
+
     private companion object {
+        const val FRAME_MS = 16L
+        const val GESTURE_FRAMES = 10
+        const val SWIPE_PX_PER_FRAME = 30f
         const val PX = 0.75f
         const val LICENSE = "Jetpack Compose and Material 3"
         const val TOUCH_Y = 900f

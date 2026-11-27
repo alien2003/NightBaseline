@@ -98,6 +98,15 @@ class InteractionBoundaryTest {
                 "Modifier.nestedScroll(connection)",
                 "LocalIndication provides x",
                 "import androidx.compose.material3.Button",
+                // Review 9: the gaps of the first round.
+                "import androidx.compose.ui.input.key.Key",
+                "awaitPointerEvent(PointerEventPass.Final)",
+                "val t = VelocityTracker1D(false)",
+                "state.animateScrollToItem(0)",
+                "state.scrollTo(0)",
+                "Modifier.indication(source, ripple)",
+                "BackEventCompat(0f, 0f, 0f, 0)",
+                "NbSpring(1f, 300f)",
             )
         samples.forEach { sample -> assertTrue(patterns.any { it.containsMatchIn(sample) }, "not caught: $sample") }
         // And the framework's own entry points are not.

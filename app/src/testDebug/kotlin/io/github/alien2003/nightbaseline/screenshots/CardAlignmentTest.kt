@@ -195,6 +195,8 @@ class CardAlignmentTest(
             compose
                 .onAllNodes(hasTestTag(CARD_TAG), useUnmergedTree = true)
                 .fetchSemanticsNodes()
+                // On screen only: the page below the top of a stack is composed and measured ahead but not placed.
+                .filter { it.layoutInfo.isPlaced }
                 .map { it.boundsInRoot.let { r -> Rect(r.left / density, r.top / density, r.right / density, r.bottom / density) } }
                 .filter { it.width > 1f && it.height > 1f }
         // Cards drawn inside another card (a summary inside a preview card, ...) are not part of the column.

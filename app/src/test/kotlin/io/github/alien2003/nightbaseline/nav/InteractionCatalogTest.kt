@@ -7,6 +7,8 @@ import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -159,6 +161,11 @@ class InteractionCatalogTest {
             Trigger("back gesture on a page", "pages", NbKind.Page, setup = { openNight() }) { gestureBack() },
             Trigger("previous night", "night", NbKind.Pager, setup = { openNight() }) { tapDescription("Previous night") },
             Trigger("next night", "night", NbKind.Pager, setup = { openNight() }) { tapDescription("Next night") },
+            // Without focus (after a touch): the activity offers the key to the framework's key path (minor: these
+            // keys did not step nights before).
+            Trigger("DPAD Left", "night", NbKind.Pager, setup = { openNight() }) { key(KeyEvent.KEYCODE_DPAD_LEFT) },
+            Trigger("DPAD Right", "night", NbKind.Pager, setup = { openNight() }) { key(KeyEvent.KEYCODE_DPAD_RIGHT) },
+            Trigger("Page Down", "night", NbKind.Pager, setup = { openNight() }) { key(KeyEvent.KEYCODE_PAGE_DOWN) },
             Trigger("settings sub-page", "settings", NbKind.Page, setup = {
                 compose.onAllNodesWithText("Settings")[0].performClick()
             }) { tapText("Balanced") },
@@ -224,12 +231,28 @@ class InteractionCatalogTest {
         println("I1: section change ${tab[0].size} frames, pop ${pop[0].size} frames, identical across triggers")
     }
 
+    /** What the screen shows: the top entry, the section and every text on screen (a sheet, a night, a page). */
+    private fun shownState(): String =
+        nav.currentBackStackEntry?.id + "/" + nav.currentBackStackEntry?.topLevelTab() + "/" +
+            compose
+                .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text))
+                .fetchSemanticsNodes()
+                .joinToString("|") { it.config[SemanticsProperties.Text].joinToString() }
+
     @Test
-    fun `I8 - under reduced motion every trigger snaps`() {
+    fun `I8 - under reduced motion every trigger snaps, and still changes what is shown`() {
         for (trigger in catalog) {
             launch(reduced = true)
-            val seen = run(trigger)
+            trigger.setup(this)
+            idle()
+            val before = shownState()
+            frames.clear()
+            trigger.action(this)
+            idle()
+            val seen = frames.filter { it.host == trigger.host }
             assertTrue("${trigger.name}: no frame in between", seen.none { it.p > 0f && it.p < 1f })
+            // Review 8: an empty frame list passed even when the trigger did nothing.
+            assertTrue("${trigger.name}: the trigger changed what is shown", shownState() != before)
         }
     }
 }
