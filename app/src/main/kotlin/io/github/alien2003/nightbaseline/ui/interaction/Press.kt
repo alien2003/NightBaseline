@@ -37,6 +37,8 @@ import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
@@ -53,8 +55,12 @@ import androidx.compose.ui.node.invalidateLayer
 import androidx.compose.ui.node.requireDensity
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
@@ -118,6 +124,94 @@ private val SMALL_SIDE = 40.dp
 private val LARGE_SIDE = 150.dp
 private const val WIDE_ASPECT = 4f
 private const val WIDE_PRESS_THRESHOLD = 0.97f
+
+/**
+ * The one press model of the app (ADR 0011): every pressable element (a [nbClickable], a shell control, the primary
+ * button's light, the default indication) takes its press motion from here, so the same press of the same size moves
+ * the same way everywhere, frame by frame (tested in `PressModelTest`):
+ *
+ * - scale: to [nbPressScale] of the element on [NbPhysics.PressIn] (on [NbPhysics.PressInWide] for targets at 0.97
+ *   and above: tiles, the bar, full-width buttons), back on [NbPhysics.PressOut] with the press velocity carried over,
+ *   never above 1.0 (the spring ends at its first return to 1.0, so it never dips again);
+ * - light: in on the glow tween ([NbMotionConfig.glowIn]), out on [NbMotionConfig.glowOut];
+ * - highlight: [NbMotionConfig.stateLayer] in, [NbMotionConfig.stateLayerOut] out;
+ * - a tap is a press whose finger stays within the touch slop: a move beyond it cancels the press ([nbTapSlop]), so a
+ *   swipe that starts on an element never becomes its click;
+ * - under reduced motion nothing scales and the light is static.
+ */
+internal object NbPressModel {
+    /** The scale spring of a press to [target] ([pressed]) or of its release; null under reduced motion. */
+    fun scaleSpec(
+        motion: NbMotionConfig,
+        pressed: Boolean,
+        target: Float,
+    ): AnimationSpec<Float>? = if (pressed) motion.pressIn(target >= WIDE_PRESS_THRESHOLD) else motion.pressOut()
+
+    /** A press scale value: starts at 1.0 and never goes above it. */
+    fun newScale(): Animatable<Float, AnimationVector1D> = newPressAnimatable(1f).apply { updateBounds(upperBound = 1f) }
+}
+
+/**
+ * Semantics key on every pressable element of the framework ([nbClickable], [shellClickable]): tests enumerate the
+ * pressables of a screen through it, so every trigger is covered without being listed. A pressable cannot exist
+ * without it: the boundary check forbids every other click API outside the framework.
+ */
+val NbPressable = SemanticsPropertyKey<Unit>("NbPressable")
+
+private var SemanticsPropertyReceiver.nbPressable by NbPressable
+
+/** Marks a pressable element for the registry ([NbPressable]). */
+internal fun Modifier.nbPressableKey(): Modifier = semantics { nbPressable = Unit }
+
+/**
+ * The tap rule of the press model: once the finger has moved beyond the touch slop from where it went down, every
+ * later change of that pointer is consumed in the final pass, after the scroll containers above have seen it, so the
+ * clickable under it cancels its press and never fires; scrolling and swiping are not affected.
+ */
+internal fun Modifier.nbTapSlop(): Modifier = this then TapSlopElement
+
+private data object TapSlopElement : ModifierNodeElement<TapSlopNode>() {
+    override fun create(): TapSlopNode = TapSlopNode()
+
+    override fun update(node: TapSlopNode) = Unit
+
+    override fun InspectorInfo.inspectableProperties() {
+        name = "nbTapSlop"
+    }
+}
+
+private class TapSlopNode :
+    Modifier.Node(),
+    PointerInputModifierNode,
+    CompositionLocalConsumerModifierNode {
+    private var down: PointerId? = null
+    private var origin = Offset.Zero
+    private var moved = false
+
+    override fun onPointerEvent(
+        pointerEvent: PointerEvent,
+        pass: PointerEventPass,
+        bounds: IntSize,
+    ) {
+        if (pass != PointerEventPass.Final) return
+        for (change in pointerEvent.changes) {
+            if (change.changedToDownIgnoreConsumed()) {
+                down = change.id
+                origin = change.position
+                moved = false
+            }
+            if (change.id != down) continue
+            if (!moved && (change.position - origin).getDistance() > currentValueOf(LocalViewConfiguration).touchSlop) moved = true
+            if (moved) change.consume()
+            if (!change.pressed) down = null
+        }
+    }
+
+    override fun onCancelPointerInput() {
+        down = null
+        moved = false
+    }
+}
 
 /**
  * Clickable with NightBaseline's interaction tokens (`tokens.md` 2.8, 9.5, 10), the ColorOS press language:
@@ -186,6 +280,8 @@ fun Modifier.nbClickable(
         .then(feedback)
         .pointerHoverIcon(PointerIcon.Hand)
         .hoverable(source, enabled)
+        .nbPressableKey()
+        .nbTapSlop()
         .clickable(
             interactionSource = source,
             indication = null,
@@ -309,10 +405,32 @@ private fun CoroutineScope.retarget(
     anim: Animatable<Float, AnimationVector1D>,
     target: Float,
     spec: AnimationSpec<Float>?,
+    sample: NbPressSample? = null,
+    owner: Any? = null,
 ): Job {
     previous?.cancel()
-    return launch(start = CoroutineStart.UNDISPATCHED) {
-        if (spec == null) anim.snapTo(target) else anim.animateTo(target, spec)
+    return launch(start = CoroutineStart.UNDISPATCHED) { anim.pressTo(target, spec, sample, owner) }
+}
+
+/**
+ * Runs a press value to [target] on [spec] (a snap without one); every frame is reported to [NbMotionProbe.press]
+ * as [sample] of [owner] (the press model test compares the curves of every pressable).
+ */
+internal suspend fun Animatable<Float, AnimationVector1D>.pressTo(
+    target: Float,
+    spec: AnimationSpec<Float>?,
+    sample: NbPressSample?,
+    owner: Any?,
+) {
+    if (spec == null) {
+        snapTo(target)
+        return
+    }
+    val probe = NbMotionProbe.press
+    if (probe == null || sample == null || owner == null) {
+        animateTo(target, spec)
+    } else {
+        animateTo(target, spec) { probe(owner, sample, value) }
     }
 }
 
@@ -408,15 +526,15 @@ private class PressScaleNode(
         snap: Boolean,
     ) {
         val target = if (pressed) nbPressScale(size, requireDensity()) else 1f
-        val spec = (if (pressed) motion.pressIn<Float>(target >= WIDE_PRESS_THRESHOLD) else motion.pressOut()) ?: return
+        val spec = NbPressModel.scaleSpec(motion, pressed, target) ?: return
         val anim =
-            scale ?: newPressAnimatable(1f).also {
+            scale ?: NbPressModel.newScale().also {
                 scale = it
                 // The layer block has read no state so far; from now on it reads the animation's value.
                 invalidateLayer()
             }
         // A new target cancels the running animation and keeps its velocity (the release carries the press over).
-        scaleJob = coroutineScope.retarget(scaleJob, anim, target, if (snap) null else spec)
+        scaleJob = coroutineScope.retarget(scaleJob, anim, target, if (snap) null else spec, NbPressSample.Scale, this)
     }
 
     override fun MeasureScope.measure(
@@ -607,12 +725,12 @@ private class PressFeedbackNode(
                 invalidateDraw()
             }
         // Reduced motion: no spread animation, the light is simply there while pressed.
-        glowJob = coroutineScope.retarget(glowJob, anim, 1f, spec.motion.glowIn())
+        glowJob = coroutineScope.retarget(glowJob, anim, 1f, spec.motion.glowIn(), NbPressSample.Glow, this)
     }
 
     private fun glowOut(snap: Boolean) {
         val anim = glowLevel ?: return
-        glowJob = coroutineScope.retarget(glowJob, anim, 0f, if (snap) null else spec.motion.glowOut())
+        glowJob = coroutineScope.retarget(glowJob, anim, 0f, if (snap) null else spec.motion.glowOut(), NbPressSample.Glow, this)
     }
 
     override fun onPointerEvent(
@@ -808,8 +926,9 @@ class NbPressIndication(
                     level = it
                     invalidateDraw()
                 }
-            val spec = if (next > anim.value) NbPhysics.HighlightIn else NbPhysics.HighlightOut
-            levelJob = coroutineScope.retarget(levelJob, anim, next, if (snap || reduced) null else spec.specOf())
+            val motion = NbMotionConfig(reduced)
+            val spec = if (next > anim.value) motion.stateLayer<Float>() else motion.stateLayerOut()
+            levelJob = coroutineScope.retarget(levelJob, anim, next, if (snap) null else spec)
         }
 
         override fun onDetach() {

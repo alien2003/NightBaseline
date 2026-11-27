@@ -23,8 +23,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /**
- * Semantics key on every scroll container of the framework (its id): tests enumerate the containers of a screen
- * through it, so a new screen's containers are covered by the scroll invariants without being listed (ADR 0011 I4).
+ * Semantics key on every scroll container of the framework (its id, required and unique on a screen): tests enumerate
+ * the containers of a screen through it, so a new screen's containers are covered by the scroll invariants without
+ * being listed (ADR 0011 I4). A container cannot exist without it: the boundary check forbids every other scroll API.
  */
 val NbScrollContainer = SemanticsPropertyKey<String>("NbScrollContainer")
 
@@ -47,7 +48,17 @@ private class NbFling(
 ) : FlingBehavior {
     override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
         NbMotionProbe.flings?.invoke(id, initialVelocity)
-        return with(base) { performFling(initialVelocity) }
+        val ends = NbMotionProbe.flingEnds ?: return with(base) { performFling(initialVelocity) }
+        // Tests: the distance the fling itself scrolled (what the content consumed), exact for lazy lists too.
+        var travel = 0f
+        val outer = this
+        val counting =
+            object : ScrollScope {
+                override fun scrollBy(pixels: Float): Float = outer.scrollBy(pixels).also { travel += it }
+            }
+        val left = with(base) { counting.performFling(initialVelocity) }
+        ends(id, travel)
+        return left
     }
 }
 
@@ -67,7 +78,7 @@ fun rememberNbLazyListState(): LazyListState = rememberLazyListState()
 fun Modifier.nbVerticalScroll(
     state: ScrollState,
     enabled: Boolean = true,
-    id: String = "column",
+    id: String,
 ): Modifier {
     val fling = rememberNbFling(id)
     return semantics { nbScrollContainer = id }.verticalScroll(state, enabled, flingBehavior = fling)
@@ -77,7 +88,7 @@ fun Modifier.nbVerticalScroll(
 @Composable
 fun Modifier.nbHorizontalScroll(
     state: ScrollState,
-    id: String = "row",
+    id: String,
 ): Modifier {
     val fling = rememberNbFling(id)
     return semantics { nbScrollContainer = id }.horizontalScroll(state, flingBehavior = fling)
@@ -91,7 +102,7 @@ fun NbLazyColumn(
     contentPadding: PaddingValues = PaddingValues(0.dp),
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
-    id: String = "list",
+    id: String,
     content: LazyListScope.() -> Unit,
 ) {
     val fling = rememberNbFling(id)

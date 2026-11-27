@@ -99,7 +99,7 @@ internal fun GlanceHome(
     Column(
         Modifier
             .fillMaxSize()
-            .nbVerticalScroll(scroll)
+            .nbVerticalScroll(scroll, id = "home-pane-1")
             .padding(padding)
             .padding(WindowInsets.statusBars.asPaddingValues())
             .padding(horizontal = NbDimens.gutterGlance, vertical = NbSpace.s3),

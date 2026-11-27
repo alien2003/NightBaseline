@@ -42,6 +42,7 @@ import io.github.alien2003.nightbaseline.ui.components.LocalPaneScrolls
 import io.github.alien2003.nightbaseline.ui.components.PaneScrolls
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.interaction.nbFixedInSection
+import io.github.alien2003.nightbaseline.ui.interaction.nbShownSection
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.layout.LocalLayoutSpec
 import io.github.alien2003.nightbaseline.ui.layout.NavigationKind
@@ -102,6 +103,8 @@ fun AppScaffold(
             end = maxOf(safe.calculateEndPadding(direction), system.calculateEndPadding(direction)),
         )
     val paneScrolls = remember { PaneScrolls() }
+    // The bar and rail are one element of the window: every section's layer shows the host's selection.
+    val shown = nbShownSection(selected)
     CompositionLocalProvider(
         LocalHazeState provides hazeState,
         LocalLayoutSpec provides layout,
@@ -121,7 +124,7 @@ fun AppScaffold(
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     FloatingNavRail(
-                        selected,
+                        shown,
                         onSelect,
                         modifier = Modifier.nbFixedInSection().focusGroup().onSizeChanged { railWidth = with(density) { it.width.toDp() } },
                         showLabels = layout.navigation != NavigationKind.RailIcons,
@@ -152,7 +155,7 @@ fun AppScaffold(
                     // (one pose of the running navigation, ADR 0011), so it never runs on a clock of its own.
                     if (showBar) {
                         FloatingNavBar(
-                            selected,
+                            shown,
                             onSelect,
                             Modifier
                                 .nbFixedInSection()

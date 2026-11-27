@@ -85,7 +85,7 @@ fun CatalogScreen(onClose: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .nbVerticalScroll(rememberNbScrollState()),
+                .nbVerticalScroll(rememberNbScrollState(), id = "catalog-1"),
         ) {
             Column(Modifier.padding(NbDimens.gutterCompact), verticalArrangement = Arrangement.spacedBy(NbSpace.s3)) {
                 NbIconButton(NbIcons.Back, stringResource(R.string.a11y_back), onClose)

@@ -216,7 +216,7 @@ private fun SingleColumn(
     Column(
         Modifier
             .fillMaxSize()
-            .nbVerticalScroll(scroll)
+            .nbVerticalScroll(scroll, id = "metric-1")
             .padding(padding)
             .padding(horizontal = layout.gutter)
             .padding(top = top, bottom = NbSpace.s5),
@@ -302,7 +302,7 @@ private fun WideColumn(
     Column(
         Modifier
             .fillMaxSize()
-            .nbVerticalScroll(scroll)
+            .nbVerticalScroll(scroll, id = "metric-2")
             .padding(padding)
             .padding(horizontal = layout.gutter)
             .padding(top = top, bottom = NbSpace.s5),
@@ -377,7 +377,7 @@ private fun WideShortDetail(
             Modifier
                 .weight(1f - WIDE_SHORT_CHART_SHARE)
                 .fillMaxHeight()
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "metric-3")
                 .padding(top = top, bottom = NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -457,7 +457,7 @@ private fun TabletopDetail(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "metric-4")
                 .then(sides)
                 .padding(bottom = padding.calculateBottomPadding() + NbSpace.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -561,7 +561,7 @@ private fun BookDetail(
             Modifier
                 .width(startWidth)
                 .fillMaxHeight()
-                .nbVerticalScroll(rememberPaneScrollState())
+                .nbVerticalScroll(rememberPaneScrollState(), id = "metric-5")
                 .padding(start = layout.gutter, top = top, bottom = padding.calculateBottomPadding() + NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -579,7 +579,7 @@ private fun BookDetail(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "metric-6")
                 .padding(end = layout.gutter + padding.calculateEndPadding(direction), top = top)
                 .padding(bottom = padding.calculateBottomPadding() + NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
@@ -613,7 +613,7 @@ private fun GlanceDetail(
     Column(
         Modifier
             .fillMaxSize()
-            .nbVerticalScroll(scroll)
+            .nbVerticalScroll(scroll, id = "metric-7")
             .padding(padding)
             .padding(WindowInsets.statusBars.asPaddingValues())
             .padding(horizontal = NbDimens.gutterGlance, vertical = NbSpace.s3),
@@ -806,7 +806,7 @@ fun InfoParagraphs(
     modifier: Modifier = Modifier,
 ) {
     val colors = NbTheme.colors
-    Column(modifier.nbVerticalScroll(rememberNbScrollState())) {
+    Column(modifier.nbVerticalScroll(rememberNbScrollState(), id = "metric-8")) {
         NbCard(Modifier.fillMaxWidth()) {
             paragraphs.forEach { NbText(it, style = NbTheme.typography.body, color = colors.textPrimary) }
         }
@@ -821,7 +821,7 @@ private fun ExplainerBody(
 ) {
     val text = rememberUiText()
     val colors = NbTheme.colors
-    Column(modifier.nbVerticalScroll(rememberNbScrollState())) {
+    Column(modifier.nbVerticalScroll(rememberNbScrollState(), id = "metric-9")) {
         NbCard(Modifier.fillMaxWidth()) {
             listOfNotNull(
                 text.string(R.string.explainer_range),

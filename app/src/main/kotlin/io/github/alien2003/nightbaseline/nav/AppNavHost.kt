@@ -20,13 +20,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.FrameRateCategory
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEvent
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isAltPressed
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.preferredFrameRate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -62,12 +55,14 @@ import io.github.alien2003.nightbaseline.ui.interaction.LocalNbBackRouter
 import io.github.alien2003.nightbaseline.ui.interaction.ModalHost
 import io.github.alien2003.nightbaseline.ui.interaction.ModalKind
 import io.github.alien2003.nightbaseline.ui.interaction.ModalScope
+import io.github.alien2003.nightbaseline.ui.interaction.NbKeyIntent
 import io.github.alien2003.nightbaseline.ui.interaction.NbNavStack
 import io.github.alien2003.nightbaseline.ui.interaction.NbPageNavigator
 import io.github.alien2003.nightbaseline.ui.interaction.NbSectionHost
 import io.github.alien2003.nightbaseline.ui.interaction.NbStackHost
-import io.github.alien2003.nightbaseline.ui.interaction.nbKeys
+import io.github.alien2003.nightbaseline.ui.interaction.nbKeyIntents
 import io.github.alien2003.nightbaseline.ui.interaction.nbReproject
+import io.github.alien2003.nightbaseline.ui.interaction.nbStepArea
 import io.github.alien2003.nightbaseline.ui.interaction.page
 import io.github.alien2003.nightbaseline.ui.interaction.rememberNbLazyListState
 import io.github.alien2003.nightbaseline.ui.interaction.rememberNbNavController
@@ -271,34 +266,26 @@ fun AppNavHost(
     val about: () -> Unit = { navController.push(SettingsRoute(SettingsPage.About.name)) }
     val more: () -> Unit = { sheet = AppSheet.More }
 
-    // Ctrl+1/2/3, Ctrl+R, Esc and Alt+Left (layouts.md 10.2).
-    val shortcuts: (KeyEvent) -> Boolean = shortcuts@{ event ->
-        if (event.type != KeyEventType.KeyDown) return@shortcuts false
-        val tab =
-            when (event.key) {
-                Key.One -> TopLevel.Home
-                Key.Two -> TopLevel.History
-                Key.Three -> TopLevel.Settings
-                else -> null
-            }
-        when {
-            event.isCtrlPressed && tab != null && onboardingDoneNow -> {
-                openTab(tab)
-                true
+    // Ctrl+1/2/3, Ctrl+R, Esc and Alt+Left, and the pager keys without focus (layouts.md 10.2), decoded by the
+    // framework's one key path: a section, a command, or the router (Back, a step of the shown sequence).
+    val shortcuts: (NbKeyIntent) -> Boolean = { intent ->
+        when (intent) {
+            is NbKeyIntent.Section -> {
+                val tab = TopLevel.entries.getOrNull(intent.index)
+                if (tab != null && onboardingDoneNow) openTab(tab)
+                tab != null && onboardingDoneNow
             }
 
-            event.isCtrlPressed && event.key == Key.R && onboardingDoneNow -> {
-                onCheckNow()
-                true
+            is NbKeyIntent.Command -> {
+                val check = intent.key == 'R' && onboardingDoneNow
+                if (check) onCheckNow()
+                check
             }
 
-            // The same Back as the system's: the router's topmost target (sheet, sub-page, page, section).
-            event.key == Key.Escape || (event.isAltPressed && event.key == Key.DirectionLeft) -> {
-                router?.back() == true
-            }
-
+            // The same Back as the system's: the router's topmost target (sheet, sub-page, page, section); the arrows
+            // and Page Up / Down step the shown sequence.
             else -> {
-                false
+                router?.key(intent) == true
             }
         }
     }
@@ -312,7 +299,7 @@ fun AppNavHost(
             .preferredFrameRate(FrameRateCategory.High)
             // With keyboard focus somewhere in the content; without focus the activity hands the keys that nothing
             // consumed to the same handler (RegisterKeyShortcuts).
-            .nbKeys(shortcuts),
+            .nbKeyIntents { intent -> intent !is NbKeyIntent.Move && intent !is NbKeyIntent.Page && shortcuts(intent) },
     ) {
         RegisterKeyShortcuts(shortcuts)
         val startDestination: Any = remember { if (onboardingDone) TopLevelRoute else OnboardingRoute() }
@@ -811,7 +798,13 @@ private fun HistoryDestination(
                         previous = nights.getOrNull(index + 1)?.wakeDate,
                         next = if (index > 0) nights[index - 1].wakeDate else null,
                     )
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap)) {
+                Column(
+                    Modifier.fillMaxWidth().nbStepArea(
+                        onPrevious = detail.previous?.let { date -> { vm.select(date) } },
+                        onNext = detail.next?.let { date -> { vm.select(date) } },
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
+                ) {
                     // The pane's own title row (layouts.md 4.3): the night label, as the Night detail top bar shows it.
                     NbText(
                         rememberUiText().nightLabel(night),

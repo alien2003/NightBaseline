@@ -119,7 +119,7 @@ private fun SinglePaneLearning(
     Column(
         Modifier
             .fillMaxSize()
-            .nbVerticalScroll(scroll)
+            .nbVerticalScroll(scroll, id = "learning-1")
             .padding(padding)
             .padding(horizontal = layout.gutter),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -173,7 +173,7 @@ private fun TwoPaneLearning(
             Modifier
                 .width(listWidth + layout.gutter)
                 .fillMaxHeight()
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "learning-2")
                 .padding(start = layout.gutter)
                 .then(vertical),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
@@ -192,7 +192,7 @@ private fun TwoPaneLearning(
                 .padding(end = layout.gutter + padding.calculateEndPadding(direction)),
         ) {
             val columns = if (maxWidth >= TwoColumnMin) 2 else 1
-            Column(Modifier.fillMaxSize().nbVerticalScroll(rememberPaneScrollState()).then(vertical)) {
+            Column(Modifier.fillMaxSize().nbVerticalScroll(rememberPaneScrollState(), id = "learning-3").then(vertical)) {
                 AlreadyVisible(state, columns, actions)
             }
         }
@@ -240,7 +240,7 @@ private fun TabletopLearning(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "learning-4")
                 .then(horizontal)
                 .padding(bottom = padding.calculateBottomPadding()),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -275,7 +275,7 @@ private fun GlanceLearning(
     Column(
         Modifier
             .fillMaxSize()
-            .nbVerticalScroll(scroll)
+            .nbVerticalScroll(scroll, id = "learning-5")
             .padding(padding)
             .padding(horizontal = NbDimens.gutterGlance),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s3),

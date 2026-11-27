@@ -4,7 +4,9 @@ import androidx.activity.BackEventCompat
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.GraphicsLayerScope
@@ -36,36 +38,43 @@ class NbTransition internal constructor(
 ) {
     internal var reduced: Boolean = false
     internal var dark: Boolean = false
+
+    /** True while the app re-projects its state after a layout change ([nbReproject]); set by the host. */
+    internal var reprojecting: () -> Boolean = { false }
     internal val driver = NbDriver(NbPhysics.Nav) { reduced }
 
+    // Everything [go] writes is snapshot state: [go] runs in composition, and a composition that is discarded or run
+    // again rolls its writes back with its snapshot, so a change is set up exactly once and nothing leaks out of a
+    // thrown-away composition. Jobs are cancelled only outside composition ([runPending], gestures, [abort]).
+
     /** The kind of the running change. */
-    var kind: NbKind = NbKind.Page
+    var kind: NbKind by mutableStateOf(NbKind.Page)
         private set
 
     /** The state being left, null at rest. */
-    var from: Any? = null
+    var from: Any? by mutableStateOf(null)
         private set
 
     /** The state being reached, null at rest. */
-    var to: Any? = null
+    var to: Any? by mutableStateOf(null)
         private set
 
     /** Stack kinds: [to] is the upper layer (a push) or the lower (a pop). */
-    internal var toIsUpper: Boolean = true
+    internal var toIsUpper: Boolean by mutableStateOf(true)
         private set
 
     /** The physical side the motion goes to: +1 right, -1 left. */
-    internal var e: Int = 1
+    internal var e: Int by mutableIntStateOf(1)
         private set
 
     /** True while a finger drives p. */
-    var gesture: Boolean = false
+    var gesture: Boolean by mutableStateOf(false)
         private set
 
     private var gestureFrom = 0f
     private var gestureToken = 0
-    private var pendingStart: Float? = null
-    private var pendingVelocity = 0f
+    private var pendingStart: Float? by mutableStateOf(null)
+    private var pendingVelocity by mutableFloatStateOf(0f)
     private var job: Job? = null
     private var runJob: Job? = null
 
@@ -78,7 +87,7 @@ class NbTransition internal constructor(
         private set
 
     /** Bumped when a change is set up in composition; the host's effect keyed on it runs the spring. */
-    internal var runId: Int = 0
+    internal var runId: Int by mutableIntStateOf(0)
         private set
 
     /** True while a change runs or a gesture holds one. */
@@ -191,14 +200,15 @@ class NbTransition internal constructor(
             reverse()
             return
         }
-        drop()
+        // R2: the running change ends where it is; its spring is cancelled by the effect that runs the new one.
+        gesture = false
         this.kind = kind
         from = a
         to = b
         this.toIsUpper = toIsUpper
         this.e = e
         // A layout change re-projects the state with a snap (R6): the change starts at its end.
-        pendingStart = if (NbReproject.active) 1f else 0f
+        pendingStart = if (reprojecting()) 1f else 0f
         pendingVelocity = 0f
         runId++
     }

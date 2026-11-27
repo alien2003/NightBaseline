@@ -199,16 +199,18 @@ class ModalState internal constructor(
 
             override fun enabled(): Boolean = target
 
-            override fun start(edge: Int) {
+            override fun start(
+                edge: Int,
+                touchX: Float,
+            ) {
                 job?.cancel()
                 driver.resetTracking()
                 gestureFrom = driver.p
             }
 
-            override fun progress(
-                fraction: Float,
-                timeMillis: Long,
-            ) {
+            override fun progress(move: NbBackMove) {
+                val fraction = move.progress
+                val timeMillis = move.timeMillis
                 if (!target || reduced) return
                 // p = 1 - g: the panel follows the back gesture towards hidden (ADR 0011 Sheet / Dialog row).
                 val next = (gestureFrom * (1f - fraction.coerceIn(0f, 1f))).coerceIn(0f, 1f)

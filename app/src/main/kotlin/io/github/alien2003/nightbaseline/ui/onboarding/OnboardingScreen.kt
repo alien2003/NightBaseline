@@ -139,7 +139,7 @@ private fun ScrollingStep(
     Column(
         Modifier
             .fillMaxSize()
-            .nbVerticalScroll(scroll)
+            .nbVerticalScroll(scroll, id = "onboarding-1")
             .padding(horizontal = layout.gutter, vertical = NbSpace.s5),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s4),
     ) {
@@ -164,7 +164,7 @@ private fun CompactStep(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "onboarding-2")
                 .padding(horizontal = layout.gutter)
                 .padding(top = NbSpace.s7, bottom = NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s5),
@@ -216,7 +216,7 @@ private fun BalancedColumns(
             Modifier
                 .fillMaxWidth()
                 .focusRingRoom()
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "onboarding-3")
                 .padding(FocusRingRoom)
                 .heightIn(min = minHeight)
                 .padding(vertical = NbSpace.s7),
@@ -276,7 +276,7 @@ private fun CardStep(
                     Modifier
                         .weight(1f, fill = false)
                         .focusRingRoom()
-                        .nbVerticalScroll(scroll)
+                        .nbVerticalScroll(scroll, id = "onboarding-4")
                         .padding(FocusRingRoom),
                     verticalArrangement = Arrangement.spacedBy(NbSpace.s5),
                 ) {
@@ -306,7 +306,7 @@ private fun TabletopStep(
                 .height(fold - NbDimens.hingeClearance)
                 .widthIn(max = TextColumnMax)
                 .fillMaxWidth()
-                .nbVerticalScroll(rememberNbScrollState()),
+                .nbVerticalScroll(rememberNbScrollState(), id = "onboarding-5"),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s4, Alignment.CenterVertically),
         ) {
             StepIndicator(state.step)
@@ -320,7 +320,7 @@ private fun TabletopStep(
                 .widthIn(max = TextColumnMax)
                 .fillMaxWidth()
                 .focusRingRoom()
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "onboarding-6")
                 .padding(FocusRingRoom)
                 .padding(bottom = NbSpace.s5),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s4),

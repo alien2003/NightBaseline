@@ -20,7 +20,8 @@ import kotlin.math.sqrt
  * one pixel of a page), never on Compose's 0.01 px default.
  */
 @Immutable
-data class NbSpring(
+@ConsistentCopyVisibility
+data class NbSpring internal constructor(
     /** Damping ratio (1.0 = critical, above 1 = overdamped; both never overshoot). */
     val damping: Float,
     /** Stiffness k; the natural frequency is sqrt(k) per second. */
@@ -124,6 +125,12 @@ object NbPhysics {
      * of it is shown, the lower at `-W / 3 * s` (fitted with [Nav]).
      */
     const val PAGE_GAMMA: Float = 2.2f
+
+    /**
+     * A step swipe (night, month) steps when the platform decay projects the released travel past this distance (dp)
+     * towards a side: one threshold for every sequence of the app.
+     */
+    const val STEP_SWIPE_DP: Float = 56f
 
     /** A dialog starts at this scale. */
     const val DIALOG_START_SCALE: Float = 0.8f

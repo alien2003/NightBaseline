@@ -16,8 +16,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker1D
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
 /**
@@ -80,13 +80,13 @@ private suspend fun PointerInputScope.horizontalGestures(
 
 /**
  * A horizontal step swipe (Night previous / next, month): rule A, and on release the decision of the fling physics
- * (ADR 0011 R0): the platform decay projects where the travel would come to rest; past [threshold] towards the start
- * edge steps to the previous value, towards the end edge to the next one. Start-to-end (in the layout direction) is
- * "previous". A null callback means there is no neighbour on that side.
+ * (ADR 0011 R0): the platform decay projects where the travel would come to rest; past [NbPhysics.STEP_SWIPE_DP]
+ * towards the start edge steps to the previous value, towards the end edge to the next one. Start-to-end (in the
+ * layout direction) is "previous". A null callback means there is no neighbour on that side. Once the swipe claims
+ * the pointer, the presses under it are cancelled (a swipe never becomes a tap).
  */
 @Composable
 fun Modifier.nbStepSwipe(
-    threshold: Dp,
     onPrevious: (() -> Unit)?,
     onNext: (() -> Unit)?,
 ): Modifier {
@@ -95,7 +95,7 @@ fun Modifier.nbStepSwipe(
     val next by rememberUpdatedState(onNext)
     return pointerInput(rtl) {
         val decay = splineBasedDecay<Float>(this)
-        val limit = threshold.toPx()
+        val limit = NbPhysics.STEP_SWIPE_DP.dp.toPx()
         horizontalGestures(
             onStart = {},
             onDrag = { _, _ -> },
@@ -110,6 +110,28 @@ fun Modifier.nbStepSwipe(
             },
             onCancel = {},
         )
+    }
+}
+
+/**
+ * The step area of a sequence (ADR 0011, one rule for every pager): the whole element it is put on answers a
+ * horizontal swipe ([nbStepSwipe]), the arrows in the reading direction and Page Up / Down while focus is inside it,
+ * and the same keys without focus through the app's router while its branch is shown ([NbStepKeys]). Every way runs
+ * the same step, so the same Pager change.
+ */
+@Composable
+fun Modifier.nbStepArea(
+    onPrevious: (() -> Unit)?,
+    onNext: (() -> Unit)?,
+): Modifier {
+    NbStepKeys(onPrevious, onNext)
+    val previous by rememberUpdatedState(onPrevious)
+    val next by rememberUpdatedState(onNext)
+    return nbStepSwipe(onPrevious, onNext).nbKeyIntents { intent ->
+        val delta = intent.stepDelta() ?: return@nbKeyIntents false
+        val step = if (delta < 0) previous else next
+        step?.invoke()
+        step != null
     }
 }
 

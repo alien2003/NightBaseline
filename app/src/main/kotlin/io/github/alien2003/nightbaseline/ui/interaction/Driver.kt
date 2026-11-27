@@ -118,6 +118,15 @@ class NbDriver internal constructor(
     }
 }
 
+/** What a press sample measures. */
+enum class NbPressSample {
+    /** The press scale. */
+    Scale,
+
+    /** The light's strength. */
+    Glow,
+}
+
 /** One drawn frame of a host, for tests (ADR 0011 I1, I2, I7, I9). */
 data class NbFrame(
     /** The host. */
@@ -152,4 +161,16 @@ object NbMotionProbe {
     /** Receives (container id, velocity) for every fling the framework's scroll containers start. */
     @Volatile
     var flings: ((String, Float) -> Unit)? = null
+
+    /** Receives (container id, px) when a fling ends: the distance the fling itself scrolled the content. */
+    @Volatile
+    var flingEnds: ((String, Float) -> Unit)? = null
+
+    /** Receives every drawn press sample: the scale or the light of a pressable element (the press model test). */
+    @Volatile
+    var press: ((element: Any, sample: NbPressSample, value: Float) -> Unit)? = null
+
+    /** Receives the overscroll translation (x, y px) of every frame in which some content is translated past an edge. */
+    @Volatile
+    var overscroll: ((Float, Float) -> Unit)? = null
 }

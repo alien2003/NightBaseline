@@ -1,7 +1,6 @@
 package io.github.alien2003.nightbaseline.ui.interaction
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.Interaction
@@ -17,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -34,9 +34,13 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.eventFlow
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import io.github.alien2003.nightbaseline.ui.theme.ShellDimens
@@ -44,6 +48,10 @@ import io.github.alien2003.nightbaseline.ui.theme.ShellTokens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlin.math.min
 
@@ -67,7 +75,7 @@ class ShellPressState internal constructor(
     /** The interaction source of the element's clickable. */
     val source: MutableInteractionSource,
 ) {
-    internal val scale = Animatable(1f).apply { updateBounds(upperBound = 1f) }
+    internal val scale = NbPressModel.newScale()
     internal val glow = Animatable(0f)
     internal var center by mutableStateOf<Offset?>(null)
     private val presses = HashSet<PressInteraction.Press>()
@@ -78,7 +86,7 @@ class ShellPressState internal constructor(
     internal fun onInteraction(
         interaction: Interaction,
         pressedScale: Float,
-        reduced: Boolean,
+        motion: NbMotionConfig,
     ) {
         val before = presses.isNotEmpty()
         when (interaction) {
@@ -96,34 +104,40 @@ class ShellPressState internal constructor(
             }
         }
         val pressed = presses.isNotEmpty()
-        if (pressed != before) animate(pressed, pressedScale, reduced)
+        if (pressed != before) animate(pressed, pressedScale, motion, snap = false)
     }
 
+    /** The app left the foreground while pressed: the press ends ([snap] when the activity is no longer visible). */
+    internal fun clear(
+        pressedScale: Float,
+        motion: NbMotionConfig,
+        snap: Boolean,
+    ) {
+        if (presses.isEmpty()) return
+        presses.clear()
+        animate(false, pressedScale, motion, snap)
+    }
+
+    /** One press model (ADR 0011, [NbPressModel]): the same springs and tweens as every other pressable. */
     private fun animate(
         pressed: Boolean,
         pressedScale: Float,
-        reduced: Boolean,
+        motion: NbMotionConfig,
+        snap: Boolean,
     ) {
         glowJob?.cancel()
         scaleJob?.cancel()
         glowJob =
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                if (reduced) {
-                    glow.snapTo(if (pressed) REDUCED_GLOW else 0f)
-                } else if (pressed) {
-                    glow.animateTo(1f, tween(NbPhysics.GLOW_IN_MS, easing = NbEasing.Standard))
-                } else {
-                    glow.animateTo(0f, tween(NbPhysics.GLOW_OUT_MS, easing = NbEasing.Exit))
-                }
+                val spec = if (pressed) motion.glowIn<Float>() else motion.glowOut()
+                val target = if (pressed) (if (motion.reduced) REDUCED_GLOW else 1f) else 0f
+                glow.pressTo(target, if (snap || motion.reduced) null else spec, NbPressSample.Glow, this@ShellPressState)
             }
-        if (reduced) return
+        val target = if (pressed) pressedScale else 1f
+        val spec = NbPressModel.scaleSpec(motion, pressed, pressedScale) ?: return
         scaleJob =
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                if (pressed) {
-                    scale.animateTo(pressedScale, NbPhysics.PressIn.specOf())
-                } else {
-                    scale.animateTo(1f, NbPhysics.PressOut.specOf())
-                }
+                scale.pressTo(target, if (snap) null else spec, NbPressSample.Scale, this@ShellPressState)
             }
     }
 }
@@ -170,9 +184,20 @@ fun FollowPresses(
     source: InteractionSource,
     pressedScale: Float = SHELL_PRESS_SCALE_SMALL,
 ) {
-    val reduced = LocalNbMotion.current.reduced
-    LaunchedEffect(state, source, pressedScale, reduced) {
-        source.interactions.collect { state.onInteraction(it, pressedScale, reduced) }
+    val motion = LocalNbMotion.current
+    LaunchedEffect(state, source, pressedScale, motion) {
+        source.interactions.collect { state.onInteraction(it, pressedScale, motion) }
+    }
+    // As every pressable: no element comes back to the foreground pressed (focus lost, paused, stopped).
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val window = LocalWindowInfo.current
+    LaunchedEffect(state, lifecycle, window, pressedScale, motion) {
+        val focusLost = snapshotFlow { window.isWindowFocused }.drop(1).filter { !it }.map { false }
+        val paused =
+            lifecycle.eventFlow
+                .filter { it == Lifecycle.Event.ON_PAUSE || it == Lifecycle.Event.ON_STOP }
+                .map { it == Lifecycle.Event.ON_STOP }
+        merge(focusLost, paused).collect { stopped -> state.clear(pressedScale, motion, snap = stopped) }
     }
 }
 
@@ -237,6 +262,8 @@ fun Modifier.shellClickable(
         .shellFocusRing(source, shape, visualInset, forced == ForcedInteraction.Focus)
         .pointerHoverIcon(PointerIcon.Hand)
         .hoverable(source, enabled)
+        .nbPressableKey()
+        .nbTapSlop()
         .clickable(
             interactionSource = source,
             indication = null,

@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -19,7 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.IntOffset
@@ -40,6 +43,8 @@ internal fun rememberTransition(id: String): NbTransition {
     val transition = remember(scope) { NbTransition(id, scope) }
     transition.reduced = LocalNbMotion.current.reduced
     transition.dark = NbTheme.colors.isDark
+    val router = LocalNbBackRouter.current
+    transition.reprojecting = { router?.reprojecting == true }
     return transition
 }
 
@@ -57,6 +62,9 @@ private class HostMemory {
     var top: Any? = null
     var keys: List<Any> = emptyList()
     val saved = HashSet<Any>()
+
+    /** The host's width in px (the travel of a back gesture over it). */
+    var width: Float = 0f
 }
 
 /**
@@ -73,6 +81,7 @@ private class HostMemory {
  *   provides its own (navigation entries).
  * @param onSettled runs after every change has settled and its leaving page is gone.
  */
+@Suppress("CyclomaticComplexMethod") // One host: change, back target, settle, parked page, layers.
 @Composable
 fun <T : Any> NbStackHost(
     stack: List<T>,
@@ -115,21 +124,29 @@ fun <T : Any> NbStackHost(
     RegisterBackTarget(target)
     val settled = rememberUpdatedState(onSettled)
     LaunchedEffect(transition.settled) {
+        // Only at rest: a change set up after the one that settled (a fold's snap right after a dropped push) still
+        // shows its leaving page, whose entry must stay alive until that change settles too (V7).
+        if (transition.running) return@LaunchedEffect
         values.keys.retainAll((keys + layers).toSet())
         if (saveable) memory.forgotten(holder, keys)
         settled.value()
     }
-    Box(modifier.fillMaxSize()) {
-        layers.forEach { k ->
+    // The page below the top is composed and measured ahead, parked (neither placed nor drawn, no semantics, no input):
+    // a back gesture or a pop starts on a page that is already there, so its first frame only places and draws it.
+    val below = keys.getOrNull(keys.size - 2)
+    val composed = if (below != null && !transition.running) listOf(below) + layers else layers
+    Box(modifier.fillMaxSize().onSizeChanged { memory.width = it.width.toFloat() }) {
+        composed.forEach { k ->
             key(k) {
                 val value = values[k]
                 val child = rememberChildScope { memory.top == k }
                 val isTop = k == top
+                val parked = k !in layers
                 Box(
                     Modifier
                         .fillMaxSize()
                         .zIndex(if (k == layers.last()) 1f else 0f)
-                        .poseLayer(transition, k)
+                        .then(if (parked) Parked else Modifier.poseLayer(transition, k))
                         .blockInput { memory.top != k || transition.gesture }
                         .then(if (isTop) Modifier else Hidden),
                 ) {
@@ -164,20 +181,22 @@ private class StackBackTarget(
     private val onBack: () -> Unit,
 ) : NbBackTarget {
     private var token = -1
+    private val finger = NbBackFinger()
     override val depth: Int get() = scope.depth + 1
 
     override fun enabled(): Boolean = canBack.value && scope.active()
 
-    override fun start(edge: Int) {
+    override fun start(
+        edge: Int,
+        touchX: Float,
+    ) {
         val keys = memory.keys
         if (keys.size < 2) return
+        finger.start(edge, touchX)
         token = transition.beginGesture(keys.last(), keys[keys.size - 2], NbKind.Page, toIsUpper = false, e = edgeSide(edge, side))
     }
 
-    override fun progress(
-        fraction: Float,
-        timeMillis: Long,
-    ) = transition.drag(token, fraction, timeMillis)
+    override fun progress(move: NbBackMove) = transition.drag(token, finger.share(move, memory.width), move.timeMillis)
 
     override fun cancel() {
         transition.release(token, commit = false)
@@ -196,6 +215,13 @@ private class StackBackTarget(
 
 /** A hidden layer: no semantics (screen readers, tests). */
 private val Hidden: Modifier = Modifier.clearAndSetSemantics {}
+
+/** A layer composed and measured ahead but neither placed nor drawn (the page below the top of a stack). */
+private val Parked: Modifier =
+    Modifier.layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        layout(placeable.width, placeable.height) {}
+    }
 
 /**
  * Top-level sections in bar order (ADR 0011, kind Tab, relation Section; ADR 0006): every visited section stays
@@ -244,7 +270,7 @@ fun <K : Any> NbSectionHost(
     target.side = side
     RegisterBackTarget(target)
     Layout(
-        modifier = modifier,
+        modifier = modifier.onSizeChanged { memory.width = it.width.toFloat() },
         content = {
             visited.forEach { section ->
                 key(section) {
@@ -259,7 +285,11 @@ fun <K : Any> NbSectionHost(
                             .blockInput { memory.selected != section || transition.gesture }
                             .then(if (shown && section == selected) Modifier else Hidden),
                     ) {
-                        CompositionLocalProvider(LocalNbBackScope provides child, LocalSectionShift provides shift) {
+                        CompositionLocalProvider(
+                            LocalNbBackScope provides child,
+                            LocalSectionShift provides shift,
+                            LocalSectionSelected provides selected,
+                        ) {
                             holder.SaveableStateProvider(section.toString()) { content(section, active) }
                         }
                     }
@@ -278,6 +308,9 @@ fun <K : Any> NbSectionHost(
 private class SectionMemory<K : Any> {
     var selected: K? = null
     var first: K? = null
+
+    /** The host's width in px (the travel of a back gesture over it). */
+    var width: Float = 0f
 }
 
 /** The Back target of a [NbSectionHost]: back to the first section. */
@@ -290,11 +323,16 @@ private class SectionBackTarget<K : Any>(
     private val onBack: () -> Unit,
 ) : NbBackTarget {
     private var token = -1
+    private val finger = NbBackFinger()
     override val depth: Int get() = scope.depth + 1
 
     override fun enabled(): Boolean = canBack.value && scope.active()
 
-    override fun start(edge: Int) {
+    override fun start(
+        edge: Int,
+        touchX: Float,
+    ) {
+        finger.start(edge, touchX)
         val shown = memory.selected
         val first = memory.first
         // Tab: the direction comes from the bar order, whatever the edge (the first section is always at the start).
@@ -303,10 +341,7 @@ private class SectionBackTarget<K : Any>(
         }
     }
 
-    override fun progress(
-        fraction: Float,
-        timeMillis: Long,
-    ) = transition.drag(token, fraction, timeMillis)
+    override fun progress(move: NbBackMove) = transition.drag(token, finger.share(move, memory.width), move.timeMillis)
 
     override fun cancel() {
         transition.release(token, commit = false)
@@ -364,13 +399,15 @@ fun <T : Any> NbSwitcher(
         layers.forEach { layer ->
             key(layer) {
                 val v = values[layer]
+                // Each layer is its own back branch: a leaving layer's hosts are no back target (ADR 0011 R4).
+                val child = rememberChildScope { memory.top == layer }
                 Box(
                     Modifier
                         .zIndex(if (layer == k) 1f else 0f)
                         .poseLayer(transition, layer)
                         .blockInput { memory.top != layer }
                         .then(if (layer == k) Modifier else Hidden),
-                ) { if (v != null) content(v) }
+                ) { if (v != null) CompositionLocalProvider(LocalNbBackScope provides child) { content(v) } }
             }
         }
     }
@@ -388,6 +425,20 @@ internal class SectionShift(
 }
 
 private val LocalSectionShift = staticCompositionLocalOf<SectionShift?> { null }
+
+/** The section a [NbSectionHost] shows or is changing to; the same value in every section's layer. */
+private val LocalSectionSelected = compositionLocalOf<Any?> { null }
+
+/**
+ * The selection the fixed elements of a section (the bar, the rail) show: the host's selected section, the same in
+ * every section's layer, so during a change both layers' bars show the target from its first frame and animate the
+ * same way whichever layer is on top (ADR 0011: the bar is one element of the window). Outside a section host, [own].
+ */
+@Composable
+fun <K : Any> nbShownSection(own: K): K {
+    @Suppress("UNCHECKED_CAST")
+    return (LocalSectionSelected.current as? K)?.takeIf { it::class == own::class } ?: own
+}
 
 /**
  * Keeps an element of a section in place while the sections change (the floating bar and rail, ADR 0011): the bar is

@@ -8,6 +8,8 @@ import androidx\.compose\.animation\.
 \banimate[A-Z][A-Za-z]*AsState\b
 \b(Animatable|AnimationState|TargetBasedAnimation|DecayAnimation)\(
 \b(spring|tween|keyframes|snap|animateDecay|splineBasedDecay|exponentialDecay|infiniteRepeatable)\(
+# A spring exists only in the registry (its constructor is internal to the framework as well)
+\bNbSpring\(
 \b(withFrameNanos|withFrameMillis)\b
 \b(Choreographer|ViewPropertyAnimator)\b
 import android\.animation\.
@@ -17,16 +19,22 @@ import android\.animation\.
 import androidx\.navigation\.compose\.
 \bNavHost\(
 import androidx\.navigationevent\.
-\b(BackHandler|PredictiveBackHandler|OnBackPressedCallback)\b
+\b(BackHandler|PredictiveBackHandler|OnBackPressedCallback|BackEventCompat)\b
 # Gestures, presses, keys
 import androidx\.compose\.foundation\.gestures\.
 \b(pointerInput|clickable|combinedClickable|selectable|toggleable|triStateToggleable|draggable|anchoredDraggable|transformable|scrollable)\s*[({]
 \bdetect[A-Za-z]*Gestures\b
 \b(awaitPointerEventScope|awaitEachGesture|PointerInputModifierNode)\b
 \b(onPreviewKeyEvent|onKeyEvent)\s*[({]
+# Keys reach screens only as decoded intents (NbKeyIntent); pointer passes and velocity only inside the framework
+import androidx\.compose\.ui\.input\.key\.
+\bPointerEventPass\b
+\bVelocityTracker
 # Scrolling, fling, overscroll, indication
 \b(verticalScroll|horizontalScroll|rememberScrollState|LazyColumn|LazyRow|LazyVerticalGrid|rememberLazyListState)\s*[({]
 \b(nestedScroll|overscroll|flingBehavior)\b
+\b(animateScrollTo|animateScrollBy|animateScrollToItem|scrollToItem|scrollTo|scrollBy|dispatchRawDelta|stopScroll)\(
+\.indication\(
 \b(LocalOverscrollFactory|LocalIndication)\b
 # Material components bring their own motion (and the ripple)
 import androidx\.compose\.material3\.

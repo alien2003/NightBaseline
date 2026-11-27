@@ -40,10 +40,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
@@ -71,10 +67,11 @@ import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.algo.MetricId
 import io.github.alien2003.nightbaseline.ui.interaction.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.interaction.NbKeyIntent
 import io.github.alien2003.nightbaseline.ui.interaction.NbPhysics
 import io.github.alien2003.nightbaseline.ui.interaction.animateNbFloat
 import io.github.alien2003.nightbaseline.ui.interaction.nbClickable
-import io.github.alien2003.nightbaseline.ui.interaction.nbKeys
+import io.github.alien2003.nightbaseline.ui.interaction.nbKeyIntents
 import io.github.alien2003.nightbaseline.ui.interaction.nbScrub
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.ChartPeriod
@@ -388,13 +385,11 @@ fun TrendChart(
                 }.then(
                     if (interactive) {
                         Modifier
-                            .nbKeys { event ->
-                                if (event.type != KeyEventType.KeyDown) return@nbKeys false
-                                when (event.key) {
-                                    Key.DirectionLeft -> step(if (rtl) 1 else -1).let { true }
-                                    Key.DirectionRight -> step(if (rtl) -1 else 1).let { true }
-                                    Key.MoveHome -> currentSelect(0).let { true }
-                                    Key.MoveEnd -> currentSelect(last).let { true }
+                            .nbKeyIntents { intent ->
+                                // Nights run in the reading direction: dx is already mirrored in RTL.
+                                when {
+                                    intent is NbKeyIntent.Move && intent.dy == 0 -> step(intent.dx).let { true }
+                                    intent is NbKeyIntent.Edge -> currentSelect(if (intent.end) last else 0).let { true }
                                     else -> false
                                 }
                             }.focusable()

@@ -51,6 +51,7 @@ import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.ShellTopBar
 import io.github.alien2003.nightbaseline.ui.components.TitleColumn
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.interaction.NbLazyColumn
 import io.github.alien2003.nightbaseline.ui.interaction.NbSwitcher
 import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
@@ -413,6 +414,7 @@ private fun HistoryList(
     calendarMinHeight: Dp = 0.dp,
 ) {
     NbLazyColumn(
+        id = "history-3",
         modifier = modifier,
         state = listState,
         contentPadding = contentPadding,
@@ -510,7 +512,7 @@ private fun TwoPaneHistory(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .nbVerticalScroll(rememberNbScrollState())
+                .nbVerticalScroll(rememberPaneScrollState(), id = "history-1")
                 .padding(end = layout.gutter + padding.calculateRightPadding(LayoutDirection.Ltr), top = NbSpace.s3, bottom = bottom),
         ) {
             val night = content.state.selectedNight
@@ -541,7 +543,7 @@ private fun TabletopHistory(
             Modifier
                 .height(topHalf)
                 .fillMaxWidth()
-                .nbVerticalScroll(rememberNbScrollState())
+                .nbVerticalScroll(rememberNbScrollState(), id = "history-2")
                 .padding(WindowInsets.statusBars.asPaddingValues())
                 .padding(horizontal = layout.gutter, vertical = NbSpace.s4),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -574,7 +576,8 @@ private fun GlanceHistory(
 ) {
     val colors = NbTheme.colors
     NbLazyColumn(
-        Modifier.fillMaxSize().padding(padding).padding(WindowInsets.statusBars.asPaddingValues()),
+        modifier = Modifier.fillMaxSize().padding(padding).padding(WindowInsets.statusBars.asPaddingValues()),
+        id = "history-4",
         state = listState,
         contentPadding = PaddingValues(horizontal = NbDimens.gutterGlance, vertical = NbSpace.s3),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s2),

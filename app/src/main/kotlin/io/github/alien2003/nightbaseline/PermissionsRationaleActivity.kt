@@ -47,7 +47,7 @@ class PermissionsRationaleActivity : ComponentActivity() {
                             .fillMaxSize()
                             .background(NbTheme.colors.background)
                             .safeDrawingPadding()
-                            .nbVerticalScroll(rememberNbScrollState())
+                            .nbVerticalScroll(rememberNbScrollState(), id = "rationale-1")
                             .padding(NbDimens.gutterCompact)
                             .widthIn(max = NbDimens.textMax),
                     verticalArrangement = Arrangement.spacedBy(NbSpace.s5),

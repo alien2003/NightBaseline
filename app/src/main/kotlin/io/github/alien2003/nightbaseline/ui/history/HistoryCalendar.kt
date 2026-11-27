@@ -23,10 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CollectionInfo
@@ -45,9 +41,10 @@ import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.NbText
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
 import io.github.alien2003.nightbaseline.ui.components.cardTag
+import io.github.alien2003.nightbaseline.ui.interaction.NbKeyIntent
 import io.github.alien2003.nightbaseline.ui.interaction.NbSwitcher
 import io.github.alien2003.nightbaseline.ui.interaction.nbHorizontalScroll
-import io.github.alien2003.nightbaseline.ui.interaction.nbKeys
+import io.github.alien2003.nightbaseline.ui.interaction.nbKeyIntents
 import io.github.alien2003.nightbaseline.ui.interaction.nbStepSwipe
 import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
 import io.github.alien2003.nightbaseline.ui.material.solidCard
@@ -99,7 +96,6 @@ fun HistoryCalendar(
     val requesters = remember(month) { mutableMapOf<LocalDate, FocusRequester>() }
     var focused by remember { mutableStateOf<LocalDate?>(null) }
     var pendingFocus by remember { mutableStateOf<LocalDate?>(null) }
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     LaunchedEffect(month, pendingFocus) {
         val target = pendingFocus ?: return@LaunchedEffect
         requesters[target]?.let {
@@ -128,14 +124,11 @@ fun HistoryCalendar(
             Modifier
                 .fillMaxWidth()
                 .nbStepSwipe(
-                    SWIPE_DP.dp,
                     onPrevious = { onMonth(month.minusMonths(1)) }.takeIf { canPrevious },
                     onNext = { onMonth(month.plusMonths(1)) }.takeIf { canNext },
-                ).nbKeys { event ->
-                    if (event.type != KeyEventType.KeyDown) return@nbKeys false
-                    val from = focused ?: return@nbKeys false
-                    val target = keyTarget(event.key, from, nights, today, keyStep(event.key, transposed, rtl))
-                    if (target == null && !event.key.isCalendarKey()) return@nbKeys false
+                ).nbKeyIntents { intent ->
+                    val from = focused ?: return@nbKeyIntents false
+                    val target = keyTarget(intent, from, nights, today, transposed) ?: return@nbKeyIntents intent.isCalendarKey()
                     move(target)
                     true
                 },
@@ -251,7 +244,7 @@ private fun TransposedGrid(
     val text = rememberUiText()
     Column(
         Modifier
-            .then(if (scrolls) Modifier.nbHorizontalScroll(rememberNbScrollState()) else Modifier)
+            .then(if (scrolls) Modifier.nbHorizontalScroll(rememberNbScrollState(), id = "calendar-1") else Modifier)
             .semantics { collectionInfo = CollectionInfo(DAYS, weeks.size) },
         verticalArrangement = Arrangement.spacedBy(CELL_GAP),
     ) {
@@ -320,52 +313,46 @@ private fun anyDate(day: DayOfWeek): LocalDate = REFERENCE_MONDAY.plusDays((day.
 
 /** Day step of an arrow key in the usual or the transposed grid; null for other keys. */
 private fun keyStep(
-    key: Key,
+    move: NbKeyIntent.Move,
     transposed: Boolean,
-    rtl: Boolean,
-): Int? {
+): Int {
+    // dx is already in the reading direction (the framework decodes RTL once).
     val across = if (transposed) DAYS else 1
     val down = if (transposed) 1 else DAYS
-    val forward = if (rtl) -across else across
-    return when (key) {
-        Key.DirectionRight -> forward
-        Key.DirectionLeft -> -forward
-        Key.DirectionDown -> down
-        Key.DirectionUp -> -down
-        else -> null
-    }
+    return move.dx * across + move.dy * down
 }
 
 /** The day an arrow, Page Up / Down, Home or End key moves to from [from]; null when there is none or not a key of ours. */
 private fun keyTarget(
-    key: Key,
+    intent: NbKeyIntent,
     from: LocalDate,
     nights: Map<LocalDate, NightUi>,
     today: LocalDate,
-    step: Int?,
+    transposed: Boolean,
 ): LocalDate? =
-    when {
-        step != null -> nearestNight(from.plusDays(step.toLong()), step.toLong(), nights, today)
-        key == Key.PageUp -> nightInMonth(YearMonth.from(from).minusMonths(1), from.dayOfMonth, nights)
-        key == Key.PageDown -> nightInMonth(YearMonth.from(from).plusMonths(1), from.dayOfMonth, nights)
-        key == Key.MoveHome -> nights.keys.filter { YearMonth.from(it) == YearMonth.from(from) }.minOrNull()
-        key == Key.MoveEnd -> nights.keys.filter { YearMonth.from(it) == YearMonth.from(from) }.maxOrNull()
-        else -> null
+    when (intent) {
+        is NbKeyIntent.Move -> {
+            keyStep(intent, transposed).toLong().let { nearestNight(from.plusDays(it), it, nights, today) }
+        }
+
+        is NbKeyIntent.Page -> {
+            nightInMonth(YearMonth.from(from).plusMonths(intent.delta.toLong()), from.dayOfMonth, nights)
+        }
+
+        is NbKeyIntent.Edge -> {
+            nights.keys
+                .filter {
+                    YearMonth.from(it) == YearMonth.from(from)
+                }.let { if (intent.end) it.maxOrNull() else it.minOrNull() }
+        }
+
+        else -> {
+            null
+        }
     }
 
-private fun Key.isCalendarKey(): Boolean = this in CALENDAR_KEYS
-
-private val CALENDAR_KEYS =
-    setOf(
-        Key.DirectionLeft,
-        Key.DirectionRight,
-        Key.DirectionUp,
-        Key.DirectionDown,
-        Key.PageUp,
-        Key.PageDown,
-        Key.MoveHome,
-        Key.MoveEnd,
-    )
+/** The intents the calendar owns while a day is focused (consumed even when they lead nowhere). */
+private fun NbKeyIntent.isCalendarKey(): Boolean = this is NbKeyIntent.Move || this is NbKeyIntent.Page || this is NbKeyIntent.Edge
 
 /** The first date from [start] in steps of [step] days that has a night and is not after [today]; null if none near. */
 private fun nearestNight(
@@ -391,7 +378,6 @@ private fun nightInMonth(
 
 private const val DAYS = 7
 private const val MAX_SEARCH_STEPS = 62
-private const val SWIPE_DP = 64
 private val CELL_GAP = 2.dp
 private val CARD_PADDING = 8.dp
 private val FUTURE_DISC = 32.dp

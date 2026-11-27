@@ -421,7 +421,7 @@ private fun SinglePaneHome(
         Column(
             Modifier
                 .fillMaxSize()
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "home-1")
                 .padding(padding)
                 .padding(horizontal = layout.gutter)
                 .belowTopBar(barHeight, bottom = NbSpace.s5),
@@ -476,7 +476,7 @@ private fun TwoPaneHome(
                 .padding(start = layout.gutter)
                 .width(listWidth)
                 .fillMaxHeight()
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "home-2")
                 .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -487,7 +487,7 @@ private fun TwoPaneHome(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .nbVerticalScroll(rememberPaneScrollState())
+                .nbVerticalScroll(rememberPaneScrollState(), id = "home-3")
                 .padding(end = if (supporting) 0.dp else endGutter)
                 .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
@@ -503,7 +503,7 @@ private fun TwoPaneHome(
                 Modifier
                     .width(SUPPORTING_PANE)
                     .fillMaxHeight()
-                    .nbVerticalScroll(rememberPaneScrollState())
+                    .nbVerticalScroll(rememberPaneScrollState(), id = "home-4")
                     .padding(end = layout.gutter)
                     .belowTopBar(barHeight, bottom),
                 verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
@@ -584,7 +584,7 @@ private fun WideShortHome(
             Modifier
                 .width(WIDE_SHORT_START)
                 .fillMaxHeight()
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "home-5")
                 .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -594,7 +594,7 @@ private fun WideShortHome(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .nbVerticalScroll(rememberPaneScrollState())
+                .nbVerticalScroll(rememberPaneScrollState(), id = "home-6")
                 .belowTopBar(barHeight, bottom),
             verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
         ) {
@@ -662,7 +662,7 @@ private fun TabletopHome(
                 .fillMaxSize()
                 .offset(y = foldY + NbDimens.hingeClearance)
                 .padding(bottom = foldY + NbDimens.hingeClearance)
-                .nbVerticalScroll(scroll)
+                .nbVerticalScroll(scroll, id = "home-7")
                 .padding(bottom = padding.calculateBottomPadding() + NbSpace.s5),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

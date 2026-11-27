@@ -6,10 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.KeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalDensity
 
 /**
@@ -42,13 +39,6 @@ fun NbInteractionRoot(
 }
 
 /**
- * Keyboard shortcuts of a screen (navigation keys: Esc, Alt+Left, arrows, Ctrl+digits) on the framework's single key
- * path: the handler must turn a key into the same intent a tap would (a back through [NbBackRouter.back], a tab
- * change, a step), never into its own motion.
- */
-fun Modifier.nbKeys(onKey: (KeyEvent) -> Boolean): Modifier = onPreviewKeyEvent(onKey)
-
-/**
  * Layout changes are not navigation (ADR 0011 R6): a stack change made by [block] (a fold or unfold that re-projects
  * the pages) snaps instead of playing a push or pop, and any running back gesture is dropped.
  */
@@ -56,22 +46,19 @@ suspend fun nbReproject(
     router: NbBackRouter?,
     block: () -> Unit,
 ) {
-    router?.abort()
-    NbReproject.depth++
+    if (router == null) {
+        block()
+        return
+    }
+    router.abort()
+    router.reprojectDepth++
     try {
         block()
-        // Two frames: the composition that sees the change, and its effects.
+        // Two frames: the composition that sees the change, and the changes its effects make (a pane selection that
+        // follows the pop). User input cannot land in them: the fold itself aborted every gesture above.
         withFrameNanos { }
         withFrameNanos { }
     } finally {
-        NbReproject.depth--
+        router.reprojectDepth--
     }
-}
-
-/** True while [nbReproject] runs: hosts snap the changes they see. */
-internal object NbReproject {
-    @Volatile
-    var depth: Int = 0
-
-    val active: Boolean get() = depth > 0
 }

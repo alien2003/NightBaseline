@@ -271,7 +271,7 @@ private fun SinglePaneColumn(
     Column(
         Modifier
             .fillMaxSize()
-            .nbVerticalScroll(scroll)
+            .nbVerticalScroll(scroll, id = "settings-1")
             .padding(padding)
             .padding(horizontal = layout.gutter),
         horizontalAlignment = alignment,
@@ -309,7 +309,7 @@ private fun TwoPaneSettings(
             Modifier
                 .width(listWidth + layout.gutter)
                 .fillMaxHeight()
-                .nbVerticalScroll(rememberPaneScrollState())
+                .nbVerticalScroll(rememberPaneScrollState(), id = "settings-2")
                 .padding(start = layout.gutter, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding()),
             verticalArrangement = Arrangement.spacedBy(NbSpace.s2),
         ) {
@@ -326,7 +326,7 @@ private fun TwoPaneSettings(
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .nbVerticalScroll(paneScroll)
+                        .nbVerticalScroll(paneScroll, id = "settings-3")
                         .padding(
                             end = layout.gutter + padding.calculateEndPadding(direction),
                             top = padding.calculateTopPadding(),
@@ -490,7 +490,7 @@ private fun TabletopSettings(
             Column(
                 Modifier
                     .fillMaxSize()
-                    .nbVerticalScroll(scrolls.of(shown))
+                    .nbVerticalScroll(scrolls.of(shown), id = "settings-4")
                     .then(horizontal)
                     .padding(bottom = padding.calculateBottomPadding()),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -532,7 +532,7 @@ private fun GlancePage(
     Column(
         Modifier
             .fillMaxSize()
-            .nbVerticalScroll(scroll)
+            .nbVerticalScroll(scroll, id = "settings-5")
             .padding(padding)
             .padding(horizontal = NbDimens.gutterGlance),
         verticalArrangement = Arrangement.spacedBy(NbSpace.s3),
@@ -636,7 +636,7 @@ private fun <T : Any> ConfirmDialog(
         // Scrolls when the window is too short for the dialog (cover screen, tabletop half, 200 % font).
         BoxWithConstraints(Modifier.fillMaxSize().then(placement)) {
             Box(
-                Modifier.fillMaxSize().nbVerticalScroll(rememberNbScrollState()).heightIn(min = maxHeight),
+                Modifier.fillMaxSize().nbVerticalScroll(rememberNbScrollState(), id = "settings-6").heightIn(min = maxHeight),
                 contentAlignment = alignment,
             ) {
                 dialog(

@@ -33,6 +33,8 @@ import kotlin.math.sign
  *   scrolls in the same event.
  * - Fling, in any state: the fling is always performed; a non-zero o relaxes in parallel, and the velocity the content
  *   could not use (it hit the edge) seeds the return spring 1:1. Nothing is dropped: velocity in = content + offset.
+ *   Compose's `performFling` returns the velocity it **consumed**, so the leftover is `velocity - consumed`; a fling
+ *   that comes to rest inside the content consumes all of it and moves no offset (no bump away from an edge).
  * - Return: one spring, [NbPhysics.Overscroll], from (o, v); a finger landing during it stops it where it is (the
  *   scrollable cancels the running fling) and the drag rule applies to that o.
  *
@@ -44,9 +46,14 @@ class NbOverscrollEffect(
 ) : OverscrollEffect {
     private var offsetX by mutableFloatStateOf(0f)
     private var offsetY by mutableFloatStateOf(0f)
-    private var returning = false
 
-    override val isInProgress: Boolean get() = returning || offsetX != 0f || offsetY != 0f
+    /** Return springs running now (a cancelled one ends after its successor started, so a flag would clear too early). */
+    private var returning = 0
+
+    override val isInProgress: Boolean get() = returning > 0 || offsetX != 0f || offsetY != 0f
+
+    /** The translation past the edges now, px (tests). */
+    internal val translation: Offset get() = Offset(offsetX, offsetY)
 
     override val node: DelegatableNode = OffsetNode()
 
@@ -85,7 +92,7 @@ class NbOverscrollEffect(
             // A translated content relaxes while the fling runs (it never waits for the fling, nor drops it).
             val relaxX = if (offsetX != 0f) launch { returnTo(Axis.X, 0f) } else null
             val relaxY = if (offsetY != 0f) launch { returnTo(Axis.Y, 0f) } else null
-            val left = performFling(velocity)
+            val left = velocity - performFling(velocity)
             // The velocity the content could not use (it reached the edge) seeds the spring 1:1 from wherever the
             // offset is now: it throws the content past the edge and brings it back.
             if (abs(left.x) > MIN_VELOCITY) {
@@ -108,7 +115,7 @@ class NbOverscrollEffect(
     ) {
         val start = if (axis == Axis.X) offsetX else offsetY
         if (start == 0f && velocity == 0f) return
-        returning = true
+        returning++
         val limit = maxOffset
         val anim = Animatable(start, NbPhysics.OVERSCROLL_EPS_PX).apply { updateBounds(-limit, limit) }
         val write: Animatable<Float, *>.() -> Unit = { if (axis == Axis.X) offsetX = value else offsetY = value }
@@ -122,7 +129,7 @@ class NbOverscrollEffect(
             if (axis == Axis.X) offsetX = 0f else offsetY = 0f
         } finally {
             // Cancelled by a new touch: the content stays where the finger caught it.
-            returning = false
+            returning--
             if (axis == Axis.X && abs(offsetX) < NbPhysics.OVERSCROLL_EPS_PX) offsetX = 0f
             if (axis == Axis.Y && abs(offsetY) < NbPhysics.OVERSCROLL_EPS_PX) offsetY = 0f
         }
@@ -163,6 +170,7 @@ class NbOverscrollEffect(
                 placeable.placeWithLayer(0, 0) {
                     translationX = offsetX
                     translationY = offsetY
+                    if (offsetX != 0f || offsetY != 0f) NbMotionProbe.overscroll?.invoke(offsetX, offsetY)
                 }
             }
         }
