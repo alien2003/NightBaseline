@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -28,6 +29,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.TextLayoutResult
 import io.github.alien2003.nightbaseline.catalog.CatalogConfig
 import io.github.alien2003.nightbaseline.catalog.CatalogFrame
+import io.github.alien2003.nightbaseline.ui.interaction.NbScrollContainer
 import io.github.alien2003.nightbaseline.ui.layout.FoldInfo
 import io.github.alien2003.nightbaseline.ui.layout.LayoutInputs
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
@@ -207,12 +209,34 @@ class SetupScreenshotsTest(
         checkTargets(name, layout)
         val frames = mutableListOf(compose.onRoot().captureToImage().asAndroidBitmap())
         val step = frames.first().height * 3 / 4
-        while (scroll.value < scroll.maxValue && frames.size < MAX_FRAMES) {
-            compose.runOnIdle { runBlocking { scroll.scrollTo(scroll.value + step) } }
-            idle()
-            frames += compose.onRoot().captureToImage().asAndroidBitmap()
+        if (scroll.maxValue != Int.MAX_VALUE) {
+            while (scroll.value < scroll.maxValue && frames.size < MAX_FRAMES) {
+                compose.runOnIdle { runBlocking { scroll.scrollTo(scroll.value + step) } }
+                idle()
+                frames += compose.onRoot().captureToImage().asAndroidBitmap()
+            }
+        } else {
+            // The main state is not the shown page's (a sub-page scrolls on its own state): scroll the shown page's
+            // framework container (the largest one) through its semantics.
+            while (frames.size < MAX_FRAMES && scrollShown(step.toFloat())) {
+                idle()
+                frames += compose.onRoot().captureToImage().asAndroidBitmap()
+            }
         }
         write(name, stack(frames))
+    }
+
+    /** Scrolls the largest framework scroll container by [by] px; false when it is at its end. */
+    private fun scrollShown(by: Float): Boolean {
+        val node =
+            compose
+                .onAllNodes(SemanticsMatcher.keyIsDefined(NbScrollContainer))
+                .fetchSemanticsNodes()
+                .maxByOrNull { it.boundsInRoot.width * it.boundsInRoot.height }
+        val range = node?.config?.getOrNull(SemanticsProperties.VerticalScrollAxisRange)
+        val more = node != null && range != null && range.value() < range.maxValue()
+        if (more) compose.runOnIdle { node.config[SemanticsActions.ScrollBy].action?.invoke(0f, by) }
+        return more
     }
 
     /** Frames one below the other with a thin grey separator. */

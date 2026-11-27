@@ -2,6 +2,7 @@ package io.github.alien2003.nightbaseline.ui.interaction
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -16,15 +17,16 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.zIndex
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
+import kotlin.math.roundToInt
 import kotlin.math.sign
 
 /** The layout side pages come from: +1 (right) in LTR, -1 in RTL. */
@@ -395,5 +397,6 @@ private val LocalSectionShift = staticCompositionLocalOf<SectionShift?> { null }
 @Composable
 fun Modifier.nbFixedInSection(): Modifier {
     val shift = LocalSectionShift.current ?: return this
-    return graphicsLayer { translationX = -shift.tx() }
+    // An offset read at placement, not a layer: the glass bar samples its backdrop exactly as before.
+    return offset { IntOffset(-shift.tx().roundToInt(), 0) }
 }

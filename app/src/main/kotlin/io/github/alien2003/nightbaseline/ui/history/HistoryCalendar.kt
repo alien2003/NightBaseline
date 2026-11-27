@@ -147,29 +147,32 @@ fun HistoryCalendar(
                 onNext = { onMonth(month.plusMonths(1)) }.takeIf { canNext },
             )
             // Months are a sequence: a month change (buttons, swipe, keys) is the Pager kind (ADR 0011).
-            NbSwitcher(month, key = { it }, id = "month", order = naturalOrder()) { shownMonth ->
-                val weeks = weeksOf(shownMonth, firstDay)
-                val cell: @Composable (LocalDate?, Int, Int, Modifier) -> Unit = { date, row, column, cellModifier ->
-                    DaySlot(date, today, cellModifier) { day ->
-                        val requester = requesters.getOrPut(day) { FocusRequester() }
-                        CalendarCell(
-                            date = day,
-                            night = nights[day],
-                            onClick = { onDay(day) },
-                            today = day == today,
-                            selected = day == selected,
-                            modifier =
-                                cellModifier
-                                    .onFocusChanged { if (it.isFocused) focused = day }
-                                    .focusRequester(requester)
-                                    .semantics { collectionItemInfo = CollectionItemInfo(row, 1, column, 1) },
-                        )
+            NbSwitcher(month, key = { it }, modifier = Modifier.fillMaxWidth(), id = "month", order = naturalOrder()) { shownMonth ->
+                // The grid's rows as the month card lays them out (the header row, then one row per week).
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(NbSpace.s2)) {
+                    val weeks = weeksOf(shownMonth, firstDay)
+                    val cell: @Composable (LocalDate?, Int, Int, Modifier) -> Unit = { date, row, column, cellModifier ->
+                        DaySlot(date, today, cellModifier) { day ->
+                            val requester = requesters.getOrPut(day) { FocusRequester() }
+                            CalendarCell(
+                                date = day,
+                                night = nights[day],
+                                onClick = { onDay(day) },
+                                today = day == today,
+                                selected = day == selected,
+                                modifier =
+                                    cellModifier
+                                        .onFocusChanged { if (it.isFocused) focused = day }
+                                        .focusRequester(requester)
+                                        .semantics { collectionItemInfo = CollectionItemInfo(row, 1, column, 1) },
+                            )
+                        }
                     }
-                }
-                if (transposed) {
-                    TransposedGrid(weeks, firstDay, cell, scrolls = !fits)
-                } else {
-                    WeekGrid(weeks, firstDay, cell)
+                    if (transposed) {
+                        TransposedGrid(weeks, firstDay, cell, scrolls = !fits)
+                    } else {
+                        WeekGrid(weeks, firstDay, cell)
+                    }
                 }
             }
         }

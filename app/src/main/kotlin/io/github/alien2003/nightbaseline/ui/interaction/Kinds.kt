@@ -179,7 +179,7 @@ object NbPoses {
     }
 
     /** The radio fill scale bump `1 + 0.08 sin(pi p)` on the Select spring. */
-    fun radio(p: Float): Float = 1f + NbPhysics.RADIO_PULSE * kotlin.math.sin(Math.PI.toFloat() * p.coerceIn(0f, 1f))
+    fun radio(p: Float): Float = if (p <= 0f || p >= 1f) 1f else 1f + NbPhysics.RADIO_PULSE * kotlin.math.sin(Math.PI.toFloat() * p)
 }
 
 /** Maps a gesture's finger fraction to p for each kind (the "gesture -> p" column of ADR 0011). */
