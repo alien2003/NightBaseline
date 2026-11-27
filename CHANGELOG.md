@@ -10,6 +10,12 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-27
+
+Interaction update. Every page change, tab switch, sheet, scroll and press now runs on one shared motion model, the
+back gesture moves the page with your finger, the app asks for the screen's highest refresh rate, and about fifty
+fixes found by testing every screen on phone, foldable, tablet and Android 9 emulators.
+
 ### Added
 
 - **The back gesture moves the page with your finger.** When you swipe back from a night, a measurement, a Settings
@@ -18,33 +24,6 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
   the first screen nothing changes, so the system's own back-to-home animation plays. With animations off the back
   goes at once ([ADR 0009](https://github.com/alien2003/NightBaseline/blob/main/docs/adr/0009-predictive-back.md),
   [ADR 0011](https://github.com/alien2003/NightBaseline/blob/main/docs/adr/0011-interaction-framework.md)).
-
-### Fixed
-
-- **A flick no longer bounces when it stops.** Every page used to overshoot a little and spring back at the end of a
-  flick, even far from the top or bottom; now a flick comes to rest where it slows down, like it does in the sheets,
-  and only bounces at the end of the content.
-- **A swipe is never a tap.** A sideways swipe that starts on a measurement tile, a row or a button no longer opens
-  it. On a night, a sideways swipe anywhere on the page steps to the previous or next night.
-- **The back gesture follows your finger exactly** on every phone and on the inner screen of a foldable, and the page
-  you go back to is ready at the first frame, so the gesture no longer hesitates at the start.
-- **Bar and round buttons.** The bar now shows the section you are going to from the start of every tab change (it
-  used to show the old one while going back towards Home), and the bar, round buttons and tiles now shrink and light up
-  in exactly the same way.
-- **Folding back.** Folding the phone right after opening a night from History no longer breaks the next Back.
-- **Going back no longer stops halfway and then jumps.** When you let go of a back swipe, the page now keeps moving
-  smoothly to the edge, and the page underneath is switched in only once it has left the screen. A back swipe right
-  after one you took back, or a Back right after it, now always slides the page away instead of making it disappear
-  at once.
-- **Every change starts at its beginning.** Opening a page, a tab, a sheet or a banner whose first frame takes long
-  (the first sheet after starting the app, for example) now starts from its first step instead of jumping into the
-  middle of the motion, and a frame that takes long slows the motion down instead of skipping part of it.
-- **A tap shows its press before the page opens.** A quick tap on a row or a tile now lights it up before the next
-  page starts to come in, and a Back right after a tap goes back from what the tap opened.
-- **Sheets scroll from their edges.** A swipe that starts near the left or right edge of a sheet or dialog now scrolls
-  it, as it does on pages.
-- **Closing a sheet by choosing an option** (for example History or Settings in the Glance "More" sheet) now slides it
-  away instead of making it disappear at once.
 
 ### Changed
 
@@ -76,6 +55,27 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 
 ### Fixed
 
+- **A flick no longer bounces when it stops.** Every page used to overshoot a little and spring back at the end of a
+  flick, even far from the top or bottom; now a flick comes to rest where it slows down, like it does in the sheets,
+  and only bounces at the end of the content.
+- **A swipe is never a tap.** A sideways swipe that starts on a measurement tile, a row or a button no longer opens
+  it. On a night, a sideways swipe anywhere on the page steps to the previous or next night.
+- **The back gesture follows your finger exactly** on every phone and on the inner screen of a foldable, and the page
+  you go back to is ready at the first frame, so the gesture no longer hesitates at the start.
+- **Bar and round buttons.** The bar now shows the section you are going to from the start of every tab change (it
+  used to show the old one while going back towards Home), and the bar, round buttons and tiles now shrink and light up
+  in exactly the same way.
+- **Folding back.** Folding the phone right after opening a night from History no longer breaks the next Back.
+- **Going back no longer stops halfway and then jumps.** When you let go of a back swipe, the page now keeps moving
+  smoothly to the edge, and the page underneath is switched in only once it has left the screen.
+- **Every change starts at its beginning.** Opening a page, a tab, a sheet or a banner whose first frame takes long
+  (the first sheet after starting the app, for example) now starts from its first step instead of jumping into the
+  middle of the motion, and a frame that takes long slows the motion down instead of skipping part of it.
+- **A Back right after a tap** goes back from what the tap opened.
+- **Sheets scroll from their edges.** A swipe that starts near the left or right edge of a sheet or dialog now scrolls
+  it, as it does on pages.
+- **Closing a sheet by choosing an option** (for example History or Settings in the Glance "More" sheet) now slides it
+  away instead of making it disappear at once.
 - **Sources other than OHealth.** On Android 11 and later the app could not see any other source app, so right after
   setup it said the source was no longer on the phone and showed package names instead of app names. The app can now
   see every app that works with Health Connect (and only those).
@@ -84,13 +84,12 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
   after the tap: the release arrived before the highlight had drawn its first frame and was skipped. Every press now
   ends on its own release or cancel, and a press also clears when the window loses focus or the app is paused or
   stopped.
-- **Back gesture after a cancelled one.** A second swipe right after cancelling one on a page opened from History or
-  Settings now goes back one level, and the page continues from where it was instead of jumping back.
+- **Back gesture after a cancelled one.** A second swipe after cancelling one on a page opened from History or
+  Settings now goes back one level.
 - **Letting go of the back gesture no longer stalls.** When you let go, the page now keeps moving from the very next
   frame at the speed of your finger, instead of stopping for a moment and then jumping away.
 - **Pages and sheets open drawn.** A page whose content is still being prepared, such as a measurement opened from a
-  night, now slides in once its content is there instead of sliding in empty; sheets do the same, so the first sheet
-  you open no longer stutters.
+  night, now slides in once its content is there instead of sliding in empty; sheets do the same.
 - **A flick right after the end of a page goes as far as any other.** A flick just after the page bounced at its top
   or bottom used to travel farther, because the bounce kept moving the page under your finger.
 - **The bar changes its selected item at once** when you switch tabs, instead of fading between the two.
@@ -122,7 +121,9 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
   value is called "median" there instead of "mean". A low value on a side that doesn't count now says "Lower values … don't count". Skin
   temperature is shown as a signed change ("−0.1 °C vs usual"). Values never wrap between the number and the unit,
   and night titles never wrap inside the date. The chart summary counts the same nights as "This period".
-- **Health Connect links.** "Health Connect permissions" opens NightBaseline's own Health Connect permission page;
+- **Health Connect links.** "Health Connect permissions" opens NightBaseline's own Health Connect permission page
+  where Android allows it (on Android 14 and later Health Connect may open "Data and access"; NightBaseline is under
+  "App permissions");
   "Install or update" falls back to the Play web page and shows a message if nothing can open.
 - **First run.** Step 3 asks for access instead of saying there is no sleep data and preselects the source once
   access is granted, and "Check again" says when Health Connect is still not available or there is still no sleep
@@ -154,6 +155,14 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
   grants the seeder, so seeding works on a fresh emulator. `multiwindow.sh reset` restores the freeform settings that
   `freeform` turned on. `rotate.sh` works on API 28, checks the lock and fails loudly if it did not apply. `diag.sh`
   lists only NightBaseline's scheduled jobs on API 28 too.
+
+### Known issues
+
+- A back swipe started while a page is still springing back from a cancelled swipe can hold the page for a moment
+  and then make it disappear at once.
+- A tap on a row starts its page change a little later than Back and tab changes do.
+- The first sheet opened after starting the app can stutter.
+- In History, switching between list and calendar and changing the filter swap the content without a transition.
 
 ## [0.1.0] - 2026-11-26
 
@@ -217,5 +226,6 @@ a medical device.
 - Release APKs are signed with one release key; certificate SHA-256
   `26:EC:1D:EC:35:93:AD:CE:D2:68:BB:64:1E:CB:74:7B:2E:8B:15:42:D5:66:24:78:20:2F:E0:C6:B1:F4:D3:77`.
 
-[Unreleased]: https://github.com/alien2003/NightBaseline/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/alien2003/NightBaseline/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/alien2003/NightBaseline/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/alien2003/NightBaseline/releases/tag/v0.1.0

@@ -163,7 +163,7 @@ worried, talk to a health professional.
 
 ## Project status
 
-- **Current release: 0.1.0** (2026-11-26, [CHANGELOG.md](CHANGELOG.md)). First public version; feedback and source
+- **Current release: 0.1.1** (2026-11-27, [CHANGELOG.md](CHANGELOG.md)). Second public version; feedback and source
   reports are welcome in GitHub issues.
 - **Tested on a device:** the on-device suite ([tools/device-test](tools/device-test/README.md)) passes on the
   developer's phone, and real nights from OHealth are processed automatically.
