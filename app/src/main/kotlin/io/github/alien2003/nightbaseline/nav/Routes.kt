@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 /**
  * Typed destinations of the navigation graph (`screens.md` 2). Arguments are strings so they survive process death.
  *
- * The top-level sections Home, History and the Settings list share this one destination ([TopLevelHost], ADR 0006);
+ * The top-level sections Home, History and the Settings list share this one destination (`NbSectionHost`, ADR 0006);
  * the selected section is saved state of its back stack entry ([TOP_LEVEL_TAB], set by [toTop]).
  */
 @Serializable

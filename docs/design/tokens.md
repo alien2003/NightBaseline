@@ -166,7 +166,7 @@ faded in, its row gets `glass.topBar`, which passes the worst case.
 The chart tooltip is **not** glass: it floats over data, so it is always `material.solid.tooltip` (section 7.2)
 and uses `text.*` [decision, review round 0: glass is reserved for the shell, ADR 0003].
 
-The touch light (`glow.neutral`, section 9.5) is composited *under* the labels, as part of the backdrop, so the
+The touch light (`glow.neutral`, section 9.4) is composited *under* the labels, as part of the backdrop, so the
 worst-case contrast model (backdrop pure white or pure black) still bounds every label on a pressed glass item.
 
 Inside a glass sheet or dialog, content cards (for example a settings group) are solid `surface.elevated` /
@@ -199,8 +199,8 @@ off. Under higher contrast the solid shell also gets a 1 dp border in `onGlass.p
 ### 2.8 State layers
 
 ColorOS has no ripple. The pressed highlight is drawn **under** the content, clipped to the element's shape, so
-labels keep their colour; elements also shrink (section 9.5). Material's ripple is removed app-wide
-(`LocalIndication` = `NbPressIndication`, `LocalRippleConfiguration` = null; `tools/check-ripple.sh` rejects
+labels keep their colour; elements also shrink (section 9.4). Material's ripple is removed app-wide
+(`LocalIndication` = `NbPressIndication` from the interaction framework, `LocalRippleConfiguration` = null; `tools/check-ripple.sh` rejects
 `ripple(`).
 
 | token | light | dark | use |
@@ -211,7 +211,7 @@ labels keep their colour; elements also shrink (section 9.5). Material's ripple 
 | name | value | where |
 |---|---|---|
 | `state.glassHover` | rim alphas x 1.5 | glass items (no grey layer on glass) |
-| `state.glassPressed` | `glow.neutral` light under the finger (section 9.5) | glass items, round shell buttons, primary button |
+| `state.glassPressed` | `glow.neutral` light under the finger (section 9.4) | glass items, round shell buttons, primary button |
 | `state.dragged` | `text.primary` at 16 % | chart scrub handle, sheet handle |
 | `state.disabled` | labels stay `text.tertiary` (>= 4.5:1); only control graphics (switch, radio) may use the canon #5F5F5F; filled buttons at alpha 0.3 with a reason text | disabled controls |
 
@@ -527,8 +527,8 @@ reason. The first matching rule wins; the reason becomes the Settings summary (`
 | 8 | Device hot | `PowerManager.getCurrentThermalStatus() >= THERMAL_STATUS_SEVERE` (temporary, reverts when it cools) | Solid | normal | `glass_off_device` |
 | - | otherwise | | Glass | normal | (setting shows "Automatic") |
 
-Rules: a mode change never happens mid-gesture or mid-transition (it waits for the next idle frame) and crossfades
-the shell over `motion.duration.short` (instant under reduced motion). The fallback never changes geometry: sizes,
+Rules: a mode change never happens mid-gesture or mid-transition (it waits for the next idle frame) and switches
+the shell at once (no motion token: ADR 0011 has none for it). The fallback never changes geometry: sizes,
 radii, rims, shadows and positions are the same in both modes, only fills differ (`layouts.md` 1.5). Widgets and
 screenshots of the Solid variant use exactly the same component code with `EffectsMode.Solid` injected.
 
@@ -561,124 +561,118 @@ capsule). Back is an arrow, not a chevron; the disclosure chevron is a small 5 x
 
 ## 9. Motion
 
-Springs follow the reverse-engineered range of ColorOS 17 (dampingRatio 0.55-1.0, stiffness 160-1755 [Iris, COUI])
-and the measured back transition (exit ≈ 200 ms, entry from ≈ -1/3 width with a ≈ 0.33 -> 0 dim, settle ≈ 470 ms,
-no overshoot [measured]). The canon is critically damped almost everywhere; nothing grows above its size.
-Gesture-driven motion always uses springs and inherits the finger's velocity; data never overshoots.
+All motion, back, scroll and press behaviour is one framework: `ui/interaction` ([ADR 0011](../adr/0011-interaction-framework.md)).
+Every animated change is one scalar p in [0, 1] driven by one spring of the registry below and drawn by a pure pose
+function of its kind; screens never animate, they change state and the host the state lives in derives the kind from
+the change. Nothing grows above its size; data never overshoots. The tables 9.1 to 9.3 mirror
+`ui/interaction/Physics.kt` and are compared with it by `MotionTokensDocTest`: a change on one side without the
+other fails the build.
 
-### 9.1 Durations (for tweens and fades)
+### 9.1 Springs (the registry)
 
-| name | ms | use |
-|---|---|---|
-| `motion.duration.instant` | 0 | reduced-motion replacement |
-| `motion.duration.micro` | 100 | navigation icon outline -> filled and label weight crossfade |
-| `motion.duration.short` | 150 | crossfades, top-level switch, top bar tint in, effects-mode switch, dialog exit |
-| `motion.duration.medium` | 250 | dialog enter, banner in |
-| `motion.duration.reduced` | 120 | screen, sheet and dialog crossfade that replaces motion under reduced motion |
-| `motion.duration.long` | 350 | onboarding page change |
-| `motion.duration.glowIn` | 110 | touch light appears under the finger [Iris] |
-| `motion.duration.glowOut` | 480 | touch light fades after release [Iris] |
-
-### 9.2 Easing
-
-| name | cubic-bezier | use |
-|---|---|---|
-| `motion.easing.standard` | (0.2, 0, 0, 1) | general property changes |
-| `motion.easing.flow` | (0.3, 0, 0.1, 1) | entering elements (dialog, banner, tooltip) [decision: a generic strong-decelerate curve; the same numbers appear in a third-party kit (research file), no code or resource is taken from it] |
-| `motion.easing.exit` | (0.3, 0, 1, 1) | leaving elements |
-| `motion.easing.title` | (0.33, 0, 0.67, 1) | small top-bar title fading in over scroll 40 -> 72 dp |
-| `motion.easing.overscrollReturn` | (0.2, 0.62, 0.17, 1.05) | overscroll back to rest |
-| `motion.easing.linear` | linear | scroll-driven values (top bar tint by scroll offset) |
-
-### 9.3 Springs
-
-| name | dampingRatio | stiffness | use |
+| name | damping | stiffness | role |
 |---|---|---|---|
-| `motion.spring.page` | 1.0 | 220 | screen push / pop, predictive back release (settles ≈ 470 ms, matches [measured]) |
-| `motion.spring.morph` | 0.9 | 380 | shared-bounds morph tile -> Metric detail header, row -> Night detail, list -> pane |
-| `motion.spring.selection` | 1.0 | 247 | period selector thumb, tab underline (no overshoot) |
-| `motion.spring.pressIn` | 1.0 | 632 (compact) / 439 (wide) | press shrink |
-| `motion.spring.pressOut` | 0.8 | 380 | release; carries the press velocity, scale clamped at 1.0 [decision: the COUI 0.4 / 158 release would grow the element above its size, which ColorOS never does] |
-| `motion.spring.highlightIn` / `Out` | 1.0 | 1755 / 187 | pressed highlight of buttons and tiles |
-| `motion.spring.rowHighlightIn` / `Out` | 1.0 | 439 / 895 | pressed highlight of rows in a grouped card |
-| `motion.spring.follow` | 1.0 | 1500 | anything tracking the finger: chart scrub, thumb drag, sheet drag |
-| `motion.spring.sheet` | 1.0 | 250 | sheet show |
-| `motion.spring.sheetHide` | 1.0 | 440 | programmatic sheet hide |
-| `motion.spring.sheetReturn` | 1.0 | 247 | dragged sheet returning to rest |
-| `motion.spring.switch` | 0.7 | 247 | switch knob, stretch to x1.3 at 34.7 % of travel |
-| `motion.spring.squash` | 0.5 | 110 | segmented control height squash 0.94 -> 1 (optional) |
-| `motion.spring.pane` | 1.0 | 300 | pane resize / list-detail changes on resize, fold and unfold |
-| `motion.spring.data` | 1.0 | 400 | band, marker and value changes when the selected night changes (never overshoot) |
+| `Nav` | 1.2 | 860 | every navigation kind: page, tab, pager, swap, sheet, dialog, docked dialog, reveal [measured fit, HYPOTHESIS until a pixel re-measure] |
+| `Quick` | 1.0 | 1500 | navigation icon outline -> filled |
+| `Select` | 1.0 | 247 | tab underline, period thumb trailing edge, radio fill |
+| `SelectLead` | 1.0 | 600 | period thumb leading edge (it stretches towards the new period) |
+| `Data` | 1.0 | 400 | band, marker and value changes |
+| `Switch` | 0.7 | 247 | switch knob, the one bounce of the canon |
+| `PressIn` | 1.0 | 632 | press shrink of compact elements |
+| `PressInWide` | 1.0 | 439 | press shrink of wide elements (tiles, bar, full-width buttons) |
+| `PressOut` | 0.8 | 380 | press release, scale clamped at 1.0 |
+| `HighlightIn` | 1.0 | 1755 | pressed highlight of buttons and tiles appearing |
+| `HighlightOut` | 1.0 | 187 | pressed highlight of buttons and tiles fading |
+| `RowHighlightIn` | 1.0 | 439 | pressed highlight of a row in a grouped card appearing |
+| `RowHighlightOut` | 1.0 | 895 | pressed highlight of a row fading |
+| `Overscroll` | 1.0 | 150 | overscroll return (100 px -> 0.5 px in about 0.65 s) |
 
-### 9.4 Transitions
+`Nav` comes from `tools/design/fit-spring.py` over the back recording of `reference-analysis.md` 8.1 (free start
+offset, free damping, both layers): rms 2.7 px on the incoming page and 1.7 px on the outgoing page; a linear
+coupling of the two layers fits at 15.4 px only, hence the page exponent below. It settles (to `P_EPS`) in 460 ms;
+the old page spring (1.0 / 220 on Compose's 0.01 px default threshold) ran about 1 s.
 
-| transition | spec |
-|---|---|
-| Push (non-shared) | incoming slides in from the end edge (+100 % width), the covered page moves to -1/3 width with a black dim 0 -> 0.3; `spring.page`; no scale, no fade. Mirrored in RTL [measured: `reference-analysis.md` 8.1] |
-| Pop | mirrored: incoming from -1/3 with the dim 0.3 -> 0, outgoing to +100 %; `spring.page` |
-| In-page sub-navigation | the same push / pop via `AnimatedContent`, direction from page depth (Settings sub-pages, onboarding steps) |
-| Home tile -> Metric detail | `SharedTransitionLayout`: tile container `sharedBounds` -> header card, radius `shape.l` kept, value text `sharedElement`; other content fades in after 60 % progress; `spring.morph` |
-| History row -> Night detail | same pattern, row -> header |
-| Predictive back | drives the pop from the back progress; release `spring.page`, cancel `spring.follow`; commit threshold 45 dp; preview scale 0.92 kept until a slow-gesture capture exists |
-| Top-level section switch | crossfade `duration.short` |
-| Navigation selection | icon outline -> filled and label 500 -> 700, crossfade `duration.micro` `easing.standard`; no indicator |
-| Bottom bar on sub-pages | slides out (translate 88 dp + alpha 0, 200 ms `easing.exit`), back with `spring.page` |
-| Sheet | shows with `spring.sheet` from below; hides with `spring.sheetHide`; drag follows the finger (upward rubber band to 72 dp); release dismisses past 50 % or on a downward fling, else `spring.sheetReturn`; scrim alpha follows the offset |
-| Dialog | Compact, bottom-docked: slide from +100 % of its height + fade, `duration.medium` `easing.flow`; centred: scale 0.8 -> 1 + fade, same timing; exit fade (+ 24 dp slide when docked) `duration.short` `easing.exit` |
-| Tooltip | appears at the finger with fade + scale 0.9 -> 1, `duration.short`; position follows with `spring.follow` |
-| Learning -> range ready (`B-RANGE-READY`) | dotted band outline morphs into the filled band: dashes close, fill fades in, `spring.data` |
-| Fold / unfold / resize | panes animate with `spring.pane`; content keeps its scroll anchor; no reload, no fade of data |
+### 9.2 Constants
 
-### 9.5 Finger-following feedback
+| name | value | use |
+|---|---|---|
+| `P_EPS` | 0.001 | settle tolerance of every p (a 1e-3 share of the travel, about 1 px of a page) |
+| `OVERSCROLL_EPS_PX` | 0.5 | settle tolerance of the overscroll offset, px |
+| `GLOW_IN_MS` | 110 | touch light appears, `easing.standard` (0.2, 0, 0, 1) [Iris] |
+| `GLOW_OUT_MS` | 480 | touch light fades, `easing.exit` (0.3, 0, 1, 1) [Iris] |
+| `PARALLAX` | 1/3 | share of the width the covered page moves [measured] |
+| `DIM` | 0.3 | black dim over the fully covered page, dark theme [measured] |
+| `PAGE_GAMMA` | 2.2 | upper page at `W (1 - s^gamma)` when a share s of it is shown [measured fit] |
+| `DIALOG_START_SCALE` | 0.8 | a dialog grows from this scale |
+| `DIALOG_OPAQUE_AT` | 0.35 | a dialog is opaque from this share of its motion |
+| `REVEAL_RISE_DP` | 8 | a revealed element rises this far while it fades in |
+| `RADIO_PULSE` | 0.08 | radio fill scale bump `1 + 0.08 sin(pi p)` |
+| `SWITCH_STRETCH` | 0.3 | switch knob stretch, x1.3 |
+| `SWITCH_STRETCH_PEAK` | 0.347 | where along the travel the stretch peaks |
+| `PRESS_SCALE_SMALL` | 0.96 | press scale of 40 dp elements |
+| `PRESS_SCALE_LARGE` | 0.98 | press scale of the bar, tiles, full-width buttons |
+| `OVERSCROLL_FOLLOW` | 0.5 | share of a pull past the edge the content follows at o = 0 |
+| `OVERSCROLL_MAX_DP` | 240 | largest overscroll translation |
 
-- **Press shrink**: tiles, buttons, chips, round shell buttons and the bar shrink to 0.96 (side <= 40 dp) ... 0.98
-  (side >= 150 dp or aspect >= 4: bar, full-width buttons, sheet handle), linear in between, on
-  `spring.pressIn`; release on `spring.pressOut` with the press velocity, never above 1.0. Rows inside a grouped
-  card do not shrink, they only light up. Not on chart points.
-- **Pressed highlight**: `state.pressed` under the content, clipped to the element's shape (hover: two thirds).
-- **Touch glow** on shell items, round shell buttons, the period selector thumb and primary buttons: a radial
-  `glow.neutral` light (radius up to 140 dp, capped by the element and clipped to it) appears in `duration.glowIn`,
-  follows the finger, fades in `duration.glowOut` after release. Decorative, never on cards; at most one animating.
-- **Functional light**: one place only, a short highlight sweep across the period selector thumb in the direction of
-  the change.
-- No bar minimising on scroll.
-- **Haptics**: public `HapticFeedbackConstants` only (no vendor codes, ADR 0003): switch `TOGGLE_ON` / `TOGGLE_OFF`
-  (API 34+, else `CLOCK_TICK`); segment drag crossing `SEGMENT_TICK` (else `CLOCK_TICK`); chart scrub point
-  `CLOCK_TICK` (`SEGMENT_FREQUENT_TICK` on 34+); long press `LONG_PRESS`; nothing for taps, tabs, rows, navigation
-  or the overscroll edge; through the View so the system setting applies.
+The small top-bar title is a pure function of the scroll offset through `easing.title` (0.33, 0, 0.67, 1) over
+40 -> 72 dp; the top-bar material is `scroll / 10 dp` clamped to [0, 1]. Neither has a clock of its own.
+
+### 9.3 Kinds and poses
+
+p is 0 at the state being left and 1 at the state being reached. e is the side: +1 the end edge (right in LTR).
+s is the shown share of the upper layer of a stack pair: s = p for a push, s = 1 - p for a pop, on the same layers.
+
+| kind | relation it comes from | pose | gesture -> p |
+|---|---|---|---|
+| Page | one level deeper or shallower in a stack: app routes, settings sub-pages (every layout), the two-pane detail pane's own stack, onboarding steps, the debug catalog | upper `tx = e W (1 - s^2.2)`; lower `tx = -e W/3 s`, dim `0.3 s`; no scale, no fade, no corners | the leaving page stays under the finger: `1 - s^2.2 = u0 + (1 - u0) g` |
+| Tab | the top-level sections in bar order (bar, rail, Ctrl+1/2/3, "See all", "See history", Glance "More", back to Home) | the Page geometry, the higher bar index is the upper layer; e from the bar order whatever the swipe edge; the bar and rail stay in place | as Page |
+| Pager | neighbours in a sequence: previous / next night (button, swipe, arrow keys), month (buttons, swipe, keys), the History detail pane's night | outgoing `tx = -e p W`, incoming `tx = e (1 - p) W`; newer values come from the end side | (a swipe decides by fling projection, then runs p) |
+| Swap | unordered peers in a fixed place: Home's detail pane metric, Settings section in two panes | outgoing alpha `max(0, 1 - 2p)`, incoming `max(0, 2p - 1)` | - |
+| Sheet | overlay from the bottom | `ty = (1 - p) H`, scrim alpha p | drag `p = 1 - dy / H`; back `p = 1 - g` |
+| Dialog | centred overlay | scale `0.8 + 0.2 p`, alpha `min(1, p / 0.35)`, scrim alpha p | back `p = 1 - g` |
+| DockedDialog | dialog docked at the bottom (phone widths) | `ty = (1 - p) H`, alpha `min(1, p / 0.35)` | back `p = 1 - g` |
+| Reveal | an element appearing or disappearing in place (banners) | alpha p, height share p, rising 8 dp | - |
+
+Release (R0): a gesture's release continues on the same spring from (p, v), v measured on p. Towards a state that
+leaves the screen (a commit, a hide) nothing is capped and the motion ends at its first crossing; towards a visible
+rest (a cancel, a sheet returning) v is capped at `omega (zeta + sqrt(zeta^2 - 1)) a`, so it never crosses. Both
+settle no later than a tap from rest (ADR 0011, lemmas 1 and 2). Pager swipes and sheet drags are decided like a
+fling: the platform decay projects the travel; past half (or the step threshold) it commits.
+
+### 9.4 Press, highlight, glow
+
+- **Press shrink**: 0.96 (side <= 40 dp) ... 0.98 (side >= 150 dp or aspect >= 4), linear between, on `PressIn`
+  (`PressInWide` from 0.97); release on `PressOut`, never above 1.0. Rows inside a grouped card only light up.
+- Every press, shell controls included, follows the clickable's press interactions: inside a scrolling container it
+  starts after the tap timeout and ends as soon as a scroll takes the gesture.
+- **Pressed highlight** `state.pressed` under the content on `HighlightIn` / `HighlightOut` (rows on the row springs).
+- **Touch glow** on shell items, round shell buttons, the period thumb and primary buttons: radial `glow.neutral`,
+  radius up to 140 dp, in `GLOW_IN_MS`, out `GLOW_OUT_MS`.
+- **Haptics**: public `HapticFeedbackConstants` only (switch, segment, chart scrub tick, long press).
+
+### 9.5 Scroll and overscroll
+
+- One fling: the platform spline decay (`ScrollableDefaults.flingBehavior()`) on every framework container
+  (`nbVerticalScroll`, `nbHorizontalScroll`, `NbLazyColumn`) [decision: ColorOS fling feel is unmeasured].
+- Overscroll translates without distortion [measured: `reference-analysis.md` 8.2]: a pull adds
+  `0.5 (1 - |o| / 240 dp)` of the leftover (it saturates); a drag away from the edge takes o back 1:1 and scrolls the
+  remainder in the same event; a fling is always performed and the velocity the content cannot use seeds the
+  `Overscroll` spring 1:1; a finger landing during the return stops it where it is. Content shorter than its
+  viewport bounces the same way. None under reduced motion.
+- Horizontal gestures inside a vertical scroll claim the pointer only when the finger has moved more than the touch
+  slop and more horizontally than vertically at that moment (rule A).
 
 ### 9.6 Reduced motion
 
-Active when `ANIMATOR_DURATION_SCALE == 0` ("Remove animations"), when battery saver is on, or when the system
-reports the accessibility "remove animations" option (same setting). With a scale between 0 and 1, durations and
-spring settle times are simply scaled by Compose; with 0, these variants replace the normal ones:
+One rule, at the root: `reduced` when animations are removed (`ANIMATOR_DURATION_SCALE == 0`) or battery saver is on
+[decision]. Then every p snaps to its target, press scale and glow are off (the static highlight remains), the
+overscroll is off and a back gesture shows nothing and goes back at once. Fling stays on. Other duration scales are
+applied by the platform's `MotionDurationScale`; the framework does not scale again.
 
-| normal | reduced variant |
-|---|---|
-| shared-bounds morph, push / pop with parallax and dim | crossfade `motion.duration.reduced` (forced to 120 ms by our own clock even at scale 0, so the change of screen stays visible) |
-| predictive back preview | none; back completes without preview |
-| sheet and dialog motion | fade `motion.duration.reduced` |
-| springs with overshoot (switch, squash) | snap to the end state |
-| press shrink, glow spread | none; the static pressed highlight (and a static glow while pressed on glass) only |
-| overscroll bounce | none: content stops at the edge |
-| progressive top bar tint by scroll | appears at a fixed scroll threshold, no fade |
-| `B-RANGE-READY` morph | static filled band |
-| fold/unfold pane animation | instant relayout |
+### 9.7 Not built
 
-### 9.7 Overscroll
-
-ColorOS translates the content past the edge without distortion instead of Android's stretch [measured:
-`reference-analysis.md` 8.2]. Implemented by our own `NbOverscrollEffect`, provided app-wide through
-`LocalOverscrollFactory` (none under reduced motion):
-
-| name | value |
-|---|---|
-| `motion.overscroll.follow` | the content follows 24 % (slow pull) to 34 % (fast pull, >= 24 dp per event) of the finger travel past the edge, with growing resistance up to 240 dp; holds while the finger rests |
-| `motion.overscroll.return` | 700 ms, `easing.overscrollReturn`, never across the edge |
-| `motion.overscroll.throw` | a fling that hits the edge: leftover velocity x 0.047 s, at most 107 dp, rise 60 ms FastOutSlowIn, then the return |
-| `motion.overscroll.catch` | a finger landing during the return stops it where it is |
-
-Fling itself stays the Compose spline decay (revisit after a side-by-side recording [hypothesis]).
+- Shared-bounds morphs (Home tile -> Metric, History row -> Night) and pane resize animations on fold: not built;
+  their tokens are gone. A fold or unfold re-projects the pages with a snap (ADR 0011 R6).
 
 ## 10. Interaction: targets, focus, hover
 

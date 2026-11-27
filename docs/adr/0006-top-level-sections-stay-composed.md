@@ -15,7 +15,7 @@ formatting in each row) on the UI thread.
 
 ## Decision
 
-- Home, History and the Settings list share one destination, `TopLevelRoute`, hosted by `TopLevelHost`. A section
+- Home, History and the Settings list share one destination, `TopLevelRoute`, hosted by `TopLevelHost` (since ADR 0011: `NbSectionHost` in `ui/interaction`, the same rule). A section
   is composed on its first visit and stays composed while the destination is on the back stack; hidden sections are
   neither measured, placed nor drawn and their semantics are cleared. A switch crossfades two already composed trees
   through the layers' alpha (150 ms, 120 ms under reduced motion, as before), read in the draw phase only.

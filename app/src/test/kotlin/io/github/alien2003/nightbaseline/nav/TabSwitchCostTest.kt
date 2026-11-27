@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * switch while every switch rebuilt the destination). On the owner's unfolded layout (952 x 1050 dp, rail, two panes)
  * with synthetic nights, switching Last night <-> History back and forth must not compose any screen or History row
  * again once both were shown, and must not map the ViewModels' inputs again: the sections stay composed in
- * [TopLevelHost] and keep their ViewModel subscriptions. Counted through [PerfProbe].
+ * `NbSectionHost` and keep their ViewModel subscriptions. Counted through [PerfProbe].
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, qualifiers = "en-rUS-w952dp-h1050dp-port-378dpi")

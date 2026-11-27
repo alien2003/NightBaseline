@@ -99,7 +99,7 @@ enum class ForcedInteraction {
 }
 
 /**
- * Press scale for an element of [size] (`tokens.md` 9.5): 0.96 for small controls (side <= 40 dp) up to 0.98 for
+ * Press scale for an element of [size] (`tokens.md` 9.4): 0.96 for small controls (side <= 40 dp) up to 0.98 for
  * large or wide ones (side >= 150 dp, or aspect >= 4, such as the bar and full-width buttons). Never above 1.0.
  */
 fun nbPressScale(

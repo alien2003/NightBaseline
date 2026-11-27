@@ -133,9 +133,9 @@ presented by one `ModalHost` (`ui/components/Modal.kt`), COUI-panel style:
   composed before it, so the floating bar and rail are below it and dim with it; nothing of the shell is drawn over a
   panel.
 - **Closing always animates and always ends hidden.** Scrim tap, system Back and the predictive back gesture (the
-  panel follows the gesture by 12 % of its height and scales to 0.92 from its bottom centre; cancel returns on
-  `spring.sheetReturn`), a drag on the header or a downward pull of content already at its top (past half the height
-  or a fling > 1000 dp/s dismisses, carrying the velocity into `spring.sheetHide`, otherwise it returns), the close
+  panel follows the gesture towards hidden, p = 1 - g, and a cancel returns on the same spring), a drag on the header
+  or a downward pull of content already at its top (dismissed when the fling projection passes half the height or on
+  a fling > 1000 dp/s, carrying the velocity into the hide; otherwise it returns; one Nav spring, ADR 0011), the close
   button and a chosen option (`ModalScope.dismiss`) all ask the caller to clear the value; the host animates out.
   Re-opening while it leaves reverses from where it is.
 - **No stuck overlay.** While leaving, the scrim no longer takes touches (the screen underneath works at once) and the

@@ -43,5 +43,6 @@ wins), `docs/adr/0006-top-level-sections-stay-composed.md` (cheap tab switches).
 | Text >= 4.5:1, graphics and focus >= 3:1, both themes, glass over white and black backdrops | `python3 -I tools/design/contrast_check.py docs/design/tokens.md`; `ContrastTest` | in place: CI `checks` job and `:app:testDebugUnitTest` |
 | English-only repository | `tools/check-language.sh` (pre-commit hook) | in place: pre-commit and CI |
 | No Material ripple (ColorOS press feedback only, `tokens.md` 2.8) | `tools/check-ripple.sh`; `RippleBanTest` | in place: CI |
+| One interaction framework: motion, back, scroll and press only in `ui/interaction` ([ADR 0011](../adr/0011-interaction-framework.md), `tokens.md` 9) | `tools/check-interaction.sh`; `InteractionBoundaryTest`, `MotionTokensDocTest`, `NbPhysicsTest`, `InteractionCatalogTest`, `ScrollInvariantTest` | in place: CI |
 | Screenshot matrix and layout assertions (clipping, fold intersection, 48 dp targets) | `layouts.md` 11, `screens.md` 10; JVM screenshot tests in `app/src/testDebug` | screenshot matrix in place (CI `app-tests` job); which layout assertions are automated: the per-screen reviews |
 | Frame timing on the owner's phone (glass and solid) | `tokens.md` 7.4 | manual, with the owner's permission (results in `docs/STATUS.md`) |

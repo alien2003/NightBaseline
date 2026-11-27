@@ -167,7 +167,7 @@ object NbDimens {
     /** Status triangle side in the band. */
     val markerTriangle: Dp = 10.dp
 
-    /** Radius of the touch light under the finger (`tokens.md` 9.5); capped by the element's own size. */
+    /** Radius of the touch light under the finger (`tokens.md` 9.4); capped by the element's own size. */
     val glowRadius: Dp = 140.dp
 
     /** Chart height in Compact (`layouts.md` 5.2). */

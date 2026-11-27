@@ -12,14 +12,26 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 
 ### Added
 
-- **The back gesture previews where it goes.** When you swipe back from a night, a measurement, a Settings page, an
-  onboarding step or the History and Settings tabs, the page now shrinks slightly, rounds its corners and moves with
-  your finger over the page you are going back to; let go to go back, or swipe back the other way to stay. On the
-  first screen nothing changes, so the system's own back-to-home animation plays. With animations off there is no
-  preview ([ADR 0009](https://github.com/alien2003/NightBaseline/blob/main/docs/adr/0009-predictive-back.md)).
+- **The back gesture moves the page with your finger.** When you swipe back from a night, a measurement, a Settings
+  page, an onboarding step or the History and Settings tabs, the page slides under your finger over the page you are
+  going back to; let go to go back, it continues at the speed of your finger, or swipe back the other way to stay. On
+  the first screen nothing changes, so the system's own back-to-home animation plays. With animations off the back
+  goes at once ([ADR 0009](https://github.com/alien2003/NightBaseline/blob/main/docs/adr/0009-predictive-back.md),
+  [ADR 0011](https://github.com/alien2003/NightBaseline/blob/main/docs/adr/0011-interaction-framework.md)).
 
 ### Changed
 
+- **Every movement in the app now follows the same rules.** Opening and closing a page, switching tabs (with the
+  bar, the rail, a keyboard shortcut or a "See all" link), stepping to the previous or next night or month,
+  selecting in a two-pane layout, sheets and dialogs all use the same motion with the same timing, fitted to the
+  back animation of the ColorOS Settings app. "See all" and "See history" now slide to History like every other change instead of
+  appearing, the bar stays in place while the pages move under it, and a swipe back right after opening a page
+  continues smoothly instead of getting stuck halfway. Folding or unfolding the phone rearranges the screen without
+  playing a page change ([ADR 0011](https://github.com/alien2003/NightBaseline/blob/main/docs/adr/0011-interaction-framework.md)).
+- **Scrolling is the same everywhere.** A flick right after reaching the end of a page now scrolls and flings
+  instead of doing nothing, pulling past the edge follows the finger more closely, and it springs back from the speed
+  it had. Round buttons in scrolling content (such as the calendar's month buttons) no longer light up while you
+  scroll over them.
 - **Smoother on high-refresh screens.** While you use the app it now asks for the screen's highest refresh rate at
   the current resolution (for example 120 Hz instead of 60 Hz), and gives it back 5 seconds after your last touch and
   when you leave the app; battery saver and the system's refresh-rate setting still take precedence

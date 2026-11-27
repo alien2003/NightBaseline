@@ -80,6 +80,7 @@ mise exec -- ./gradlew ktlintFormat                        # fix formatting
 bash tools/check-language.sh                               # English only
 bash tools/check-leaks.sh                                  # no home paths, keys, passwords, tokens, personal emails
 bash tools/check-ripple.sh                                 # no Material ripple in the app sources
+bash tools/check-interaction.sh                            # motion, back, gesture, scroll APIs only in ui/interaction
 mise exec -- python3 tools/design/contrast_check.py docs/design/tokens.md
 ```
 
@@ -91,6 +92,7 @@ mise exec -- python3 tools/design/contrast_check.py docs/design/tokens.md
 | `tools/check-language.sh` | No Cyrillic in tracked files outside the modules' `res/values-ru*` folders (`app/`, `work/`) and `README.ru.md` ([ADR 0002](adr/0002-project-language-and-history.md)); `--staged` checks the index (pre-commit hook). New files are checked once they are added to git |
 | `tools/check-leaks.sh` | No absolute home paths, private keys, signing passwords, tokens or personal email addresses in tracked files; `--staged` checks the index (pre-commit hook) |
 | `tools/check-ripple.sh` | No Material ripple in the app's main and debug sources: press feedback is the ColorOS highlight ([tokens.md 2.8](design/tokens.md#28-state-layers)); the same rule runs as `RippleBanTest` |
+| `tools/check-interaction.sh` | No animation, navigation, back, gesture, press, key, scroll, fling, overscroll or indication API outside `ui/interaction`, no spring or tween literal outside its registry, no screen import inside it ([ADR 0011](adr/0011-interaction-framework.md)); the same rules run as `InteractionBoundaryTest` |
 | `tools/design/contrast_check.py` | WCAG contrast of every pair in the contrast table of `docs/design/tokens.md`, glass tints over white and black |
 | `tools/device-test/run-device-tests.sh` | The on-device end-to-end suite against the installed release app ([On-device tests](#on-device-tests)); only with the phone owner's permission, never in CI |
 
@@ -151,6 +153,53 @@ and dark, captured at rest: `home-{light,dark}.png` (last night with measurement
 `onboarding-{light,dark}.png` (welcome step) and `settings-{light,dark}.png` (main page). It fails on an unfilled
 placeholder or clipped text. Look at the images before committing them. Screenshots of real data
 never go into the repository; reference screenshots of other apps stay in `.data/design-refs/`.
+
+## Interaction framework: screens, transitions, scrolling, presses
+
+Every animation, back, gesture, press, key, scroll, fling and overscroll of the app goes through
+`app/src/main/kotlin/…/ui/interaction` ([ADR 0011](adr/0011-interaction-framework.md)). Outside that package these
+APIs are forbidden (`tools/interaction-forbidden.txt`), checked by `tools/check-interaction.sh` (pre-commit hook, CI)
+and by `InteractionBoundaryTest` (`./gradlew test`). The allowlist `tools/interaction-allowlist.txt` is empty and may
+only shrink. Screens state what changed; the host the state lives in decides how it moves.
+
+**A new screen (a route).** Add the route to `nav/Routes.kt` and a `page<YourRoute> { entry -> … }` block to the graph
+in `nav/AppNavHost.kt`. Push with `navController.push(YourRoute(...))` (a push is ignored while the top page is still
+moving in, so a double tap pushes once) and go back with `navController.popBackStack()`; nothing else. The push, the
+pop, the round Back button, Esc, 3-button Back and the back gesture are then the framework's Page kind on the Nav
+spring, with the gesture under the finger. Give the screen its scaffold (`AppScaffold` or `ShellPage`) as the other
+screens do.
+
+**A stack inside a screen** (sub-pages, steps): keep the current page in the view model, compute the path from the
+root to it, and draw it with `NbStackHost(stack = path, key = { it }, onBack = vm::back) { page -> … }`. Back targets
+nest by themselves: the deepest stack whose branch is shown takes Back.
+
+**Content that changes in place:** `NbSwitcher(value, key = { … }, order = …)`: with an order (dates, months) it is a
+Pager towards the newer side, without one a Swap. An element that appears and disappears (a banner):
+`NbReveal(value) { … }`. A sheet or a dialog: `ModalHost(value, onDismiss, kind = ModalKind.…)` with a `GlassSheet` or
+`GlassDialog`; Back, the scrim, a drag and the close button are handled there.
+
+**Scrolling:** `Modifier.nbVerticalScroll(rememberNbScrollState())`, `NbLazyColumn(state = rememberNbLazyListState())`
+or `Modifier.nbHorizontalScroll(...)`. They carry the one fling and the one overscroll, and register the container for
+`ScrollInvariantTest`, which then covers the new screen without being edited (add the screen to its list of screens
+if it needs a route to open).
+
+**Presses:** `Modifier.nbClickable(onClick, shape)` for every control; shell controls use `ShellRoundButton` or
+`shellClickable` with `rememberShellPressState()` and `interactionSource = press.source`. A horizontal gesture inside
+a scrolling column: `nbStepSwipe` (steps) or `nbScrub` (charts), both on the axis rule. Keys: `Modifier.nbKeys`,
+turning a key into the same change a tap makes (`LocalNbBackRouter.current?.back()` for Back).
+
+**A value that animates** (a control's knob, a marker): `animateNbFloat(target, NbPhysics.<role>)`. A new role is a
+new entry in `Physics.kt` and in `tokens.md` 9.1 or 9.2, in the same commit (`MotionTokensDocTest` compares them); a
+spring or tween literal anywhere else fails the build.
+
+**A new kind of change** is a new `NbRelation` / `NbKind`, a pose function in `NbPoses` and a case in `kindOf` (the
+compiler checks the `when` is total), plus a row in `tokens.md` 9.3, an ADR note, and the triggers in
+`InteractionCatalogTest`.
+
+**Tests.** `NbMotionProbe.frames` receives every drawn frame of a running change (host, kind, spring, p, poses,
+gesture); `NbMotionProbe.flings` every fling. `InteractionCatalogTest` shows how to drive a trigger and check its
+kind, its frames and its end; `PredictiveBackTest` how to drive the back gesture through the activity's
+`OnBackPressedDispatcher`.
 
 ## Health data, the dataset exporter and algo-cli
 
@@ -319,7 +368,7 @@ and `docs/design/tokens.md` is read by tests and the contrast check.
 
 | Job | What it does |
 |---|---|
-| `checks` | `tools/check-language.sh`, `tools/check-leaks.sh`, `tools/design/contrast_check.py docs/design/tokens.md` and `tools/check-ripple.sh` (5 min) |
+| `checks` | `tools/check-language.sh`, `tools/check-leaks.sh`, `tools/design/contrast_check.py docs/design/tokens.md` `tools/check-ripple.sh` and `tools/check-interaction.sh` (5 min) |
 | `build` | `verifyModuleGraph ktlintCheck detekt :app:assembleDebug :app:processReleaseMainManifest`, then the module tests, then a direct check that the merged release manifest has no network permission. On `main` it uploads the debug APK (`nightbaseline-debug-apk`, 2 days); on failure, the reports (7 days) |
 | `app-tests` | `:app:testDebugUnitTest` on a fresh runner; uploads the synthetic screenshots (`screenshots`, 3 days) and, on failure, the reports |
 

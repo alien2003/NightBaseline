@@ -1,6 +1,6 @@
 # ADR 0009: Predictive back for screens
 
-- Status: accepted
+- Status: accepted; the page pose, the settles and the timeout superseded by [ADR 0011](0011-interaction-framework.md)
 - Date: 2026-11-26
 
 ## Context

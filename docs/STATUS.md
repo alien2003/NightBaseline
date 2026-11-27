@@ -9,7 +9,7 @@ Live project state. A new session starts here. Updated after every step. Last fu
   `.data`.
 - Repository: github.com/alien2003/NightBaseline — PUBLIC (since 2026-11-26, owner's request). Recreated once with a
   rewritten history (no home paths, Apache-2.0 in every commit, ADR 0004). Guards on every commit and in CI:
-  `tools/check-language.sh`, `tools/check-leaks.sh`, `tools/check-ripple.sh`.
+  `tools/check-language.sh`, `tools/check-leaks.sh`, `tools/check-ripple.sh`, `tools/check-interaction.sh`.
 - Release signing key: `<project>/.secrets/nightbaseline-release.jks` + `keystore.properties` (mode 600). Certificate
   SHA-256 `26:EC:1D:EC:35:93:AD:CE:D2:68:BB:64:1E:CB:74:7B:2E:8B:15:42:D5:66:24:78:20:2F:E0:C6:B1:F4:D3:77`. Uploaded
   as repo secrets NIGHTBASELINE_KEYSTORE_BASE64 / _KEYSTORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD. **The owner must back
@@ -44,10 +44,19 @@ Live project state. A new session starts here. Updated after every step. Last fu
   fastest mode at the current resolution while in use, plus `FrameRateCategory.High` votes on API 35+ (ADR 0008);
   second pass: java.time stability config, calendar cells memoized, lazy start-up injection, `ScrollCostTest`. Still
   to verify on the phone (ask): `dumpsys display` / `SurfaceFlinger` / `gfxinfo` (docs/development.md, Performance).
-- Predictive back for screens (ADR 0009): pushed routes, tab -> Home, Settings sub-pages, onboarding steps and the
-  catalog preview the page under the finger; no handler at the root. Verified in Robolectric (`PredictiveBackTest`,
-  frames in `SheetFramesScreenshotsTest`); not yet felt on the phone or an emulator with a real gesture. Values are
-  estimates until a slow back swipe of an OPPO system app is captured.
+- One interaction framework (ADR 0011, 2026-11-27), answering the owner's reports (a) back gesture from a History
+  night stuck halfway then vanishing, (b) "See all" without animation, (c) gestures and bar / round buttons at
+  different speeds, (d) Settings scroll heavy, fling "every other time": every animated change is one p on one
+  spring registry with pure poses (`ui/interaction`), hosts for stacks, sections, pagers, swaps, reveals and modals,
+  one back router, one scroll / overscroll / press model. Root causes fixed by construction (1 s page spring with no
+  visibility threshold, NavHost restarting pops from rest, frozen preview pose, overscroll dropping flings). Verified
+  on the JVM and Robolectric only: `NbPhysicsTest`, `InteractionCatalogTest`, `ScrollInvariantTest`,
+  `PredictiveBackTest`, `InteractionBoundaryTest`, `MotionTokensDocTest`. Not yet felt on the phone (ask): reports
+  (a) to (d) on a release build. HYPOTHESIS: Nav spring 1.2 / 860 with page exponent 2.2 (fit of the recording's
+  table, rms 2.7 / 1.7 px; a pixel re-measure of the frames is open), Tab = Page geometry (no OPPO tab recording),
+  overscroll follow 0.5. Open: the page under a pushed page is composed only during a change (first gesture frame
+  over History costs a composition); night / month pagers do not drag the neighbour under the finger; the boundary
+  check is a regex source scan (no type-resolved detekt rule, no public API snapshot).
 
 ## Next
 1. Fix → build dev.6 → install (ask) → confirm the night is processed automatically; then a further new night without

@@ -38,6 +38,7 @@ Every document of the repository, grouped by reader.
 | [adr/0007-on-device-e2e-suite.md](adr/0007-on-device-e2e-suite.md) | On-device end-to-end suite inside the installed release |
 | [adr/0008-high-refresh-rate.md](adr/0008-high-refresh-rate.md) | High refresh rate while the app is in use, battery-friendly |
 | [adr/0009-predictive-back.md](adr/0009-predictive-back.md) | Predictive back for screens: the page follows the gesture, values as tokens |
+| [adr/0011-interaction-framework.md](adr/0011-interaction-framework.md) | One interaction framework: one scalar p per change, one spring registry, pure poses, one back router, one scroll and press model, enforced by a boundary check |
 
 ## Design
 

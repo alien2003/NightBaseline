@@ -593,7 +593,7 @@ const val TOP_LEVEL_TAB: String = "top_level_tab"
 
 /**
  * Top-level navigation: back to the [TopLevelRoute] entry at the root (pages pushed above it are popped) and select
- * [tab] there. The sections stay composed in [TopLevelHost], so this rebuilds nothing.
+ * [tab] there. The sections stay composed in `NbSectionHost`, so this rebuilds nothing.
  */
 fun NavHostController.toTop(tab: TopLevel) {
     val root = currentBackStack.value.lastOrNull { it.destination.hasRoute<TopLevelRoute>() }
