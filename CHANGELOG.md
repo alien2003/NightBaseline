@@ -32,6 +32,19 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
   used to show the old one while going back towards Home), and the bar, round buttons and tiles now shrink and light up
   in exactly the same way.
 - **Folding back.** Folding the phone right after opening a night from History no longer breaks the next Back.
+- **Going back no longer stops halfway and then jumps.** When you let go of a back swipe, the page now keeps moving
+  smoothly to the edge, and the page underneath is switched in only once it has left the screen. A back swipe right
+  after one you took back, or a Back right after it, now always slides the page away instead of making it disappear
+  at once.
+- **Every change starts at its beginning.** Opening a page, a tab, a sheet or a banner whose first frame takes long
+  (the first sheet after starting the app, for example) now starts from its first step instead of jumping into the
+  middle of the motion, and a frame that takes long slows the motion down instead of skipping part of it.
+- **A tap shows its press before the page opens.** A quick tap on a row or a tile now lights it up before the next
+  page starts to come in, and a Back right after a tap goes back from what the tap opened.
+- **Sheets scroll from their edges.** A swipe that starts near the left or right edge of a sheet or dialog now scrolls
+  it, as it does on pages.
+- **Closing a sheet by choosing an option** (for example History or Settings in the Glance "More" sheet) now slides it
+  away instead of making it disappear at once.
 
 ### Changed
 

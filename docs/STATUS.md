@@ -61,6 +61,13 @@ Live project state. A new session starts here. Updated after every step. Last fu
   rule meeting the injector's 56-59 ms gaps, not app logic. Open: first sheet open stall (V4) and tab frame cost (V6,
   two glass bars per tab change) are unmeasured on the phone and not changed; night / month pagers do not drag the
   neighbour under the finger; the boundary check is a regex source scan (no type-resolved detekt rule).
+  Round 4 (ADR 0011 "Round 4", emulator measurements V2-1..V2-12 and review V1..V13): a Back (gesture or not) moves
+  first and changes the state after its motion (R9); a run from rest starts one display frame in and no frame advances
+  a motion by more than 50 ms (R7); a click runs after the frame that shows its press (P1); the release velocity is
+  measured on the finger; sheets scroll from their margins; `InteractionReachTest` checks every scroll container of the
+  sources is reached one tap deep at three sizes. Verified on the emulator (nb-phone alone, temporary trace): fast
+  back gesture release continuous, pop composed after the last moving frame. V2-6 (platform touchX resampling) and
+  V2-8 (touch-mode exit eats the first key) are platform behaviour. Not yet felt on the phone (ask).
 
 ## Next
 1. Fix → build dev.6 → install (ask) → confirm the night is processed automatically; then a further new night without

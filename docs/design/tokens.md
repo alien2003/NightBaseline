@@ -614,7 +614,8 @@ the old page spring (1.0 / 220 on Compose's 0.01 px default threshold) ran about
 | `OVERSCROLL_MAX_DP` | 240 | largest overscroll translation |
 | `STEP_SWIPE_DP` | 56 | a step swipe (night, month) steps when the decay projects the released travel past this, towards a side; one threshold for every sequence |
 | `POINTER_STOPPED_MS` | 40 | a finger that rested this long before it let go has no release velocity and its release starts from rest (the platform's stopped-pointer rule) |
-| `ENTER_WAIT_MS` | 300 | an entering page or panel without content yet holds its change at the start at most this long (R8) |
+| `ENTER_WAIT_MS` | 300 | an entering page or panel without content yet holds its change at the start at most this long after the request (R8) |
+| `FRAME_STALL_MS` | 50 | no frame advances a motion by more than this: a stalled frame slows it instead of jumping it (R7) |
 
 The small top-bar title is a pure function of the scroll offset through `easing.title` (0.33, 0, 0.67, 1) over
 40 -> 72 dp; the top-bar material is `scroll / 10 dp` clamped to [0, 1]. Neither has a clock of its own.
@@ -630,22 +631,27 @@ s is the shown share of the upper layer of a stack pair: s = p for a push, s = 1
 | Tab | the top-level sections in bar order (bar, rail, Ctrl+1/2/3, "See all", "See history", Glance "More", back to Home) | the Page geometry, the higher bar index is the upper layer; e from the bar order whatever the swipe edge; the bar and rail stay in place | as Page |
 | Pager | neighbours in a sequence: previous / next night (button, swipe, arrow keys, Page Up / Down), month (buttons, swipe, keys), the History detail pane's night | outgoing `tx = -e p W`, incoming `tx = e (1 - p) W`; newer values come from the end side; the night pager spans the window width (pages enter and leave at the screen edges, the gutters are inside each page) | (a swipe decides by fling projection past `STEP_SWIPE_DP`, then runs p). One step area: the whole page answers the swipe, the arrows in the reading direction and Page Up / Down, with focus inside it or without focus through the router |
 | Swap | unordered peers in a fixed place: Home's detail pane metric, Settings section in two panes | outgoing alpha `max(0, 1 - 2p)`, incoming `max(0, 2p - 1)` | - |
-| Sheet | overlay from the bottom | `ty = (1 - p) H`, scrim alpha p | drag `p = 1 - dy / H`; back `p = p0 (1 - g)`, g the finger's travel over the window width as for a page |
-| Dialog | centred overlay | scale `0.8 + 0.2 p`, alpha `min(1, p / 0.35)`, scrim alpha p | back `p = p0 (1 - g)` |
-| DockedDialog | dialog docked at the bottom (phone widths) | `ty = (1 - p) H`, alpha `min(1, p / 0.35)` | back `p = p0 (1 - g)` |
-| Reveal | an element appearing or disappearing in place (banners) | alpha p, height share p, rising 8 dp | - |
+| Sheet | overlay from the bottom | `ty = (1 - p) H`, scrim alpha p | drag `p = 1 - dy / H`; back `p = p0 - g`, g the finger's travel over the window width as for a page |
+| Dialog | centred overlay | scale `0.8 + 0.2 p`, alpha `min(1, p / 0.35)`, scrim alpha p | back `p = p0 - g` |
+| DockedDialog | dialog docked at the bottom (phone widths) | `ty = (1 - p) H`, alpha `min(1, p / 0.35)` | back `p = p0 - g` |
+| Reveal | an element appearing or disappearing in place (banners) | alpha p, height share p, rising 8 dp; on the hosts' driver (R7), frames reported | - |
 
-Release (R0): a gesture's release continues on the same spring from (p, v), v measured on p. Towards a state that
+Release (R0): a gesture's release continues on the same spring from (p, v); v is the finger's velocity measured on
+its travel, times the slope of the gesture map at the release (the page leaves at the finger's speed). Towards a state that
 leaves the screen (a commit, a hide) nothing is capped and the motion ends at its first crossing; towards a visible
 rest (a cancel, a sheet returning) v is capped at `omega (zeta + sqrt(zeta^2 - 1)) a`, so it never crosses. Both
 settle no later than a tap from rest (ADR 0011, lemmas 1 and 2). Pager swipes and sheet drags are decided like a
 fling: the platform decay projects the travel; past half (or the step threshold) it commits; a step swipe's Pager
 change starts with the swipe's velocity.
 
-Time (R7): every frame draws its spring at `frame time - origin`. A tap's origin is its request; a release continues
-from the frame that drew the finger's last sample, or starts from rest at the release when the finger rested longer
-than `POINTER_STOPPED_MS`. Content (R8): a change whose entering page or panel has no content yet holds at its start
-(the frame before the change) until it has some, at most `ENTER_WAIT_MS`, and starts its time then. The page below the
+Time (R7): without stalls every frame draws its spring at `frame time - origin`. A tap's origin is its request; a
+release continues from the frame that drew the finger's last sample, or starts from rest at the release when the
+finger rested longer than `POINTER_STOPPED_MS`. A run from rest is at most one display frame into its spring in its
+first frame (a slow set-up frame is never caught up), and no frame advances a run by more than `FRAME_STALL_MS`.
+Content (R8): a change whose entering page or panel has no content yet holds at its start (the frame before the
+change) until it has some, at most `ENTER_WAIT_MS` after the request. Back (R9): a Back, by gesture or not, runs its
+motion to the end and changes the host's state after it. Press (P1): a click runs after the frame that shows its
+press. The page below the
 top of a stack and every visited section are placed and drawn ahead in an invisible layer, so a gesture or a tab change
 starts on an existing layer.
 

@@ -91,18 +91,35 @@ rendering of every kind (a snap).
   platform's `MotionDurationScale` and are not applied again.
 - **R6 layout is not navigation.** A fold or unfold that re-projects the pages (`FoldBack`) snaps, and drops a
   running back gesture; the rest of that gesture does nothing.
-- **R7 time origin.** A run is a pure function of the time since it was asked for: every frame draws the spring at
+- **R7 time origin (round 4).** Without stalls a run is a pure function of time: every frame draws the spring at
   `frame time - origin`. The origin of a tap-driven change is its request (the composition that set it up); the
   origin of a release is the frame that drew the finger's last sample while the finger was still moving (no sample
   arrives between the last move and the lift), or the release itself once the finger had rested longer than the
-  platform's stopped-pointer time (`POINTER_STOPPED_MS`, 40 ms), which then also has no velocity. So the first frame
-  after a release already moves, and a long frame catches up exactly as the spring would have moved. Compose's
-  `Animatable` starts its clock at its first frame and draws its start value there, so the driver runs its own frame
-  loop on `TargetBasedAnimation` (bounded to [0, 1], ends at the first crossing or the settle).
+  platform's stopped-pointer time (`POINTER_STOPPED_MS`, 40 ms), which then also has no velocity; the origin of a
+  reversal or a retarget is the last frame the motion drew. Two bounds (`NbPlayClock`): a run **from rest** (no start
+  velocity) is at most one display frame into the spring in its first frame, so the time a slow set-up frame took is
+  never caught up as a jump (the screen showed the start pose until then); and no frame advances any run by more than
+  `FRAME_STALL_MS` (50 ms): a stalled frame slows the motion instead of jumping it. Compose's `Animatable` starts its
+  clock at its first frame and draws its start value there, so every spring of the framework runs on one frame loop
+  (`nbRunSpring` on `TargetBasedAnimation`): the hosts' p, the reveal and the overscroll return.
 - **R8 a change moves only what is drawn.** A change from rest whose entering layer has no content yet (the page was
   just composed and its state is still loading; a panel not measured yet) holds p at its start, which draws exactly
-  the frame before the change, until that layer has content, at most `ENTER_WAIT_MS` (300 ms); its origin is then the
-  frame after that content was laid out. A layer reports content when it emitted and measured some (`NbLayer`).
+  the frame before the change, until that layer has content, at most `ENTER_WAIT_MS` (300 ms) after the request; its
+  first frame of motion is then at most one display frame into the spring (R7). A layer reports content when it
+  emitted and measured some, and no content once it leaves the composition (`NbLayer`).
+- **R9 a Back moves first.** A Back of a stack or section host, by gesture or not (button, Esc, Alt+Left, 3-button,
+  TalkBack), runs its motion to the end and applies its state change (the pop, the section) when the motion has
+  settled; the host's next composition completes the change. The cost of the state change (lifecycles, the page
+  below becoming the shown one, its flows resuming) falls after the last moving frame. During the motion no layer
+  takes input; a second Back without a gesture waits for the first to settle and then runs; a back gesture that
+  starts during it lands the first Back at once (its state change applied, its motion at its end) and goes back from
+  there, as two Backs do. A Back that catches a cancel or a held gesture of the same change continues it from (p, v),
+  and so does a state change that arrives while a cancel runs (V2-2). Modals keep their own close: the caller's state
+  change comes first and the panel leaves on its spring.
+- **P1 the press comes first.** A click runs after the frame that shows its press: the tap's frame draws the press
+  (a press released before any frame drew it, as a quick tap in a scroll container, is drawn lit for one frame), and
+  the click runs at the start of the next frame. A Back or a navigation key that comes before a waiting click runs
+  that click first and is handled once its state change is composed, so input keeps its order.
 
 ### The two lemmas (proved in `NbPhysicsTest` by closed form and frame by frame)
 
@@ -240,6 +257,86 @@ fix is in the framework; each has a test that fails without it (checked by undoi
   finger from where it is. Host memory is written after a composition is applied (`SideEffect`). `AppScreens` is
   checked both ways (every route is opened by a registered screen) and has the Learning state. The boundary forbids
   any use of `androidx.compose.animation.`, fully qualified names included.
+
+### Round 4 (2026-11-27): the third measurement and review
+
+Emulator measurements of round 3 (V2-x, frame by frame, evdev input, two emulators running) and a review (Vx). Each
+fix is in the framework; the tests named fail without it (checked by undoing the fixes together and running them:
+15 of the round's 22 new tests failed, the others are guards or new API). Logged on one emulator (nb-phone, alone)
+with a temporary trace of the back events and the drawn pose, not committed.
+
+- **V2-1 the back gesture held, then jumped.** Two causes. The commit frame applied the pop (the History entry
+  resumed, its page became the shown one, a recomposition of the host), so the release's first frame was long
+  (70-190 ms with two emulators running), and R7 then caught the whole stall up in one frame. Fix: R9 (the pop after
+  the motion) and the stall bound of R7. Logged after the fix, a fast gesture: the last finger pose at 549 px, then
+  703, 843, 940, 1033 px on the next frames, the pop composed 16 ms after the last moving frame. The release's velocity
+  is now measured on the finger's travel (linear in the finger) and mapped by the slope of the page's gesture map
+  (`NbGestureMap.stackPopSlope`); measured on p it read up to 6 % low for fast flicks near the end of the travel. The
+  first frames after a release still move faster than the finger: that is the Nav spring's pull towards the end
+  (about 640 p/s^2 at p = 0.3), the same spring that starts every pop. Tests: `FrameworkRound3Test` (no state change
+  composes while the page moves; the pop exactly once, at the end), `NbClockLawTest` (a stalled frame advances by at
+  most `FRAME_STALL_MS`; without stalls every frame is the closed form; the release velocity is the finger's within
+  1 %).
+- **V2-2 a Back after a cancelled gesture made the page vanish in one frame.** A state change from the shown page to
+  the page below found "this change already runs" (its cancel, heading to 0) and set up nothing: the cancel ran on to
+  0 and the next frame showed the page below at rest. On the emulator the second gesture worked when it started after
+  the cancel; the measured failure is the platform committing a gesture it never started (no start, a commit while the
+  cancel returns). Fix: a state change or a Back that meets a cancel or a held gesture of the same change continues
+  it to the end from (p, v) (`retarget`, `goBack`). Test: `FrameworkRound3Test` (a Back and a direct pop during a
+  cancel's return: p rises monotonically from where the cancel was to the end).
+- **V2-3 / V2-4 / review V2 slow first frames.** A run's origin was its request; a set-up frame of 150-450 ms (a first
+  sheet open, a tab or page change) was caught up in its first frame (first visible p 0.2 to 0.95). R8 only covered an
+  entering layer without content. Fix: R7's first-frame bound for every run from rest (one display frame, from the
+  window's refresh rate). Tests: `NbClockLawTest`, `FrameworkRound3Test` (a push whose set-up frame took 200 ms starts
+  at the spring's first frame; the same for a reveal). The first-open frames of the explainer sheet themselves stay
+  long on the emulator (glass rendering on swiftshader) [not changed: rendering cost].
+- **V2-5 pushes started late, with no press feedback.** The click ran in the lift's event, so the frame that composed
+  the new page was the first frame after the tap; the R8 wait counted from its own first frame. Fix: P1, and R8's wait
+  counted from the request. Tests: `FrameworkRound3Test` (a quick tap in a scroll container has its press drawn before
+  its click runs; a push asked for 250 ms before its composition starts within 6 frames instead of 21).
+- **V2-6 hysteresis of 6-12 px.** Not the framework: logged on the emulator for the same injected gesture (1 -> 200,
+  hold, -> 400, hold, -> 200, hold), the platform delivered `touchX` 202.05 going forwards and 194.46 coming back for
+  the finger held at 200 (input resampling: the last delivered position of a moving finger is interpolated or
+  extrapolated, and nothing is delivered while it rests); the drawn pose was exactly the map of the delivered value
+  both times. Test: `FrameworkRound3Test` (the same delivered position draws the same p on any path, exactly).
+- **V2-7 the sheet did not scroll from its side padding.** The scroll container sat inside the panel's padding. Fix:
+  `nbVerticalScroll(contentPadding)` applies a margin inside the container; info sheets and dialogs scroll edge to
+  edge. Tests: `FrameworkRound3Test` (a margin inside the container scrolls), `ExplainerSheetScrollTest` (the real
+  explainer sheet flings from its side margin as from its middle), `InteractionReachTest` (every scrollable container
+  of a sheet or dialog reached one tap deep flings from the panel's margin).
+- **V2-8 keyboard steps on Night did nothing.** Not the framework: the platform spends the first navigation key after
+  a touch on leaving touch mode (it focuses the window), in every app. Logged on the emulator: the first Page Down
+  after a tap did nothing, the second stepped, and the arrows stepped. Each measured trial pressed one key after a tap
+  [not changed].
+- **V2-9 occasional weak flings** (6 of about 620) and **V2-11 frame stalls** in most transition trials: injection and
+  rendering on loaded emulators [hypothesis, not changed]; the stall bound of R7 keeps a stalled frame from showing as
+  a jump.
+- **V2-10 after a bounce a flick went up to 55 px farther** than the rest distance plus the touch slop on the
+  emulator. The Robolectric sweep measures the same cells within 2 px [not reproduced; open].
+- **V2-12 a swipe in the two-pane Night pane once changed the night but not the list's selection.** The pane's step
+  and the list's selection are one value (`vm.select`); the one trial started from another state [hypothesis, not
+  reproduced].
+- **V1** a modal closed by its caller ran from its open request: every open and every close now takes its origin.
+  **V3** the reveal runs on `NbDriver` (frames reported, kind Reveal) and the overscroll return on `nbRunSpring`.
+  **V4** a step's hand-over is read in composition and consumed once it is applied; the transition's request time,
+  the hosts' values, visited sections and targets' sides, and the modal's retained value are snapshot state or written
+  after the composition is applied. **V5** a back gesture moves a modal by the finger's travel from wherever it is
+  (`NbGestureMap.linear` = `p0 + g`). **V6** a layer that stops being shown gives up the focus it holds, and a step
+  area of a branch not shown steps nothing. **V7** a layer that leaves reports no content. **V8** the parked page
+  stays composed through a push, and a pop composes the page that will be below ahead. **V9** the parked probe runs
+  in the layer's draw (Robolectric draws the window on request in the tests). **V10** `InteractionReachTest` goes one
+  tap deeper (every pressable of every screen at three sizes; sheets, dialogs, toggles and panes), opens every screen
+  in every other layout mode (Glance, CompactShort, WideShort, Tabletop, Medium, Expanded, Large) and the permission
+  rationale, and checks that every scroll container id of the sources is reached, except a reviewed list that may only
+  shrink: the not-recorded sheet (the sample data never opens it) and the two panes of a night opened from Home in Book
+  (the registry opens nights from History, which fold into History's pane; registering that state made the fold-open
+  pressable sweep report a swipe that changed a selection on it, not investigated in this round [open]); the boundary
+  check requires a literal, unique id on every scroll container. **V11** pagers, staggered and horizontal grids, marquees, `android.view.animation` and raw motion events
+  are forbidden outside the framework. **V12** a fold drops a modal's back gesture. **V13** the default indication and
+  the clickable's highlight report their samples (`NbPressSample.Highlight`). Tests: `FrameworkRound3Test` (one per
+  item), `InteractionBoundaryTest`, `InteractionReachTest`.
+- A Back right after a modal opened found the root handler still disabled (it followed the targets one composition
+  late); it now follows them at once.
 
 ### Enforcement
 
