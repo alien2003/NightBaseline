@@ -76,6 +76,17 @@ class InteractionBoundaryTest {
     }
 
     @Test
+    fun `a selection changes in one step - no crossfade anywhere, the framework included (R1-8)`() {
+        // The bar's selected icon crossfaded over 2-4 frames, so the old item stayed lit after the change had started.
+        val crossfade = Regex("\\bCrossfade\\b")
+        val hits =
+            sources().flatMap { f ->
+                f.readLines().mapIndexedNotNull { i, line -> if (crossfade.containsMatchIn(code(line))) "${f.name}:${i + 1}" else null }
+            }
+        assertEquals(emptyList<String>(), hits)
+    }
+
+    @Test
     fun `every forbidden pattern catches what it is meant to`() {
         val samples =
             listOf(
@@ -107,6 +118,10 @@ class InteractionBoundaryTest {
                 "Modifier.indication(source, ripple)",
                 "BackEventCompat(0f, 0f, 0f, 0)",
                 "NbSpring(1f, 300f)",
+                // Review round 2: fully qualified calls bypassed the import ban.
+                "val t = androidx.compose.animation.core.rememberInfiniteTransition()",
+                "androidx.compose.animation.core.animate(0f, 1f) { v, _ -> }",
+                "t.animateFloat(0f, 1f, spec)",
             )
         samples.forEach { sample -> assertTrue(patterns.any { it.containsMatchIn(sample) }, "not caught: $sample") }
         // And the framework's own entry points are not.

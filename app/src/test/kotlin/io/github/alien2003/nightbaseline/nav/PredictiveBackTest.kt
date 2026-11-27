@@ -18,6 +18,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import io.github.alien2003.nightbaseline.testing.TestApp
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.interaction.NbClock
 import io.github.alien2003.nightbaseline.ui.interaction.NbFrame
 import io.github.alien2003.nightbaseline.ui.interaction.NbKind
 import io.github.alien2003.nightbaseline.ui.interaction.NbMotionProbe
@@ -75,12 +76,16 @@ class PredictiveBackTest {
 
     @Before
     fun setUp() {
+        // The framework's clock on the test's frame clock (ADR 0011 R7: requests and releases are timed in it).
+        NbClock.nowNanos = { compose.mainClock.currentTime * 1_000_000L }
         NbMotionProbe.frames = { frames += it }
         PerfProbe.sink = { name -> counts.getOrPut(name) { AtomicInteger() }.incrementAndGet() }
     }
 
     @After
     fun tearDown() {
+        NbClock.nowNanos = System::nanoTime
+        NbMotionProbe.parked = null
         NbMotionProbe.frames = null
         PerfProbe.sink = null
     }
@@ -490,6 +495,21 @@ class PredictiveBackTest {
     }
 
     @Test
+    fun `the page is a pure function of the touch position - forwards and back, no hysteresis (R1-7)`() {
+        launch()
+        val home = nav.currentBackStackEntry!!.id
+        val night = openNight()
+        startGesture()
+        // The emulator measured ~12 px of hysteresis on a reversal; the platform's own touchX lags on a reversal
+        // (it reported 291.7 px for a finger back at 300 px). Inside the framework the pose depends on touchX only.
+        for (share in floatArrayOf(0.1f, 0.3f, 0.5f, 0.3f, 0.1f, 0.3f)) {
+            progress(share)
+            assertUnderFinger("pages", night, home, share)
+        }
+        cancel()
+    }
+
+    @Test
     fun `the page follows the touch position, not the platform's shaped progress`() {
         launch()
         val home = nav.currentBackStackEntry!!.id
@@ -507,9 +527,14 @@ class PredictiveBackTest {
 
     @Test
     fun `the page below is composed ahead, so the first gesture frame composes no page`() {
+        val parked = CopyOnWriteArrayList<Pair<String, Any>>()
+        NbMotionProbe.parked = { host, key -> parked += host to key }
         launch()
+        val below = nav.currentBackStackEntry!!.id
         openNight()
         idle()
+        // R1-3: placed and drawn ahead as well (an invisible layer), not only measured.
+        assertTrue("the page below has its layer ahead: $parked", parked.any { it.first == "pages" && it.second == below })
         val home = count("HomeScreen")
         assertTrue("Home is composed while Night is on top (parked below it)", home > 0)
         startGesture()
@@ -543,20 +568,30 @@ class PredictiveBackTest {
         val vFinger = (gesture[gesture.size - 1] - gesture[gesture.size - 2]) / (FRAME_MS / 1000f)
         frames.clear()
         back.onBackPressed()
+        // What each frame shows: the last pose reported up to it (a layer block also reruns between frames when a state
+        // it reads changes, so the probe's reports are not one per frame).
+        val after = ArrayList<Float>()
         repeat(4) {
             shadowOf(Looper.getMainLooper()).idle()
             compose.mainClock.advanceTimeByFrame()
+            frames.lastOrNull { it.host == "pages" }?.let { after += it.p }
         }
         compose.mainClock.autoAdvance = true
-        val after = frames.filter { it.host == "pages" && !it.gesture }.map { it.p }.distinct()
-        assertTrue("frames after the release: $after", after.size >= 3)
-        // The release frame draws the release p (R0: continuous), the next one follows the spring from (p, v).
-        assertEquals("the release frame is where the finger left the page", pRelease, after[0], 2e-3f)
-        val step = after[1] - after[0]
+        assertTrue("frames after the release: $after", after.distinct().size >= 3)
+        // R7 (report a, R1-1): the first frame after the release already moves on the spring from the finger's last
+        // drawn (p, v), one frame after the frame that drew it; no frame repeats the release pose (the old run started
+        // at its first frame, so the page held for a frame or two and then jumped by the time it had lost).
+        assertTrue("no frame after the release repeats the release pose: $after", after.none { abs(it - pRelease) < 1e-4f })
+        val step = after[0] - pRelease
         val fromRest = springStep(pRelease, 0f)
         val withVelocity = springStep(pRelease, vFinger)
         assertTrue("the finger moved fast ($vFinger p/s)", withVelocity - fromRest > 5e-3f)
-        assertEquals("the first spring frame continues with the finger's velocity", withVelocity, step, (withVelocity - fromRest) / 3f)
+        assertEquals(
+            "the first frame after the release continues with the finger's velocity",
+            withVelocity,
+            step,
+            (withVelocity - fromRest) / 3f,
+        )
         idle()
     }
 

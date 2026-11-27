@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Velocity
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -88,6 +89,31 @@ class OverscrollFlingTest {
         assertTrue(notInProgress.isEmpty(), "translated but not in progress: $notInProgress")
         assertEquals(Offset.Zero, effect.translation)
         assertFalse(effect.isInProgress)
+    }
+
+    @Test
+    fun `a drag during the return spring owns the content - the spring stops and moves nothing under the finger (R1-4)`() {
+        val effect = NbOverscrollEffect(density)
+        // Pulled past the top edge: the content is translated down.
+        effect.applyToScroll(Offset(0f, 300f), NestedScrollSource.UserInput) { Offset.Zero }
+        var clock: SamplingClock? = null
+        clock = SamplingClock {}
+        runBlocking(clock) {
+            // The release: the content returns on its spring (no fling velocity).
+            val returning = launch { effect.applyToFling(Velocity.Zero) { Velocity.Zero } }
+            repeat(3) { clock.withFrameNanos { } }
+            val before = effect.translation.y
+            assertTrue(before > 0f, "still on its way back: $before")
+            // A new finger drags 10 px away from the edge (the content takes what is left after the offset).
+            effect.applyToScroll(Offset(0f, -10f), NestedScrollSource.UserInput) { it }
+            val afterDrag = effect.translation.y
+            assertEquals(before - 10f, afterDrag, 1e-3f, "the drag takes the offset back 1:1")
+            repeat(10) { clock.withFrameNanos { } }
+            // Before the fix the return spring went on under the finger: the content travelled the offset on top of
+            // the finger's own travel (a flick right after a bounce went 10-28 % farther than at rest).
+            assertEquals(afterDrag, effect.translation.y, 0f, "nothing but the finger moves the content")
+            returning.join()
+        }
     }
 
     private companion object {

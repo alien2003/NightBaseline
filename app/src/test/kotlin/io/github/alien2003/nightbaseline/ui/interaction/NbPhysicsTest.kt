@@ -133,24 +133,88 @@ class NbPhysicsTest {
         println("I3 closed form: $cases cases, tap settles in %.1f ms, worst release - tap = %.1f ms".format(tap * 1e3, worst * 1e3))
     }
 
-    /** Runs Compose's Animatable on a manual clock of 16 ms frames; returns p per frame. */
+    /**
+     * Runs the hosts' [NbDriver] on a manual clock of 16 ms frames from [start] with [v0] towards 1; returns p per frame.
+     * [originBefore] (ns): the run was asked for that long before its first frame (rule R7); null: at its first frame.
+     */
     private fun frames(
         start: Float,
         v0: Float,
-        bounded: Boolean = true,
+        originBefore: Long? = null,
     ): List<Float> {
         val clock = ManualClock()
         val out = ArrayList<Float>()
-        runBlocking(clock) {
-            val anim = Animatable(start, NbPhysics.P_EPS)
-            if (bounded) anim.updateBounds(0f, 1f)
-            anim.animateTo(1f, nav.spec(), v0) { out += value }
+        val driver = NbDriver(nav) { false }
+        val saved = NbClock.nowNanos
+        NbClock.nowNanos = { clock.now }
+        try {
+            runBlocking(clock) {
+                driver.snapTo(start)
+                clock.afterFrame = { out += driver.p }
+                driver.run(1f, v0, originBefore?.let { clock.now + ManualClock.FRAME_NANOS - it })
+                clock.afterFrame = null
+            }
+        } finally {
+            NbClock.nowNanos = saved
         }
         return out
     }
 
     @Test
-    fun `I3 - frame by frame on Compose's Animatable, a release ends no later than a tap`() {
+    fun `R7 - a run is the spring at frame time minus its request, so no frame after a release repeats the release pose`() {
+        val dt = 0.016
+        var cases = 0
+        for (i in 1..9) {
+            val p = i * 0.1f
+            for (vr in listOf(0f, 2f, 6f, 10f)) {
+                val v0 = NbRelease.startVelocity(p, vr, 1f, nav, visibleTarget = false)
+                // The release falls anywhere in the frame before the first one: 1, 8 or 15 ms before it.
+                for (lead in longArrayOf(1_000_000L, 8_000_000L, 15_000_000L)) {
+                    val seq = frames(p, v0, originBefore = lead)
+                    // Frame k (from 0) is at lead + k * 16 ms after the release: the closed form there, never the
+                    // release pose again (the fault behind report a: Compose's Animatable draws its start value in
+                    // its first frame, so the page held one more frame and then jumped by the time it had lost).
+                    seq.forEachIndexed { k, x ->
+                        val t = lead / 1e9 + k * dt
+                        val expected = minOf(1.0, 1.0 + d(t, -(1.0 - p), v0.toDouble()))
+                        if (expected < 1.0 - NbPhysics.P_EPS) assertEquals(expected, x.toDouble(), 2e-3, "p=$p vr=$vr lead=$lead k=$k")
+                    }
+                    assertTrue(seq.first() > p, "p=$p vr=$vr lead=$lead: the first frame after the release moves (${seq.first()})")
+                    cases++
+                }
+            }
+        }
+        println("R7: $cases releases, every frame on the closed form at its time since the release")
+    }
+
+    @Test
+    fun `R7 - a release continues the finger's last motion, and from rest once the finger rested`() {
+        val clock = ManualClock()
+        val saved = NbClock.nowNanos
+        NbClock.nowNanos = { clock.now }
+        try {
+            runBlocking(clock) {
+                val driver = NbDriver(nav) { false }
+                // Every sample is drawn in the next frame (track waits for it on this clock).
+                for (k in 0..5) driver.track(k * 0.05f, k * 16L)
+                val lastDrawn = clock.now
+                clock.advance(5_000_000L)
+                val moving = driver.releaseVelocity(clock.now)
+                assertTrue(moving > 2f, "a moving finger has its velocity at the release ($moving)")
+                // A moving finger's release continues from its last sample, from the frame that drew it (no hold
+                // until the release: the platform reports no position between the last move and the lift).
+                assertEquals(lastDrawn, driver.releaseOrigin(clock.now))
+                clock.advance((NbPhysics.POINTER_STOPPED_MS + 1) * 1_000_000L)
+                assertEquals(0f, driver.releaseVelocity(clock.now), "a finger that rested before it let go has none")
+                assertEquals(clock.now, driver.releaseOrigin(clock.now), "a rested finger starts from rest at the release")
+            }
+        } finally {
+            NbClock.nowNanos = saved
+        }
+    }
+
+    @Test
+    fun `I3 - frame by frame on the hosts' driver, a release ends no later than a tap`() {
         val tap = frames(0f, 0f).size
         var cases = 0
         for (i in 0..19) {
@@ -276,7 +340,7 @@ class NbPhysicsTest {
     }
 
     @Test
-    fun `gesture maps - the leaving page stays under the finger from any start`() {
+    fun `gesture maps - the leaving page moves exactly with the finger from any start`() {
         val w = 1000f
         for (p0 in listOf(0f, 0.2f, 0.5f, 0.8f)) {
             val start = NbPoses.stack(1f - p0, 1, w, false).first.tx
@@ -284,7 +348,9 @@ class NbPhysicsTest {
                 val g = j / 20f
                 val p = NbGestureMap.stackPop(g, p0)
                 val tx = NbPoses.stack(1f - p, 1, w, false).first.tx
-                assertEquals(start + (w - start) * g, tx, 0.05f, "p0=$p0 g=$g")
+                // 1:1 with the finger from where the page is (review: a gesture catching a running pop scaled the
+                // finger by 1 - u0), up to the far edge.
+                assertEquals(minOf(w, start + w * g), tx, 0.05f, "p0=$p0 g=$g")
             }
         }
         assertEquals(0.5f, NbGestureMap.linear(0.5f, 0f), 0f)
@@ -333,12 +399,23 @@ class NbPhysicsTest {
 internal class ManualClock : MonotonicFrameClock {
     private var nanos = 0L
 
-    override suspend fun <R> withFrameNanos(onFrame: (frameTimeNanos: Long) -> R): R {
-        nanos += FRAME_NANOS
-        return onFrame(nanos)
+    /** The time of the last frame, ns. */
+    val now: Long get() = nanos
+
+    /** Runs after every frame (tests read what the frame drew). */
+    var afterFrame: (() -> Unit)? = null
+
+    /** Moves the clock without a frame. */
+    fun advance(by: Long) {
+        nanos += by
     }
 
-    private companion object {
+    override suspend fun <R> withFrameNanos(onFrame: (frameTimeNanos: Long) -> R): R {
+        nanos += FRAME_NANOS
+        return onFrame(nanos).also { afterFrame?.invoke() }
+    }
+
+    companion object {
         const val FRAME_NANOS = 16_000_000L
     }
 }

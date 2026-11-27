@@ -148,11 +148,11 @@ class FrameworkHostsTest {
                 )
                 val state = rememberShellPressState()
                 shell = state
-                val scale = with(LocalDensity.current) { nbPressScale(IntSize(WIDTH.roundToPx(), HEIGHT.roundToPx()), this) }
+                // No scale is given: the shell control derives it from its measured size, as the clickable does.
                 Box(
                     Modifier
                         .size(WIDTH, HEIGHT)
-                        .shellPressInput(state, pressedScale = scale)
+                        .shellPressInput(state)
                         .shellPressScale(state)
                         .shellPressGlow(state, RectangleShape),
                 )

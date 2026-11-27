@@ -16,6 +16,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
+import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
@@ -72,12 +73,17 @@ abstract class InteractionSweep(
     private val overscroll = CopyOnWriteArrayList<Float>()
     private val report = StringBuilder()
 
+    /** The vertical overscroll translation now, px (signed: + the content is moved down). */
+    @Volatile
+    private var overscrollY = 0f
+
     @Before
     fun setUp() {
         NbMotionProbe.frames = { frames += it }
         NbMotionProbe.flings = { id, v -> flings += id to v }
         NbMotionProbe.flingEnds = { id, d -> flingEnds += id to d }
         NbMotionProbe.overscroll = { x, y -> overscroll += maxOf(abs(x), abs(y)) }
+        NbMotionProbe.overscrollNow = { _, y -> overscrollY = y }
     }
 
     @After
@@ -86,17 +92,19 @@ abstract class InteractionSweep(
         NbMotionProbe.flings = null
         NbMotionProbe.flingEnds = null
         NbMotionProbe.overscroll = null
+        NbMotionProbe.overscrollNow = null
         controller?.pause()?.stop()?.destroy()
         println("${javaClass.simpleName}:\n$report")
     }
 
-    private fun launch() {
+    private fun launch(nights: Int? = null) {
         controller?.pause()?.stop()?.destroy()
         idle()
         controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        val app = if (nights != null) TestApp(nights = nights) else TestApp()
         controller!!.get().setContent {
             nav = rememberNavController()
-            CompositionLocalProvider(LocalViewModelFactory provides TestApp().factory) {
+            CompositionLocalProvider(LocalViewModelFactory provides app.factory) {
                 NightBaselineTheme(darkTheme = true, effects = EffectsDecision.ForcedSolid) {
                     AppNavHost(
                         layout = resolveLayout(inputs),
@@ -117,7 +125,7 @@ abstract class InteractionSweep(
     }
 
     private fun open(screen: AppScreen) {
-        launch()
+        launch(screen.nights)
         compose.runOnIdle { screen.open(nav, SampleData.LAST_WAKE.minusDays(3), METRIC) }
         idle()
         frames.clear()
@@ -181,6 +189,13 @@ abstract class InteractionSweep(
         return Offset(v.center.x, v.top + v.height * 0.4f)
     }
 
+    /** The platform's touch slop, px (a drag on resting content starts after it). */
+    private val slop: Float get() =
+        android.view.ViewConfiguration
+            .get(controller!!.get())
+            .scaledTouchSlop
+            .toFloat()
+
     private fun maxFling(id: String): Float = flings.filter { it.first == id }.maxOfOrNull { abs(it.second) } ?: 0f
 
     @Test
@@ -190,6 +205,26 @@ abstract class InteractionSweep(
         val unregistered = graph.filter { d -> AppScreens.routes.none { d.hasRoute(it) } }.map { it.route }
         assertTrue("destinations not in AppScreens: $unregistered", unregistered.isEmpty())
         assertEquals("every registered route is a destination", AppScreens.routes.size, graph.count())
+        // And the other direction (review): every registered route is opened by some screen of the registry, so the
+        // sweeps below run over it.
+        val opened = HashSet<Any>()
+        for (screen in AppScreens.all) {
+            launch(screen.nights)
+            // Every destination the screen passes through counts: in two panes a night opens and is folded back into
+            // History's detail pane right away (layouts.md 8.2).
+            val listener =
+                NavController.OnDestinationChangedListener { _, d, _ ->
+                    AppScreens.routes.filter { d.hasRoute(it) }.forEach {
+                        opened +=
+                            it
+                    }
+                }
+            compose.runOnIdle { nav.addOnDestinationChangedListener(listener) }
+            compose.runOnIdle { screen.open(nav, SampleData.LAST_WAKE.minusDays(3), METRIC) }
+            idle()
+            compose.runOnIdle { nav.removeOnDestinationChangedListener(listener) }
+        }
+        assertEquals("routes no registered screen opens", AppScreens.routes, opened)
     }
 
     // One sweep: screens x containers x cases.
@@ -226,6 +261,20 @@ abstract class InteractionSweep(
                 }
                 report.append("${screen.name}/$id: v=%.0f travel=%.1f room=%.0f\n".format(v, travel, room))
                 if (room < BOUNCE_ROOM_PX) continue
+                // The same flick back from the end of the content, at rest: the reference distance on screen.
+                open(screen)
+                val restRef =
+                    container(id)?.let { n ->
+                        val p = flickPoint(n)
+                        repeat(BOUNCE_FLICKS) {
+                            flick(p, -BOUNCE_PX, BOUNCE_MS)
+                            idle()
+                        }
+                        val s0 = container(id)!!.range().first
+                        flick(p, BACK_PX, BACK_MS)
+                        idle()
+                        s0 - container(id)!!.range().first
+                    } ?: continue
                 for (delay in longArrayOf(50, 150)) {
                     open(screen)
                     val n = container(id) ?: break
@@ -238,11 +287,33 @@ abstract class InteractionSweep(
                     flick(p, -BOUNCE_PX, BOUNCE_MS)
                     compose.mainClock.advanceTimeBy(delay)
                     flings.clear()
+                    val o0 = overscrollY
+                    val s0 = container(id)!!.range().first
                     flick(p, BACK_PX, BACK_MS)
                     compose.mainClock.autoAdvance = true
                     idle()
                     val back = maxFling(id)
                     assertTrue("${screen.name}/$id $delay ms after a bounce: the flick flings ($back px/s)", back >= MIN_FLING)
+                    // Report d / R1-4: the same flick moves the content the same distance on screen as from rest (the
+                    // scrolled distance plus the offset it took back), not that plus a return spring running on. The
+                    // one difference is the platform's catch: a finger landing on moving content takes it at once,
+                    // while at rest the first touch slop of its travel only decides that it is a drag.
+                    val onScreen = (s0 - container(id)!!.range().first) - o0
+                    val expected = restRef + slop
+                    report.append(
+                        "${screen.name}/$id $delay ms after a bounce: o0=%.1f travel=%.1f rest=%.1f + slop %.1f\n".format(
+                            o0,
+                            onScreen,
+                            restRef,
+                            slop,
+                        ),
+                    )
+                    assertEquals(
+                        "${screen.name}/$id $delay ms after a bounce: the distance of the same flick at rest",
+                        expected,
+                        onScreen,
+                        BOUNCE_EPS,
+                    )
                 }
                 // Starting on a pressable inside the container: the flick still flings and fires no click.
                 open(screen)
@@ -376,6 +447,9 @@ abstract class InteractionSweep(
 
         /** Fling distance epsilon across containers, px. */
         const val TRAVEL_EPS = 1f
+
+        /** On-screen distance epsilon of a flick after an edge bounce against the same flick at rest, px. */
+        const val BOUNCE_EPS = 2f
 
         const val FLICK_PX = 600f
         const val FLICK_MS = 150L
