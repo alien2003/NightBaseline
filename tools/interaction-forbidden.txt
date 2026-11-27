@@ -1,0 +1,33 @@
+# The interaction boundary of ADR 0011: Kotlin sources of the app (app/src/main, app/src/debug) outside the
+# framework package ui/interaction may not use these APIs. One extended regex per line (grep -E and Kotlin Regex);
+# blank lines and lines starting with '#' are ignored. Read by tools/check-interaction.sh and InteractionBoundaryTest.
+#
+# Animation
+import androidx\.compose\.animation\.
+\b(AnimatedContent|AnimatedVisibility|Crossfade|updateTransition|rememberTransition|SeekableTransitionState)\b
+\banimate[A-Z][A-Za-z]*AsState\b
+\b(Animatable|AnimationState|TargetBasedAnimation|DecayAnimation)\(
+\b(spring|tween|keyframes|snap|animateDecay|splineBasedDecay|exponentialDecay|infiniteRepeatable)\(
+\b(withFrameNanos|withFrameMillis)\b
+\b(Choreographer|ViewPropertyAnimator)\b
+import android\.animation\.
+\banimateItem\(
+\b(overridePendingTransition|overrideActivityTransition)\(
+# Navigation and back
+import androidx\.navigation\.compose\.
+\bNavHost\(
+import androidx\.navigationevent\.
+\b(BackHandler|PredictiveBackHandler|OnBackPressedCallback)\b
+# Gestures, presses, keys
+import androidx\.compose\.foundation\.gestures\.
+\b(pointerInput|clickable|combinedClickable|selectable|toggleable|triStateToggleable|draggable|anchoredDraggable|transformable|scrollable)\s*[({]
+\bdetect[A-Za-z]*Gestures\b
+\b(awaitPointerEventScope|awaitEachGesture|PointerInputModifierNode)\b
+\b(onPreviewKeyEvent|onKeyEvent)\s*[({]
+# Scrolling, fling, overscroll, indication
+\b(verticalScroll|horizontalScroll|rememberScrollState|LazyColumn|LazyRow|LazyVerticalGrid|rememberLazyListState)\s*[({]
+\b(nestedScroll|overscroll|flingBehavior)\b
+\b(LocalOverscrollFactory|LocalIndication)\b
+# Material components bring their own motion (and the ripple)
+import androidx\.compose\.material3\.
+import androidx\.compose\.material\.

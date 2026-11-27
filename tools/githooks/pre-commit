@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Enable once per clone: git config core.hooksPath tools/githooks
-# The project is English-only except the app's ru resources and README.ru.md; ColorOS has no Material ripple.
+# The project is English-only except the app's ru resources and README.ru.md; ColorOS has no Material ripple; every
+# animation, back, gesture, press and scroll API lives in the interaction framework (ADR 0011).
 set -e
 root="$(git rev-parse --show-toplevel)"
 "$root/tools/check-language.sh" --staged
 "$root/tools/check-ripple.sh"
+"$root/tools/check-interaction.sh"

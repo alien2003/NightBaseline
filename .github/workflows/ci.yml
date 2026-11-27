@@ -50,6 +50,9 @@ jobs:
       - name: No Material ripple (ColorOS press feedback only)
         run: bash tools/check-ripple.sh
 
+      - name: One interaction framework (no motion, back, gesture or scroll API outside ui/interaction)
+        run: bash tools/check-interaction.sh
+
   build:
     name: Lint, test and assemble
     runs-on: ubuntu-latest

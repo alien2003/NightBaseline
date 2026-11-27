@@ -1,0 +1,4 @@
+# Exceptions to tools/interaction-forbidden.txt outside ui/interaction (ADR 0011). This list may only shrink.
+# Format: <repository-relative path>|<forbidden regex as written in interaction-forbidden.txt>|<reason>
+# Empty: every animation, navigation, back, gesture, press, key, scroll, fling, overscroll and indication API of the
+# app is used inside app/src/main/kotlin/io/github/alien2003/nightbaseline/ui/interaction only.
