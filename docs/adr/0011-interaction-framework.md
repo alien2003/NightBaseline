@@ -91,6 +91,18 @@ rendering of every kind (a snap).
   platform's `MotionDurationScale` and are not applied again.
 - **R6 layout is not navigation.** A fold or unfold that re-projects the pages (`FoldBack`) snaps, and drops a
   running back gesture; the rest of that gesture does nothing.
+- **R7 time origin.** A run is a pure function of the time since it was asked for: every frame draws the spring at
+  `frame time - origin`. The origin of a tap-driven change is its request (the composition that set it up); the
+  origin of a release is the frame that drew the finger's last sample while the finger was still moving (no sample
+  arrives between the last move and the lift), or the release itself once the finger had rested longer than the
+  platform's stopped-pointer time (`POINTER_STOPPED_MS`, 40 ms), which then also has no velocity. So the first frame
+  after a release already moves, and a long frame catches up exactly as the spring would have moved. Compose's
+  `Animatable` starts its clock at its first frame and draws its start value there, so the driver runs its own frame
+  loop on `TargetBasedAnimation` (bounded to [0, 1], ends at the first crossing or the settle).
+- **R8 a change moves only what is drawn.** A change from rest whose entering layer has no content yet (the page was
+  just composed and its state is still loading; a panel not measured yet) holds p at its start, which draws exactly
+  the frame before the change, until that layer has content, at most `ENTER_WAIT_MS` (300 ms); its origin is then the
+  frame after that content was laid out. A layer reports content when it emitted and measured some (`NbLayer`).
 
 ### The two lemmas (proved in `NbPhysicsTest` by closed form and frame by frame)
 
@@ -166,6 +178,69 @@ framework and each has a test that fails without it.
   destination), `NbScrollContainer` (the id is required and unique per screen) and `NbPressable` (set by every
   framework pressable). The sweep enumerates screens, containers and pressables from them.
 
+### Round 3 (2026-11-27): the second measurement and review
+
+Emulator measurements of round 2 (frame by frame, hardware-like evdev input) and a second review found these. Each
+fix is in the framework; each has a test that fails without it (checked by undoing the fix).
+
+- **R1-1 the back gesture held, then jumped (report a).** Logged on the emulator: the platform calls back 10-20 ms
+  after the last progress event; the release launched its spring dispatched, and `Animatable` drew its start value in
+  its first frame, so the page showed the last finger pose for one or two more frames and then moved by all the time
+  it had lost in one frame (69-175 ms holds at the emulator's slow frames). Fix: R7 (`NbDriver` frame loop, origin =
+  the frame that drew the last sample, the stopped-pointer rule at the release, the release set up undispatched).
+  Logged after the fix: the first frame after the platform's call is 19 ms of spring. The commit frame still performs
+  the navigation pop (one recomposition); on the emulator that frame was once 33 ms, and the next frame shows the
+  elapsed time exactly. Tests: `NbPhysicsTest` R7 (every frame on the closed form at its time since the release,
+  release 1, 8 or 15 ms before the first frame; stopped finger), `PredictiveBackTest` (no frame after the release
+  repeats the release pose; the first is one frame of the spring from the finger's (p, v)).
+- **R1-2 a pushed page entered empty.** The Metric page renders nothing until its `ViewModel` has computed its state
+  on a background thread; the push moved an empty layer for 3-4 frames, then the content appeared in one step at
+  p = 0.83. Fix: R8. Logged after the fix: the push holds 150 ms on the emulator, then runs from the spring's first
+  frame with the page drawn. Test: `FrameworkRound2Test` (no motion while the entering page is empty; the first moving
+  frame is an early frame of the spring).
+- **R1-3 / review the first gesture frame after a push stalled; the section host laid out its target in the first
+  frame.** A parked page was measured but not placed, so its first gesture frame placed and recorded the whole page.
+  Fix: parked layers (the page below the top of a stack and every visited section) are placed and drawn ahead in an
+  invisible layer (alpha 0: the renderer skips it, its display lists exist), with no semantics, no input and no focus
+  (`Hidden` cancels focus entering it). Tests: `FrameworkRound2Test`, `PredictiveBackTest` (the parked layer is
+  reported before the gesture).
+- **R1-4 a flick right after an edge bounce went 10-28 % farther.** The return spring kept running under the next
+  drag, and after the drag the remaining offset relaxed on its own spring on top of the fling's full distance. Fix:
+  a finger landing stops the spring at the down event; a fling towards the edge of a translated content takes the
+  offset back first with its own distance, 1:1, as a drag does, then scrolls the rest; a touch that did not scroll
+  lets the content return at the lift. The one remaining difference is the platform's catch: a finger on moving
+  content takes it at once, while at rest the first touch slop of the travel only decides that it is a drag.
+  Tests: `OverscrollFlingTest` (nothing but the finger moves the content), `InteractionSweep*` (the same flick 50 and
+  150 ms after a bounce moves the content on screen exactly the rest distance plus the touch slop, within 2 px, in
+  every container of every registered screen at three sizes).
+- **R1-5 the first sheet open stalled, later ones skipped frames.** The sheet's spring ran while its content was
+  composed and measured. Fix: R8 for modals (an opening panel waits until it is measured). Test:
+  `FrameworkRound2Test`.
+- **R1-6 dropped flings with `adb shell input swipe`.** Unchanged: an input-path artifact (V2), 10/10 with evdev input
+  in the same cells.
+- **R1-7 13-16 px hysteresis on a reversing finger.** Logged on the emulator: the platform's own `touchX` lags on a
+  reversal (it reported 291.7 px for a finger back at 300 px, 302.5 px going forwards); the pose is a pure function of
+  `touchX`. Test: `PredictiveBackTest` (forwards and back to the same touch position draw the same pose).
+- **R1-8 the bar crossfaded its selection.** The selected icon now changes in one step with the selection, so the bar
+  shows the target from the first frame of a change; the `Quick` spring and `NbCrossfade` are gone. During a back
+  gesture between tabs the bar keeps the shown section until the commit (the gesture may still be cancelled)
+  [decision].
+- **R1-9 the sheet's fling looked faster.** The sheet content uses the same `nbVerticalScroll` and the same decay; the
+  difference measured is rendering (sheet frames are about 80 ms on the emulator) [hypothesis, not changed].
+- **R1-10 Home showed "Checking..." for minutes.** Outside the framework; not changed in this round.
+- **Review.** A modal's back target is enabled only while its branch is shown (it ignored it, so a modal left open in
+  a parked page took Back from the shown page); one routing rule for keys: an open modal takes the step keys too.
+  A back gesture moves a modal by the finger's travel, as a page. Shell controls derive their press scale from their
+  measured size (`nbPressScale`, as a clickable); under reduced motion every press light switches to the same full
+  light and off (the shell had a static 0.6, the primary button's light never lit); the primary button's light is in
+  the press model (leave rule, probe samples). A batched move and lift beyond the slop is no tap (the up is consumed
+  before the clickable sees it). A step swipe counts its travel from the down and its lift sample, and hands its
+  release velocity to the Pager change it makes (the pages still do not follow the finger while it drags: the
+  neighbour is composed only once the step is made). A gesture that catches a running pop moves the page 1:1 with the
+  finger from where it is. Host memory is written after a composition is applied (`SideEffect`). `AppScreens` is
+  checked both ways (every route is opened by a registered screen) and has the Learning state. The boundary forbids
+  any use of `androidx.compose.animation.`, fully qualified names included.
+
 ### Enforcement
 
 - `tools/check-interaction.sh` (pre-commit hook and the CI checks job) and `InteractionBoundaryTest` (`./gradlew
@@ -189,11 +264,13 @@ framework and each has a test that fails without it.
   reverses it, and nothing outlives its spring. (b, c) every section change, from any trigger, and every page change
   run the same kind on the same spring object. (d) the fling can no longer be dropped and the same flick scrolls the
   same on every screen; every press follows the same rules (tap timeout, cancel on scroll).
-- The page underneath the top of a stack is composed ahead and parked (round 2): unplaced nodes take no focus, no
-  semantics and no input; its navigation entry stays in its lifecycle state (CREATED), so its flows keep the last
-  values they collected while it was shown.
-- Night and month pagers step on a release decided by the fling projection; the neighbouring page is not dragged
-  under the finger (the view models have no neighbour content) [not changed].
+- The page underneath the top of a stack and every visited section are composed, placed and drawn ahead in an
+  invisible layer (round 3): no focus can enter them, they have no semantics and take no input; the page's navigation
+  entry stays in its lifecycle state (CREATED), so its flows keep the last values they collected while it was shown.
+  They are laid out when their content changes, a cost paid while they are hidden instead of in a gesture's frame.
+- A pushed page whose state is still loading enters up to 300 ms later (R8) instead of sliding in empty.
+- Night and month pagers step on a release decided by the fling projection and start with the swipe's velocity; the
+  neighbouring page is not dragged under the finger (the view models have no neighbour content) [not changed].
 - Item placement animations of the History list, the shared-bounds morphs and pane resize animations do not exist;
   their tokens are gone.
 - A detekt type-resolved rule and a public API snapshot of the package are not set up; the source scan is

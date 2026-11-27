@@ -573,7 +573,6 @@ other fails the build.
 | name | damping | stiffness | role |
 |---|---|---|---|
 | `Nav` | 1.2 | 860 | every navigation kind: page, tab, pager, swap, sheet, dialog, docked dialog, reveal [measured fit, HYPOTHESIS until a pixel re-measure] |
-| `Quick` | 1.0 | 1500 | navigation icon outline -> filled |
 | `Select` | 1.0 | 247 | tab underline, period thumb trailing edge, radio fill |
 | `SelectLead` | 1.0 | 600 | period thumb leading edge (it stretches towards the new period) |
 | `Data` | 1.0 | 400 | band, marker and value changes |
@@ -614,6 +613,8 @@ the old page spring (1.0 / 220 on Compose's 0.01 px default threshold) ran about
 | `OVERSCROLL_FOLLOW` | 0.5 | share of a pull past the edge the content follows at o = 0 |
 | `OVERSCROLL_MAX_DP` | 240 | largest overscroll translation |
 | `STEP_SWIPE_DP` | 56 | a step swipe (night, month) steps when the decay projects the released travel past this, towards a side; one threshold for every sequence |
+| `POINTER_STOPPED_MS` | 40 | a finger that rested this long before it let go has no release velocity and its release starts from rest (the platform's stopped-pointer rule) |
+| `ENTER_WAIT_MS` | 300 | an entering page or panel without content yet holds its change at the start at most this long (R8) |
 
 The small top-bar title is a pure function of the scroll offset through `easing.title` (0.33, 0, 0.67, 1) over
 40 -> 72 dp; the top-bar material is `scroll / 10 dp` clamped to [0, 1]. Neither has a clock of its own.
@@ -625,20 +626,28 @@ s is the shown share of the upper layer of a stack pair: s = p for a push, s = 1
 
 | kind | relation it comes from | pose | gesture -> p |
 |---|---|---|---|
-| Page | one level deeper or shallower in a stack: app routes, settings sub-pages (every layout), the two-pane detail pane's own stack, onboarding steps, the debug catalog | upper `tx = e W (1 - s^2.2)`; lower `tx = -e W/3 s`, dim `0.3 s`; no scale, no fade, no corners | the leaving page stays under the finger: `1 - s^2.2 = u0 + (1 - u0) g`, g = the touch position's travel since the gesture's start event over the host width (the platform's shaped progress only without a touch position) |
+| Page | one level deeper or shallower in a stack: app routes, settings sub-pages (every layout), the two-pane detail pane's own stack, onboarding steps, the debug catalog | upper `tx = e W (1 - s^2.2)`; lower `tx = -e W/3 s`, dim `0.3 s`; no scale, no fade, no corners | the leaving page moves exactly with the finger: `1 - s^2.2 = min(1, u0 + g)`, g = the touch position's travel since the gesture's start event over the host width (the platform's shaped progress only without a touch position), u0 where a caught pop was |
 | Tab | the top-level sections in bar order (bar, rail, Ctrl+1/2/3, "See all", "See history", Glance "More", back to Home) | the Page geometry, the higher bar index is the upper layer; e from the bar order whatever the swipe edge; the bar and rail stay in place | as Page |
 | Pager | neighbours in a sequence: previous / next night (button, swipe, arrow keys, Page Up / Down), month (buttons, swipe, keys), the History detail pane's night | outgoing `tx = -e p W`, incoming `tx = e (1 - p) W`; newer values come from the end side; the night pager spans the window width (pages enter and leave at the screen edges, the gutters are inside each page) | (a swipe decides by fling projection past `STEP_SWIPE_DP`, then runs p). One step area: the whole page answers the swipe, the arrows in the reading direction and Page Up / Down, with focus inside it or without focus through the router |
 | Swap | unordered peers in a fixed place: Home's detail pane metric, Settings section in two panes | outgoing alpha `max(0, 1 - 2p)`, incoming `max(0, 2p - 1)` | - |
-| Sheet | overlay from the bottom | `ty = (1 - p) H`, scrim alpha p | drag `p = 1 - dy / H`; back `p = 1 - g` |
-| Dialog | centred overlay | scale `0.8 + 0.2 p`, alpha `min(1, p / 0.35)`, scrim alpha p | back `p = 1 - g` |
-| DockedDialog | dialog docked at the bottom (phone widths) | `ty = (1 - p) H`, alpha `min(1, p / 0.35)` | back `p = 1 - g` |
+| Sheet | overlay from the bottom | `ty = (1 - p) H`, scrim alpha p | drag `p = 1 - dy / H`; back `p = p0 (1 - g)`, g the finger's travel over the window width as for a page |
+| Dialog | centred overlay | scale `0.8 + 0.2 p`, alpha `min(1, p / 0.35)`, scrim alpha p | back `p = p0 (1 - g)` |
+| DockedDialog | dialog docked at the bottom (phone widths) | `ty = (1 - p) H`, alpha `min(1, p / 0.35)` | back `p = p0 (1 - g)` |
 | Reveal | an element appearing or disappearing in place (banners) | alpha p, height share p, rising 8 dp | - |
 
 Release (R0): a gesture's release continues on the same spring from (p, v), v measured on p. Towards a state that
 leaves the screen (a commit, a hide) nothing is capped and the motion ends at its first crossing; towards a visible
 rest (a cancel, a sheet returning) v is capped at `omega (zeta + sqrt(zeta^2 - 1)) a`, so it never crosses. Both
 settle no later than a tap from rest (ADR 0011, lemmas 1 and 2). Pager swipes and sheet drags are decided like a
-fling: the platform decay projects the travel; past half (or the step threshold) it commits.
+fling: the platform decay projects the travel; past half (or the step threshold) it commits; a step swipe's Pager
+change starts with the swipe's velocity.
+
+Time (R7): every frame draws its spring at `frame time - origin`. A tap's origin is its request; a release continues
+from the frame that drew the finger's last sample, or starts from rest at the release when the finger rested longer
+than `POINTER_STOPPED_MS`. Content (R8): a change whose entering page or panel has no content yet holds at its start
+(the frame before the change) until it has some, at most `ENTER_WAIT_MS`, and starts its time then. The page below the
+top of a stack and every visited section are placed and drawn ahead in an invisible layer, so a gesture or a tab change
+starts on an existing layer.
 
 ### 9.4 Press, highlight, glow
 
@@ -654,7 +663,10 @@ fling: the platform decay projects the travel; past half (or the step threshold)
   starts after the tap timeout and ends as soon as a scroll takes the gesture.
 - **Pressed highlight** `state.pressed` under the content on `HighlightIn` / `HighlightOut` (rows on the row springs).
 - **Touch glow** on shell items, round shell buttons, the period thumb and primary buttons: radial `glow.neutral`,
-  radius up to 140 dp, in `GLOW_IN_MS`, out `GLOW_OUT_MS`.
+  radius up to 140 dp, in `GLOW_IN_MS`, out `GLOW_OUT_MS`; under reduced motion the same full light switches on and
+  off without a tween, for every pressable. Shell controls take their press scale from their measured size, as every
+  other pressable.
+- **Selection** of the bar and rail changes in one step with the section (no crossfade).
 - **Haptics**: public `HapticFeedbackConstants` only (switch, segment, chart scrub tick, long press).
 
 ### 9.5 Scroll and overscroll
@@ -665,16 +677,18 @@ fling: the platform decay projects the travel; past half (or the step threshold)
   `0.5 (1 - |o| / 240 dp)` of the leftover (it saturates); a drag away from the edge takes o back 1:1 and scrolls the
   remainder in the same event; a fling is always performed and the velocity the content cannot use (the fling's
   velocity minus what the content consumed) seeds the `Overscroll` spring 1:1, so a fling that comes to rest inside
-  the content moves no offset (no bump); a finger landing during the return stops it where it is. Content shorter than its
-  viewport bounces the same way. None under reduced motion.
+  the content moves no offset (no bump); a finger landing during the return stops it where it is, at the down event; a
+  fling towards the edge of a translated content takes the offset back first with its own distance, 1:1, then
+  scrolls, so a flick right after a bounce travels as far on screen as from rest (plus the touch slop the catch of a
+  moving content skips). Content shorter than its viewport bounces the same way. None under reduced motion.
 - Horizontal gestures inside a vertical scroll claim the pointer only when the finger has moved more than the touch
   slop and more horizontally than vertically at that moment (rule A).
 
 ### 9.6 Reduced motion
 
 One rule, at the root: `reduced` when animations are removed (`ANIMATOR_DURATION_SCALE == 0`) or battery saver is on
-[decision]. Then every p snaps to its target, press scale and glow are off (the static highlight remains), the
-overscroll is off and a back gesture shows nothing and goes back at once. Fling stays on. Other duration scales are
+[decision]. Then every p snaps to its target, press scale is off, the press light switches on and off without a tween
+(the same full light on every pressable), the overscroll is off and a back gesture shows nothing and goes back at once. Fling stays on. Other duration scales are
 applied by the platform's `MotionDurationScale`; the framework does not scale again.
 
 ### 9.7 Not built

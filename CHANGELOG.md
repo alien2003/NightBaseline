@@ -73,6 +73,18 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
   stopped.
 - **Back gesture after a cancelled one.** A second swipe right after cancelling one on a page opened from History or
   Settings now goes back one level, and the page continues from where it was instead of jumping back.
+- **Letting go of the back gesture no longer stalls.** When you let go, the page now keeps moving from the very next
+  frame at the speed of your finger, instead of stopping for a moment and then jumping away.
+- **Pages and sheets open drawn.** A page whose content is still being prepared, such as a measurement opened from a
+  night, now slides in once its content is there instead of sliding in empty; sheets do the same, so the first sheet
+  you open no longer stutters.
+- **A flick right after the end of a page goes as far as any other.** A flick just after the page bounced at its top
+  or bottom used to travel farther, because the bounce kept moving the page under your finger.
+- **The bar changes its selected item at once** when you switch tabs, instead of fading between the two.
+- **Smaller fixes to gestures and presses.** A dialog left open on a page under the shown one no longer takes the
+  back gesture, the arrow keys no longer step the night behind an open sheet, a sheet follows the back gesture with
+  your finger, the bar and round buttons shrink like tiles of the same size, with animations off every pressed light
+  looks the same, and a quick sideways swipe on a night carries its speed into the change.
 - **Settings pages move as a whole.** The title and back button of a Settings page now move with the page during the
   back gesture and page transitions.
 - **No double pages.** A fast double tap on a card or row no longer opens the same page twice.
