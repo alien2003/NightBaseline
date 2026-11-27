@@ -53,8 +53,8 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
   screen, without first pressing Tab.
 - **Source names.** Settings shows the source app's name instead of a package id broken mid-word when the app is not
   installed.
-- **Learning progress** now counts last night too and is the same on every screen; after 7 nights it says the range
-  is ready.
+- **Learning progress** now counts last night too and is the same on every screen, including the last step of the
+  first run; after 7 nights it says the range is ready.
 - **Access that was off.** Nights read while a Health Connect permission was off now show "No access that night"
   instead of saying the source doesn't send the measurement, and are read again once access is back.
 - **One message at a time.** Home no longer shows "Last night isn't in yet" or other read banners on top of an access
@@ -62,7 +62,8 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 - **"Check now"** shows "Checking…" while it runs, then "Checked at {time}. Nothing new from {source} yet."
 - **Time zones.** "Last read" and dates follow a time zone change while the app is open.
 - **Notification text** keeps the spaces between its sentences.
-- **Names and wording.** One name per measurement in the summary, the notification, the cards and History; Russian
+- **Names and wording.** One name per measurement in the summary, the notification, the cards and History, and one
+  way of listing them everywhere ("A, B, and C" in English, no comma before the last item in Russian); Russian
   sentences no longer capitalise names in the middle, month headings start with a capital letter, and the middle
   value is called "median" there instead of "mean". A low value on a side that doesn't count now says "Lower values … don't count". Skin
   temperature is shown as a signed change ("−0.1 °C vs usual"). Values never wrap between the number and the unit,
@@ -70,16 +71,25 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 - **Health Connect links.** "Health Connect permissions" opens NightBaseline's own Health Connect permission page;
   "Install or update" falls back to the Play web page and shows a message if nothing can open.
 - **First run.** Step 3 asks for access instead of saying there is no sleep data and preselects the source once
-  access is granted; step 4 shows which optional permissions are off; step 6 no longer claims last night was already
+  access is granted, and "Check again" says when Health Connect is still not available or there is still no sleep
+  data; step 4 shows which optional permissions are off; step 6 no longer claims last night was already
   compared.
-- **Settings.** An empty source list shows a message; the Glass "Automatic" row says whether glass is available
+- **Settings.** Without Health Connect, or when it needs an update, "Data source" says so and offers "Install or
+  update Health Connect" instead of "Not read yet", and "Choose a source" shows the same instead of "No sleep data";
+  an empty source list shows a message and a "Check again" button that says what it found; the Glass "Automatic" row says whether glass is available
   instead of always "On now"; in very narrow windows rows no longer stack the title one letter per line.
+- **Home "Check again".** On the "Health Connect needs an update" card, "Check again" now says when Health Connect is
+  still not available.
+- **Back gesture with a different app theme.** With the app in dark mode on a light phone theme (or the other way
+  round), no light or dark strips show at the page edges during the back gesture.
 - **System bars.** Status and navigation bar icons stay readable after rotating when the app theme differs from the
   system theme. With 3-button navigation, content no longer runs under the system buttons. Without glass (older
   Android, glass off), the collapsed page title sits on a solid background instead of overlapping the content.
 - **Layout.** In landscape with a side cutout, the navigation rail no longer overlaps the cards; at large font sizes
-  the bottom bar icons stay level and the bar keeps its side margins; the History calendar scrolls under the
-  collapsing title without an empty band; on tablets the onboarding "Next" button stays inside the card; Home no
+  the bottom bar icons stay level, the bar keeps its side margins when the labels fit and never breaks a label inside
+  a word; the History calendar scrolls under the collapsing title without an empty band and, at large font sizes,
+  far enough for the large title to fold fully into the bar; the collapsed title keeps a gap to the content at large
+  font sizes; in landscape the top bar buttons stay clear of the system navigation buttons; on tablets the onboarding "Next" button stays inside the card; Home no
   longer jumps down on a cold start.
 - **Accessibility.** The keyboard focus ring is fully visible on list rows, the recent-nights strip and onboarding
   buttons, and the History calendar no longer reads "No data" for days before your first night.

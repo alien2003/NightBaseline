@@ -352,7 +352,7 @@ Re-tapping History in the navigation jumps back to the newest night.
 | Group | Row | What it does |
 |---|---|---|
 | Data source | "Source" | The app the nights are read from; opens "Choose a source". See [changing the source](#can-i-change-the-source). |
-| | "Health Connect permissions" | Opens NightBaseline's permissions in Health Connect. |
+| | "Health Connect permissions" | Opens NightBaseline's permissions in Health Connect. On Android 14 and later Android may open Health Connect's "Data and access" page instead; NightBaseline's permissions are under "App permissions" > "NightBaseline". Without a usable Health Connect this row reads "Install or update Health Connect". |
 | | "Last read" | When the last daily check finished ("Not read yet" before the first one). |
 | | "Set up again" | Asks first, then runs the first-run steps again from the source step. Back on the source step returns to Settings. |
 | Notifications | "Night results" | The morning note. Disabled with "Turned off in system settings" when Android blocks it; tapping the row then opens the system notification settings. |
