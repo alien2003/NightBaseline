@@ -127,7 +127,8 @@ class InteractionCatalogTest {
 
     private fun tapText(text: String) = tap(compose.onAllNodes(hasText(text) and hasClickAction()).onFirst())
 
-    private fun tapDescription(text: String) = tap(compose.onAllNodes(hasContentDescription(text, substring = true) and hasClickAction()).onFirst())
+    private fun tapDescription(text: String) =
+        tap(compose.onAllNodes(hasContentDescription(text, substring = true) and hasClickAction()).onFirst())
 
     private fun openNight() {
         compose.runOnIdle { nav.navigate(NightRoute(SampleData.LAST_WAKE.minusDays(3).toString(), TopLevel.Home.name)) }
@@ -193,7 +194,13 @@ class InteractionCatalogTest {
             frames.clear()
             compose.mainClock.advanceTimeByFrame()
             idle()
-            assertTrue("${trigger.name}: settled", frames.none { it.host == trigger.host && it.kind == trigger.kind && it.p < 1f && it.p > 0f })
+            assertTrue(
+                "${trigger.name}: settled",
+                frames.none {
+                    it.host == trigger.host && it.kind == trigger.kind && it.p < 1f &&
+                        it.p > 0f
+                },
+            )
         }
         println("I7 catalog:\n$report")
     }

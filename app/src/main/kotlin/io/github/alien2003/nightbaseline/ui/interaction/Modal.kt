@@ -363,7 +363,18 @@ fun Modifier.modalPanel(state: ModalState): Modifier =
             val pose = NbPoses.modal(state.kind.kind, p, size.height)
             if (p > 0f && p < 1f) {
                 NbMotionProbe.frames?.invoke(
-                    NbFrame("modal", state.kind.kind, NbPhysics.Nav, p, MODAL_SHOWN, MODAL_HIDDEN, pose, NbLayerPose.Rest, false, size.width),
+                    NbFrame(
+                        "modal",
+                        state.kind.kind,
+                        NbPhysics.Nav,
+                        p,
+                        MODAL_SHOWN,
+                        MODAL_HIDDEN,
+                        pose,
+                        NbLayerPose.Rest,
+                        false,
+                        size.width,
+                    ),
                 )
             }
             translationY = pose.ty

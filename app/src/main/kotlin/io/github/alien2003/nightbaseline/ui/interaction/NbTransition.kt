@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
  * R2 any other new change while one runs snaps the running one to its end first; R3 the leaving state is dropped in
  * the first frame after p settles, never later and never on a timeout.
  */
+@Suppress("TooManyFunctions") // The whole change: set up, run, reverse, gesture, release, abort, poses.
 @Stable
 class NbTransition internal constructor(
     /** Host id, reported to [NbMotionProbe]. */

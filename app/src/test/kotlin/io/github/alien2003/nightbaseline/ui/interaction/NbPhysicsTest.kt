@@ -2,9 +2,9 @@ package io.github.alien2003.nightbaseline.ui.interaction
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.MonotonicFrameClock
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -168,7 +168,8 @@ class NbPhysicsTest {
             assertTrue(fast.size <= tap, "p=$p fast: ${fast.size} > $tap")
             assertEquals(1f, fast.last(), 0f)
         }
-        println("I3 frames: $cases cases, tap = $tap frames of 16 ms (${tap * 16} ms); the old 0.01-threshold page spring: ${oldPageFrames()} frames")
+        val old = oldPageFrames()
+        println("I3 frames: $cases cases, tap = $tap frames of 16 ms (${tap * 16} ms); the old page spring: $old frames")
         assertTrue(tap * 16 <= 600, "the Nav spring settles within 600 ms")
     }
 
@@ -177,11 +178,16 @@ class NbPhysicsTest {
         val clock = ManualClock()
         var n = 0
         runBlocking(clock) {
-            Animatable(0f).animateTo(1080f, androidx.compose.animation.core.spring(1f, 220f)) { n++ }
+            Animatable(0f).animateTo(
+                1080f,
+                androidx.compose.animation.core
+                    .spring(1f, 220f),
+            ) { n++ }
         }
         return n
     }
 
+    @Suppress("NestedBlockDepth") // Release points x velocities x frames.
     @Test
     fun `I2 - a gesture release is continuous, monotonic and bounded per frame`() {
         val dt = 0.016
@@ -296,7 +302,7 @@ class NbPhysicsTest {
         // Physics.kt counts too (the motion config names its springs); the declarations do not use the prefix.
         val text = sources.joinToString("\n") { it.readText() }
         NbPhysics.springs.keys.forEach { name ->
-            assertTrue(Regex("""NbPhysics\.$name\b""").containsMatchIn(text) || name == "Nav" && "NbPhysics.Nav" in text, "unused: $name")
+            assertTrue(Regex("""NbPhysics\.$name\b""").containsMatchIn(text), "unused: $name")
         }
         val literal = Regex("""\b(spring|tween)\([^)]*\d|\bNbSpring\(""")
         val hits =

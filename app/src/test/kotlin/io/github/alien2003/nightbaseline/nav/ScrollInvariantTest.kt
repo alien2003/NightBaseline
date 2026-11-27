@@ -110,9 +110,19 @@ class ScrollInvariantTest {
             .fetchSemanticsNodes()
             .maxBy { it.boundsInRoot.height * it.boundsInRoot.width }
 
-    private fun offset(): Float = main().config.getOrNull(SemanticsProperties.VerticalScrollAxisRange)?.value?.invoke() ?: 0f
+    private fun offset(): Float =
+        main()
+            .config
+            .getOrNull(SemanticsProperties.VerticalScrollAxisRange)
+            ?.value
+            ?.invoke() ?: 0f
 
-    private fun max(): Float = main().config.getOrNull(SemanticsProperties.VerticalScrollAxisRange)?.maxValue?.invoke() ?: 0f
+    private fun max(): Float =
+        main()
+            .config
+            .getOrNull(SemanticsProperties.VerticalScrollAxisRange)
+            ?.maxValue
+            ?.invoke() ?: 0f
 
     /** A flick of [dy] px (negative = finger up) over [ms] in the middle of the main container. */
     private fun flick(
@@ -123,11 +133,22 @@ class ScrollInvariantTest {
         val x = bounds.center.x
         val y0 = bounds.center.y - dy / 2
         compose.onAllNodes(container).fetchSemanticsNodes()
-        compose.onRoot().performTouchInput { swipe(androidx.compose.ui.geometry.Offset(x, y0), androidx.compose.ui.geometry.Offset(x, y0 + dy), ms) }
+        compose.onRoot().performTouchInput {
+            swipe(
+                androidx.compose.ui.geometry
+                    .Offset(x, y0),
+                androidx.compose.ui.geometry.Offset(
+                    x,
+                    y0 + dy,
+                ),
+                ms,
+            )
+        }
     }
 
     private fun androidx.compose.ui.test.junit4.ComposeTestRule.onRoot() = onNode(SemanticsMatcher("root") { it.parent == null })
 
+    @Suppress("NestedBlockDepth") // Screens x delays, each with its own assertions.
     @Test
     fun `I4 - the same flick scrolls the same and flings, at rest and right after an edge bounce, on every screen`() {
         val report = StringBuilder()
@@ -165,7 +186,14 @@ class ScrollInvariantTest {
                 compose.mainClock.autoAdvance = true
                 idle()
                 val back = before - offset()
-                report.append("$name: at rest %.0f px; flick %d ms after the bounce: %.0f px, fling %s\n".format(atRest, delay, back, flings.isNotEmpty()))
+                report.append(
+                    "$name: at rest %.0f px; flick %d ms after the bounce: %.0f px, fling %s\n".format(
+                        atRest,
+                        delay,
+                        back,
+                        flings.isNotEmpty(),
+                    ),
+                )
                 assertTrue("$name $delay ms: the flick scrolls ($back px)", back > if (exact) SLOP_PX else 0f)
                 assertTrue("$name $delay ms: the fling is not dropped", flings.isNotEmpty())
                 if (exact) {

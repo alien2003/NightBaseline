@@ -66,7 +66,8 @@ class InteractionBoundaryTest {
 
     @Test
     fun `the framework never imports a screen package`() {
-        val screen = Regex("""import io\.github\.alien2003\.nightbaseline\.(nav|ui\.(home|history|night|metric|settings|onboarding|learning))\.""")
+        val screen =
+            Regex("""import io\.github\.alien2003\.nightbaseline\.(nav|ui\.(home|history|night|metric|settings|onboarding|learning))\.""")
         val hits =
             sources()
                 .filter { it.invariantSeparatorsPath.startsWith(framework) }
