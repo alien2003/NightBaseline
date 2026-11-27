@@ -186,15 +186,16 @@ object NbPoses {
 object NbGestureMap {
     /**
      * A back gesture on a stack pair that starts at [p0] (0 at rest; a gesture that catches a running pop starts where
-     * it is): the upper page stays under the finger, so its travel share is `u0 + (1 - u0) g`, with `u = 1 - s^gamma`
-     * and s = 1 - p.
+     * it is): the upper page moves exactly with the finger from where it is, so its travel share is `u0 + g`
+     * (`u = 1 - s^gamma`, s = 1 - p, g the finger's travel share), and its edge moves by exactly the finger's travel
+     * (review: `u0 + (1 - u0) g` scaled the finger by `1 - u0` when a gesture caught a running pop).
      */
     fun stackPop(
         g: Float,
         p0: Float,
     ): Float {
         val u0 = 1f - (1f - p0.coerceIn(0f, 1f)).pow(NbPhysics.PAGE_GAMMA)
-        val u = (u0 + (1f - u0) * g.coerceIn(0f, 1f)).coerceIn(0f, 1f)
+        val u = (u0 + g.coerceIn(0f, 1f)).coerceIn(0f, 1f)
         val s = (1f - u).pow(1f / NbPhysics.PAGE_GAMMA)
         return (1f - s).coerceIn(0f, 1f)
     }

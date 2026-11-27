@@ -1,6 +1,7 @@
 package io.github.alien2003.nightbaseline.ui.interaction
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.Interaction
@@ -15,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -27,16 +29,17 @@ import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -55,19 +58,37 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlin.math.min
 
-/** Press scale of small shell controls (round buttons, dialog buttons): `coloros17-glass.md` 4.4. */
-const val SHELL_PRESS_SCALE_SMALL: Float = NbPhysics.PRESS_SCALE_SMALL
+/**
+ * The light of one pressable of the press model (ADR 0011, [NbPressModel]): its strength runs to 1 while pressed and
+ * back to 0 on the model's light rule ([NbPressModel.lightSpec]), every frame reported to [NbMotionProbe.press] as a
+ * [NbPressSample.Glow] of [owner]. Shared by the shell controls and the primary button's touch light.
+ */
+internal class PressLight(
+    private val scope: CoroutineScope,
+    private val owner: Any,
+) {
+    val glow = Animatable(0f)
+    private var job: Job? = null
 
-/** Press scale of large shell surfaces (the bar, the rail, a sheet handle). */
-const val SHELL_PRESS_SCALE_LARGE: Float = NbPhysics.PRESS_SCALE_LARGE
-
-/** Strength of the static highlight that replaces the glow under reduced motion. */
-private const val REDUCED_GLOW = 0.6f
+    fun to(
+        pressed: Boolean,
+        motion: NbMotionConfig,
+        snap: Boolean,
+    ) {
+        job?.cancel()
+        job =
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                glow.pressTo(NbPressModel.lightTarget(pressed), NbPressModel.lightSpec(motion, pressed, snap), NbPressSample.Glow, owner)
+            }
+    }
+}
 
 /**
  * State of the shell press feedback: scale, glow strength and the glow centre, driven by the press interactions of
  * [source] (and of any source the element [follows][FollowPresses]). The visuals ([shellPressScale],
- * [shellPressGlow]) are separate modifiers so a 48 dp target can drive the light on its 40 dp visible circle.
+ * [shellPressGlow]) are separate modifiers so a 48 dp target can drive the light on its 40 dp visible circle. The
+ * pressed scale is the press model's scale for the size of the element that shrinks ([nbPressScale] of the element
+ * [shellPressScale] is on), so a shell control and a clickable of the same size press the same way.
  */
 @Stable
 class ShellPressState internal constructor(
@@ -76,16 +97,18 @@ class ShellPressState internal constructor(
     val source: MutableInteractionSource,
 ) {
     internal val scale = NbPressModel.newScale()
-    internal val glow = Animatable(0f)
+    private val light = PressLight(scope, this)
+    internal val glow: Animatable<Float, AnimationVector1D> get() = light.glow
     internal var center by mutableStateOf<Offset?>(null)
     private val presses = HashSet<PressInteraction.Press>()
     private var scaleJob: Job? = null
-    private var glowJob: Job? = null
+
+    /** The press model's scale for the shrinking element's measured size ([shellPressScale] keeps it current). */
+    internal var pressedScale: Float = NbPhysics.PRESS_SCALE_SMALL
 
     /** Applies a press interaction (ADR 0011: the same press node rules as every other control). */
     internal fun onInteraction(
         interaction: Interaction,
-        pressedScale: Float,
         motion: NbMotionConfig,
     ) {
         val before = presses.isNotEmpty()
@@ -104,35 +127,27 @@ class ShellPressState internal constructor(
             }
         }
         val pressed = presses.isNotEmpty()
-        if (pressed != before) animate(pressed, pressedScale, motion, snap = false)
+        if (pressed != before) animate(pressed, motion, snap = false)
     }
 
     /** The app left the foreground while pressed: the press ends ([snap] when the activity is no longer visible). */
     internal fun clear(
-        pressedScale: Float,
         motion: NbMotionConfig,
         snap: Boolean,
     ) {
         if (presses.isEmpty()) return
         presses.clear()
-        animate(false, pressedScale, motion, snap)
+        animate(false, motion, snap)
     }
 
-    /** One press model (ADR 0011, [NbPressModel]): the same springs and tweens as every other pressable. */
+    /** One press model (ADR 0011, [NbPressModel]): the same springs and light rule as every other pressable. */
     private fun animate(
         pressed: Boolean,
-        pressedScale: Float,
         motion: NbMotionConfig,
         snap: Boolean,
     ) {
-        glowJob?.cancel()
+        light.to(pressed, motion, snap)
         scaleJob?.cancel()
-        glowJob =
-            scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                val spec = if (pressed) motion.glowIn<Float>() else motion.glowOut()
-                val target = if (pressed) (if (motion.reduced) REDUCED_GLOW else 1f) else 0f
-                glow.pressTo(target, if (snap || motion.reduced) null else spec, NbPressSample.Glow, this@ShellPressState)
-            }
         val target = if (pressed) pressedScale else 1f
         val spec = NbPressModel.scaleSpec(motion, pressed, pressedScale) ?: return
         scaleJob =
@@ -160,10 +175,9 @@ fun rememberShellPressState(): ShellPressState {
 @Composable
 fun Modifier.shellPressInput(
     state: ShellPressState,
-    pressedScale: Float = SHELL_PRESS_SCALE_SMALL,
     enabled: Boolean = true,
 ): Modifier {
-    FollowPresses(state, state.source, pressedScale)
+    FollowPresses(state, state.source)
     val reduced = LocalNbMotion.current.reduced
     return pointerInput(state, enabled, reduced) {
         if (!enabled || reduced) return@pointerInput
@@ -182,30 +196,52 @@ fun Modifier.shellPressInput(
 fun FollowPresses(
     state: ShellPressState,
     source: InteractionSource,
-    pressedScale: Float = SHELL_PRESS_SCALE_SMALL,
 ) {
     val motion = LocalNbMotion.current
-    LaunchedEffect(state, source, pressedScale, motion) {
-        source.interactions.collect { state.onInteraction(it, pressedScale, motion) }
+    LaunchedEffect(state, source, motion) {
+        source.interactions.collect { state.onInteraction(it, motion) }
     }
     // As every pressable: no element comes back to the foreground pressed (focus lost, paused, stopped).
+    OnPressLeave(state, motion) { stopped -> state.clear(motion, snap = stopped) }
+}
+
+/**
+ * The leave rule of the press model as an effect: whenever the window loses focus or the activity pauses or stops,
+ * [onLeave] runs (`stopped` true once the activity is no longer visible), so no element comes back pressed.
+ */
+@Composable
+internal fun OnPressLeave(
+    key: Any,
+    motion: NbMotionConfig,
+    onLeave: (stopped: Boolean) -> Unit,
+) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val window = LocalWindowInfo.current
-    LaunchedEffect(state, lifecycle, window, pressedScale, motion) {
+    val leave by rememberUpdatedState(onLeave)
+    LaunchedEffect(key, lifecycle, window, motion) {
         val focusLost = snapshotFlow { window.isWindowFocused }.drop(1).filter { !it }.map { false }
         val paused =
             lifecycle.eventFlow
                 .filter { it == Lifecycle.Event.ON_PAUSE || it == Lifecycle.Event.ON_STOP }
                 .map { it == Lifecycle.Event.ON_STOP }
-        merge(focusLost, paused).collect { stopped -> state.clear(pressedScale, motion, snap = stopped) }
+        merge(focusLost, paused).collect { stopped -> leave(stopped) }
     }
 }
 
-/** The scale half of the press feedback; put it before the element's background so the whole element shrinks. */
+/**
+ * The scale half of the press feedback; put it before the element's background so the whole element shrinks. It
+ * measures the element, so the pressed scale is the press model's scale for that size ([nbPressScale]).
+ */
 fun Modifier.shellPressScale(state: ShellPressState): Modifier =
-    graphicsLayer {
-        scaleX = state.scale.value
-        scaleY = state.scale.value
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        state.pressedScale = nbPressScale(IntSize(placeable.width, placeable.height), this)
+        layout(placeable.width, placeable.height) {
+            placeable.placeWithLayer(0, 0) {
+                scaleX = state.scale.value
+                scaleY = state.scale.value
+            }
+        }
     }
 
 /**

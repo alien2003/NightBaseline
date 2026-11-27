@@ -46,7 +46,12 @@ private suspend fun PointerInputScope.horizontalGestures(
             val event = awaitPointerEvent()
             val change = event.changes.firstOrNull { it.id == down.id } ?: break
             if (!change.pressed) {
-                if (claimed) onEnd(total, runCatching { tracker.calculateVelocity() }.getOrDefault(0f))
+                if (claimed) {
+                    // The lift is a sample too: its travel and its time count (review: the up was dropped).
+                    total += change.positionChange().x
+                    tracker.addDataPoint(change.uptimeMillis, change.position.x)
+                    onEnd(total, runCatching { tracker.calculateVelocity() }.getOrDefault(0f))
+                }
                 break
             }
             if (!claimed) {
@@ -54,9 +59,12 @@ private suspend fun PointerInputScope.horizontalGestures(
                 val delta = change.positionChange()
                 dx += delta.x
                 dy += delta.y
+                tracker.addDataPoint(change.uptimeMillis, change.position.x)
                 if (abs(dx) > slop || abs(dy) > slop) {
                     if (abs(dx) > slop && abs(dx) > abs(dy)) {
                         claimed = true
+                        // The travel counts from the down, slop included (review: it started at the claim).
+                        total = dx
                         onStart(change)
                         change.consume()
                     } else {
@@ -83,7 +91,10 @@ private suspend fun PointerInputScope.horizontalGestures(
  * (ADR 0011 R0): the platform decay projects where the travel would come to rest; past [NbPhysics.STEP_SWIPE_DP]
  * towards the start edge steps to the previous value, towards the end edge to the next one. Start-to-end (in the
  * layout direction) is "previous". A null callback means there is no neighbour on that side. Once the swipe claims
- * the pointer, the presses under it are cancelled (a swipe never becomes a tap).
+ * the pointer, the presses under it are cancelled (a swipe never becomes a tap). The step's Pager change starts with
+ * the swipe's release velocity (R0: a release continues from its velocity; handed over through the app's router,
+ * [NbStepHandoff]). The pages do not follow the finger while it drags: the neighbouring value is composed only
+ * once the step is made, so there is nothing to drag in yet [decision, ADR 0011].
  */
 @Composable
 fun Modifier.nbStepSwipe(
@@ -93,7 +104,8 @@ fun Modifier.nbStepSwipe(
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val previous by rememberUpdatedState(onPrevious)
     val next by rememberUpdatedState(onNext)
-    return pointerInput(rtl) {
+    val router = LocalNbBackRouter.current
+    return pointerInput(rtl, router) {
         val decay = splineBasedDecay<Float>(this)
         val limit = NbPhysics.STEP_SWIPE_DP.dp.toPx()
         horizontalGestures(
@@ -103,9 +115,15 @@ fun Modifier.nbStepSwipe(
                 val projected = decay.calculateTargetValue(total, velocity)
                 // Towards the end edge in the layout direction = previous.
                 val towardsEnd = if (rtl) -projected else projected
-                when {
-                    towardsEnd > limit -> previous?.invoke()
-                    towardsEnd < -limit -> next?.invoke()
+                val step =
+                    when {
+                        towardsEnd > limit -> previous
+                        towardsEnd < -limit -> next
+                        else -> null
+                    }
+                if (step != null) {
+                    router?.stepHandoff?.hand(abs(velocity))
+                    step()
                 }
             },
             onCancel = {},
@@ -127,8 +145,11 @@ fun Modifier.nbStepArea(
     NbStepKeys(onPrevious, onNext)
     val previous by rememberUpdatedState(onPrevious)
     val next by rememberUpdatedState(onNext)
+    val router = LocalNbBackRouter.current
     return nbStepSwipe(onPrevious, onNext).nbKeyIntents { intent ->
         val delta = intent.stepDelta() ?: return@nbKeyIntents false
+        // The same rule as the router: an open modal takes the navigation keys.
+        if (router?.modalOpen() == true) return@nbKeyIntents false
         val step = if (delta < 0) previous else next
         step?.invoke()
         step != null

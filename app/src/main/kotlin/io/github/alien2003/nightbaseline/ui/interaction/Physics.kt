@@ -63,9 +63,6 @@ object NbPhysics {
      */
     val Nav: NbSpring = NbSpring(1.2f, 860f)
 
-    /** Icon outline to filled and the navigation label weight (about 100 ms visually). */
-    val Quick: NbSpring = NbSpring(1f, 1500f)
-
     /** Selection indicators: tab underline, period thumb trailing edge, radio fill. */
     val Select: NbSpring = NbSpring(1f, 247f)
 
@@ -132,6 +129,18 @@ object NbPhysics {
      */
     const val STEP_SWIPE_DP: Float = 56f
 
+    /**
+     * A finger that rested this long (ms) before it let go has no release velocity: the platform's rule for a stopped
+     * pointer (Compose's velocity tracker uses the same 40 ms), applied at the release instant (ADR 0011 R7).
+     */
+    const val POINTER_STOPPED_MS: Long = 40L
+
+    /**
+     * An entering page or panel waits at most this long (ms) for its first content before its change runs anyway
+     * (ADR 0011 R8: a change moves only what is drawn; a page whose state is still loading enters when it has some).
+     */
+    const val ENTER_WAIT_MS: Long = 300L
+
     /** A dialog starts at this scale. */
     const val DIALOG_START_SCALE: Float = 0.8f
 
@@ -167,7 +176,6 @@ object NbPhysics {
         get() =
             linkedMapOf(
                 "Nav" to Nav,
-                "Quick" to Quick,
                 "Select" to Select,
                 "SelectLead" to SelectLead,
                 "Data" to Data,

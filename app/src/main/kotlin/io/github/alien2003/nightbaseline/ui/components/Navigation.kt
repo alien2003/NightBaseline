@@ -31,9 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alien2003.nightbaseline.ui.interaction.FollowPresses
 import io.github.alien2003.nightbaseline.ui.interaction.ForcedInteraction
-import io.github.alien2003.nightbaseline.ui.interaction.NbCrossfade
 import io.github.alien2003.nightbaseline.ui.interaction.NbEasing
-import io.github.alien2003.nightbaseline.ui.interaction.SHELL_PRESS_SCALE_LARGE
 import io.github.alien2003.nightbaseline.ui.interaction.ShellPressState
 import io.github.alien2003.nightbaseline.ui.interaction.rememberShellPressState
 import io.github.alien2003.nightbaseline.ui.interaction.shellClickable
@@ -73,7 +71,7 @@ fun FloatingNavBar(
     Box(
         modifier =
             modifier
-                .shellPressInput(press, SHELL_PRESS_SCALE_LARGE)
+                .shellPressInput(press)
                 .shellPressScale(press)
                 .sizeIn(minHeight = ShellDimens.barHeight)
                 .shellSurface(ShellMaterial.Bar, NbShapes.pill)
@@ -115,7 +113,7 @@ fun FloatingNavRail(
     val press = rememberShellPressState()
     Column(
         modifier
-            .shellPressInput(press, SHELL_PRESS_SCALE_LARGE)
+            .shellPressInput(press)
             .shellPressScale(press)
             .width(IntrinsicSize.Max)
             .widthIn(min = ShellDimens.railWidth)
@@ -163,7 +161,7 @@ private fun NavItem(
     val style = ShellTokens.type.navLabel.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, hyphens = Hyphens.None)
     val source = remember { MutableInteractionSource() }
     // A press on an item is a press on the whole bar or rail (one press node, ADR 0011).
-    FollowPresses(press, source, SHELL_PRESS_SCALE_LARGE)
+    FollowPresses(press, source)
     Column(
         modifier
             .shellClickable(
@@ -182,15 +180,14 @@ private fun NavItem(
         verticalArrangement = if (showLabel) Arrangement.Top else Arrangement.Center,
     ) {
         if (showLabel) Spacer(Modifier.height(ShellDimens.barItemTop))
-        // Outline -> filled icon: a crossfade on the Quick spring (snap under reduced motion).
-        NbCrossfade(selected) { filled ->
-            NbIcon(
-                if (filled) destination.selectedIcon else destination.icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(NbDimens.icon),
-            )
-        }
+        // Outline -> filled icon, label colour and weight: a step at the selection's change (ADR 0011: the bar shows the
+        // target section from the first frame of the change; R1-8, a crossfade left the old item lit for 2-4 frames).
+        NbIcon(
+            if (selected) destination.selectedIcon else destination.icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(NbDimens.icon),
+        )
         if (showLabel) {
             Spacer(Modifier.height(ShellDimens.navLabelGap))
             // No line limit: at large font the label wraps and the bar or rail grows (layouts.md 4.1, never cut).

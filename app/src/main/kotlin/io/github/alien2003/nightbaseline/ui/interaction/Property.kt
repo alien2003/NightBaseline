@@ -1,6 +1,5 @@
 package io.github.alien2003.nightbaseline.ui.interaction
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
@@ -26,16 +25,6 @@ fun animateNbFloat(
     spring: NbSpring,
     label: String = "value",
 ): State<Float> = animateFloatAsState(target, LocalNbMotion.current.of(spring), label = label)
-
-/** A crossfade of two looks of one element (the navigation icon outline to filled) on [NbPhysics.Quick]. */
-@Composable
-fun <T> NbCrossfade(
-    target: T,
-    modifier: Modifier = Modifier,
-    content: @Composable (T) -> Unit,
-) {
-    Crossfade(target, modifier, animationSpec = LocalNbMotion.current.of(NbPhysics.Quick), label = "nbCrossfade") { content(it) }
-}
 
 /**
  * An element that appears and disappears in place (ADR 0011 kind Reveal, relation InPlace): shown while [value] is

@@ -2,8 +2,9 @@
 # framework package ui/interaction may not use these APIs. One extended regex per line (grep -E and Kotlin Regex);
 # blank lines and lines starting with '#' are ignored. Read by tools/check-interaction.sh and InteractionBoundaryTest.
 #
-# Animation
-import androidx\.compose\.animation\.
+# Animation (any use of the package, an import or a fully qualified name: review, a qualified call bypassed the import ban)
+\bandroidx\.compose\.animation\.
+\b(rememberInfiniteTransition|animateFloat|animateColor|animateValue|animateTo|animateDecay)\(
 \b(AnimatedContent|AnimatedVisibility|Crossfade|updateTransition|rememberTransition|SeekableTransitionState)\b
 \banimate[A-Z][A-Za-z]*AsState\b
 \b(Animatable|AnimationState|TargetBasedAnimation|DecayAnimation)\(

@@ -144,14 +144,21 @@ class NbBackRouter {
     /**
      * A decoded key (ADR 0011 one key path): Back goes to [back]; a pager step (arrows in the reading direction,
      * Page Up / Down) to the deepest shown sequence ([NbStepKeys]). False when nothing took it.
+     *
+     * One routing rule for every navigation key: it goes to the deepest enabled target, and an open modal is deeper
+     * than every page, so while one is open ([modalOpen]) a step key reaches nothing behind it, exactly as Back closes
+     * the modal instead of popping the page (review: the arrows used to step the night behind an open sheet).
      */
     fun key(intent: NbKeyIntent): Boolean {
         if (intent == NbKeyIntent.Back) return back()
         val delta = intent.stepDelta()
         var best: NbStepTarget? = null
-        if (delta != null) for (t in steps) if (t.enabled() && (best == null || t.depth >= best.depth)) best = t
+        if (delta != null && !modalOpen()) for (t in steps) if (t.enabled() && (best == null || t.depth >= best.depth)) best = t
         return delta != null && best?.step?.invoke(if (delta < 0) -1 else 1) == true
     }
+
+    /** True while an enabled modal (a sheet or dialog of the shown branch) is open. */
+    fun modalOpen(): Boolean = targets.any { it.depth >= MODAL_DEPTH && it.enabled() }
 
     internal fun addStep(target: NbStepTarget) {
         steps += target
@@ -160,6 +167,9 @@ class NbBackRouter {
     internal fun removeStep(target: NbStepTarget) {
         steps -= target
     }
+
+    /** The release velocity of the last step swipe, for the Pager change it makes ([NbStepHandoff]). */
+    internal val stepHandoff = NbStepHandoff()
 
     /** Tests: the targets that could take Back now (one per shown branch level). */
     internal fun enabledTargets(): Int = targets.count { it.enabled() }
@@ -170,6 +180,34 @@ class NbBackRouter {
 
     internal fun remove(target: NbBackTarget) {
         targets -= target
+    }
+}
+
+/** A step swipe's release speed, handed to the Pager change the step makes (the swipe and the pager are apart). */
+internal class NbStepHandoff {
+    private var speed = 0f
+    private var at = Long.MIN_VALUE
+
+    /** A step swipe released at [speedPx] px/s and makes a step now: its Pager change starts with that speed. */
+    fun hand(speedPx: Float) {
+        speed = speedPx
+        at = NbClock.nowNanos()
+    }
+
+    /**
+     * The speed (px/s) of the step swipe that caused the Pager change starting now, once (0 when there is none, or when
+     * the change comes later than [NbPhysics.ENTER_WAIT_MS] after the release: it was caused by something else).
+     */
+    fun take(): Float {
+        val fresh = at != Long.MIN_VALUE && NbClock.nowNanos() - at <= NbPhysics.ENTER_WAIT_MS * NANOS_PER_MS
+        val value = if (fresh) speed else 0f
+        speed = 0f
+        at = Long.MIN_VALUE
+        return value
+    }
+
+    private companion object {
+        const val NANOS_PER_MS = 1_000_000L
     }
 }
 

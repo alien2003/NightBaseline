@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -38,6 +39,7 @@ import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.Measurable
@@ -53,6 +55,7 @@ import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.node.invalidateLayer
 import androidx.compose.ui.node.requireDensity
+import androidx.compose.ui.node.requireLayoutCoordinates
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalViewConfiguration
@@ -133,13 +136,30 @@ private const val WIDE_PRESS_THRESHOLD = 0.97f
  * - scale: to [nbPressScale] of the element on [NbPhysics.PressIn] (on [NbPhysics.PressInWide] for targets at 0.97
  *   and above: tiles, the bar, full-width buttons), back on [NbPhysics.PressOut] with the press velocity carried over,
  *   never above 1.0 (the spring ends at its first return to 1.0, so it never dips again);
- * - light: in on the glow tween ([NbMotionConfig.glowIn]), out on [NbMotionConfig.glowOut];
+ * - light: to 1 on the glow tween ([NbMotionConfig.glowIn]), back to 0 on [NbMotionConfig.glowOut]; under reduced
+ *   motion it is the same light at the same strength, switched on and off without a tween ([lightSpec]);
  * - highlight: [NbMotionConfig.stateLayer] in, [NbMotionConfig.stateLayerOut] out;
  * - a tap is a press whose finger stays within the touch slop: a move beyond it cancels the press ([nbTapSlop]), so a
  *   swipe that starts on an element never becomes its click;
- * - under reduced motion nothing scales and the light is static.
+ * - under reduced motion nothing scales and the light is static;
+ * - no element comes back to the foreground pressed ([OnPressLeave] / `watchPressLeave`).
  */
 internal object NbPressModel {
+    /** The light's strength: 1 while pressed, 0 otherwise (the same under reduced motion). */
+    fun lightTarget(pressed: Boolean): Float = if (pressed) 1f else 0f
+
+    /** The light's motion to [lightTarget]; null (a switch) under reduced motion or when it must not be seen ([snap]). */
+    fun lightSpec(
+        motion: NbMotionConfig,
+        pressed: Boolean,
+        snap: Boolean,
+    ): AnimationSpec<Float>? =
+        when {
+            snap || motion.reduced -> null
+            pressed -> motion.glowIn()
+            else -> motion.glowOut()
+        }
+
     /** The scale spring of a press to [target] ([pressed]) or of its release; null under reduced motion. */
     fun scaleSpec(
         motion: NbMotionConfig,
@@ -193,17 +213,44 @@ private class TapSlopNode :
         pass: PointerEventPass,
         bounds: IntSize,
     ) {
+        if (pass == PointerEventPass.Initial) {
+            pointerEvent.changes.forEach(::consumeFarLift)
+            return
+        }
         if (pass != PointerEventPass.Final) return
         for (change in pointerEvent.changes) {
             if (change.changedToDownIgnoreConsumed()) {
                 down = change.id
-                origin = change.position
+                origin = onScreen(change.position)
                 moved = false
             }
             if (change.id != down) continue
-            if (!moved && (change.position - origin).getDistance() > currentValueOf(LocalViewConfiguration).touchSlop) moved = true
+            if (!moved && beyondSlop(change)) moved = true
             if (moved) change.consume()
             if (!change.pressed) down = null
+        }
+    }
+
+    /**
+     * [local] in window coordinates: the rule is about the finger, so an element that moves under a still finger (a
+     * sheet opening, a list settling) does not count as a move.
+     */
+    private fun onScreen(local: Offset): Offset = if (isAttached) requireLayoutCoordinates().localToWindow(local) else local
+
+    private fun beyondSlop(change: PointerInputChange): Boolean =
+        (onScreen(change.position) - origin).getDistance() > currentValueOf(LocalViewConfiguration).touchSlop
+
+    /**
+     * A move and the lift batched into one event: the first sample beyond the slop is the up itself. The clickable
+     * would see that up in the main pass, before the final pass, and fire; nothing above can be dragging yet (no sample
+     * was beyond the slop), so consuming the up here only cancels the tap.
+     */
+    private fun consumeFarLift(change: PointerInputChange) {
+        val lift = change.id == down && !change.pressed && change.previousPressed
+        if (!lift || moved) return
+        if (beyondSlop(change)) {
+            moved = true
+            change.consume()
         }
     }
 
@@ -347,7 +394,7 @@ private fun newPressAnimatable(initial: Float): Animatable<Float, AnimationVecto
  * cancel ends only its own press (several fingers, or a new tap that starts before the previous release arrives), and
  * the end of a press that was already cleared ([clear]) changes nothing.
  */
-private class PressTracker {
+internal class PressTracker {
     private val active = ArrayList<PressInteraction.Press>(1)
 
     val pressed: Boolean get() = active.isNotEmpty()
@@ -413,8 +460,8 @@ private fun CoroutineScope.retarget(
 }
 
 /**
- * Runs a press value to [target] on [spec] (a snap without one); every frame is reported to [NbMotionProbe.press]
- * as [sample] of [owner] (the press model test compares the curves of every pressable).
+ * Runs a press value to [target] on [spec] (a snap without one); every frame, and a snap, is reported to
+ * [NbMotionProbe.press] as [sample] of [owner] (the press model test compares the curves of every pressable).
  */
 internal suspend fun Animatable<Float, AnimationVector1D>.pressTo(
     target: Float,
@@ -422,11 +469,13 @@ internal suspend fun Animatable<Float, AnimationVector1D>.pressTo(
     sample: NbPressSample?,
     owner: Any?,
 ) {
+    val probe = NbMotionProbe.press
     if (spec == null) {
         snapTo(target)
+        // A switch is a sample too (reduced motion, a press-out the person cannot see).
+        if (probe != null && sample != null && owner != null) probe(owner, sample, target)
         return
     }
-    val probe = NbMotionProbe.press
     if (probe == null || sample == null || owner == null) {
         animateTo(target, spec)
     } else {
@@ -725,12 +774,14 @@ private class PressFeedbackNode(
                 invalidateDraw()
             }
         // Reduced motion: no spread animation, the light is simply there while pressed.
-        glowJob = coroutineScope.retarget(glowJob, anim, 1f, spec.motion.glowIn(), NbPressSample.Glow, this)
+        val light = NbPressModel.lightSpec(spec.motion, pressed = true, snap = false)
+        glowJob = coroutineScope.retarget(glowJob, anim, NbPressModel.lightTarget(true), light, NbPressSample.Glow, this)
     }
 
     private fun glowOut(snap: Boolean) {
         val anim = glowLevel ?: return
-        glowJob = coroutineScope.retarget(glowJob, anim, 0f, if (snap) null else spec.motion.glowOut(), NbPressSample.Glow, this)
+        val light = NbPressModel.lightSpec(spec.motion, pressed = false, snap = snap)
+        glowJob = coroutineScope.retarget(glowJob, anim, NbPressModel.lightTarget(false), light, NbPressSample.Glow, this)
     }
 
     override fun onPointerEvent(
@@ -950,21 +1001,41 @@ class NbPressIndication(
     }
 }
 
-/** State of the finger-following light of one button. */
-class NbTouchLight internal constructor() {
+/** State of the finger-following light of one button: one pressable of the press model ([NbPressModel]). */
+class NbTouchLight internal constructor(
+    scope: CoroutineScope,
+) {
     /** Where the finger went down, null before the first press. */
     var center: Offset? by mutableStateOf(null)
         internal set
-    internal val animatable = Animatable(0f)
+    private val light = PressLight(scope, this)
+    private val presses = PressTracker()
     internal var forced: Boolean = false
 
     /** Strength of the light now (snapshot state: read it while drawing). */
-    val alpha: Float get() = if (forced) 1f else animatable.value
+    val alpha: Float get() = if (forced) 1f else light.glow.value
+
+    internal fun onInteraction(
+        interaction: Interaction,
+        motion: NbMotionConfig,
+    ) {
+        if (interaction is PressInteraction.Press) center = interaction.pressPosition
+        if (presses.apply(interaction)) light.to(presses.pressed, motion, snap = false)
+    }
+
+    internal fun clear(
+        motion: NbMotionConfig,
+        snap: Boolean,
+    ) {
+        if (presses.clear()) light.to(false, motion, snap)
+    }
 }
 
 /**
- * The touch light of the primary button (`coloros17-glass.md` 4.4), driven by the press interactions of [source]:
- * glow in 110 ms, out 480 ms, tracked per press so the end of one press never puts out another finger's light.
+ * The touch light of the primary button (`coloros17-glass.md` 4.4), driven by the press interactions of [source] on
+ * the press model's light rule (glow in 110 ms, out 480 ms; switched under reduced motion), tracked per press so the
+ * end of one press never puts out another finger's light, cleared when the app leaves the foreground, and reported to
+ * [NbMotionProbe.press] like every other pressable.
  */
 @Composable
 fun rememberNbTouchLight(
@@ -972,33 +1043,10 @@ fun rememberNbTouchLight(
     forced: Boolean,
 ): NbTouchLight {
     val motion = LocalNbMotion.current
-    val light = remember { NbTouchLight() }
+    val scope = rememberCoroutineScope()
+    val light = remember(scope) { NbTouchLight(scope) }
     light.forced = forced
-    LaunchedEffect(source, motion) {
-        // Tracked per press, and the latest change wins: a release never waits behind the light's fade-in, and the
-        // end of one press does not put out the light of another finger.
-        val active = mutableSetOf<PressInteraction.Press>()
-        source.interactions.filterIsInstance<PressInteraction>().collectLatest { interaction ->
-            when (interaction) {
-                is PressInteraction.Press -> {
-                    active += interaction
-                    light.center = interaction.pressPosition
-                }
-
-                is PressInteraction.Release -> {
-                    active -= interaction.press
-                }
-
-                is PressInteraction.Cancel -> {
-                    active -= interaction.press
-                }
-            }
-            if (active.isEmpty()) {
-                light.animatable.animateTo(0f, motion.glowOut())
-            } else {
-                motion.glowIn<Float>()?.let { light.animatable.animateTo(1f, it) }
-            }
-        }
-    }
+    LaunchedEffect(light, source, motion) { source.interactions.collect { light.onInteraction(it, motion) } }
+    OnPressLeave(light, motion) { stopped -> light.clear(motion, snap = stopped) }
     return light
 }

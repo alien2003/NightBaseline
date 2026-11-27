@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -117,6 +118,15 @@ class ModalState internal constructor(
     /** Start velocity (p / s) of the next hide, from a fling or a released gesture. */
     internal var releaseVelocity: Float = 0f
 
+    /** [NbClock.nowNanos] of the last open or close request: the time origin of its run (ADR 0011 R7). */
+    internal var requestAt: Long? = null
+
+    /** The branch of the composition the modal was opened in (its Back is enabled only while that branch is shown). */
+    internal var branch: NbBackScope = NbBackScope(0) { true }
+
+    /** Width of the host (the window) in px: the travel of a back gesture over the modal. */
+    internal var hostWidth: Float = 0f
+
     private var job: Job? = null
     private var dragging = false
 
@@ -136,19 +146,36 @@ class ModalState internal constructor(
     fun dismiss(velocity: Float = 0f) {
         if (!target) return
         releaseVelocity = velocity
+        requestAt = NbClock.nowNanos()
         onDismiss()
     }
 
+    /**
+     * Opens (or continues opening) the panel. Rule R8: a panel opening from hidden waits, at p = 0 (invisible), until
+     * it has been measured (its content composed and laid out), at most [NbPhysics.ENTER_WAIT_MS]; its time origin is
+     * then the frame after that, so the cost of its first composition never shows as a jump of the motion. Otherwise
+     * the origin is the request (R7).
+     */
     internal suspend fun show() {
         job?.cancel()
-        driver.run(1f, NbRelease.startVelocity(driver.p, driver.v, 1f, NbPhysics.Nav, visibleTarget = true))
+        var origin = requestAt
+        if (driver.p == 0f && panelHeight <= 0f && !reduced) {
+            var first = Long.MIN_VALUE
+            while (true) {
+                val frame = withFrameNanos { it }
+                if (first == Long.MIN_VALUE) first = frame
+                if (panelHeight > 0f || frame - first >= NbPhysics.ENTER_WAIT_MS * NANOS_PER_MS) break
+            }
+            origin = NbClock.nowNanos()
+        }
+        driver.run(1f, NbRelease.startVelocity(driver.p, driver.v, 1f, NbPhysics.Nav, visibleTarget = true), origin)
     }
 
     internal suspend fun hide() {
         job?.cancel()
         val v = releaseVelocity
         releaseVelocity = 0f
-        driver.run(0f, NbRelease.startVelocity(driver.p, v, 0f, NbPhysics.Nav, visibleTarget = false))
+        driver.run(0f, NbRelease.startVelocity(driver.p, v, 0f, NbPhysics.Nav, visibleTarget = false), requestAt)
     }
 
     /** Moves the panel down by [deltaPx] (negative = up, never above rest); used by drags. Returns the consumed px. */
@@ -183,21 +210,27 @@ class ModalState internal constructor(
         if (projected > height / 2 || fling) {
             dismiss(perSecond)
         } else if (driver.p < 1f) {
+            val at = NbClock.nowNanos()
             job =
-                scope?.launch {
-                    driver.run(1f, NbRelease.startVelocity(driver.p, perSecond, 1f, NbPhysics.Nav, visibleTarget = true))
+                scope?.launch(start = CoroutineStart.UNDISPATCHED) {
+                    driver.run(1f, NbRelease.startVelocity(driver.p, perSecond, 1f, NbPhysics.Nav, visibleTarget = true), at)
                 }
         }
     }
 
     private var gestureFrom = 1f
+    private val finger = NbBackFinger()
 
-    /** The modal's Back target (depth above every page). */
+    /**
+     * The modal's Back target (depth above every page). Enabled only while the modal is wanted open **and** the branch
+     * it was opened in is the shown one: a modal left open in a parked page or a hidden section never takes Back from
+     * the page that is shown (review: it used to, as it ignored its branch, unlike every other target).
+     */
     internal val backTarget: NbBackTarget =
         object : NbBackTarget {
             override val depth: Int = MODAL_DEPTH
 
-            override fun enabled(): Boolean = target
+            override fun enabled(): Boolean = target && branch.active()
 
             override fun start(
                 edge: Int,
@@ -205,24 +238,31 @@ class ModalState internal constructor(
             ) {
                 job?.cancel()
                 driver.resetTracking()
+                finger.start(edge, touchX)
                 gestureFrom = driver.p
             }
 
             override fun progress(move: NbBackMove) {
-                val fraction = move.progress
-                val timeMillis = move.timeMillis
                 if (!target || reduced) return
-                // p = 1 - g: the panel follows the back gesture towards hidden (ADR 0011 Sheet / Dialog row).
-                val next = (gestureFrom * (1f - fraction.coerceIn(0f, 1f))).coerceIn(0f, 1f)
-                scope?.launch(start = CoroutineStart.UNDISPATCHED) { driver.track(next, timeMillis) }
+                // p = p0 (1 - g) with g the finger's travel share over the window, the same law as a page (ADR 0011:
+                // every back gesture follows the finger's travel, never the platform's shaped progress).
+                val g = finger.share(move, hostWidth)
+                val next = (gestureFrom * (1f - g)).coerceIn(0f, 1f)
+                scope?.launch(start = CoroutineStart.UNDISPATCHED) { driver.track(next, move.timeMillis) }
             }
 
             override fun cancel() {
-                job = scope?.launch { driver.release(1f, visibleTarget = true) }
+                val at = NbClock.nowNanos()
+                job = scope?.launch(start = CoroutineStart.UNDISPATCHED) { driver.release(1f, visibleTarget = true, at = at) }
             }
 
             override fun commit() {
-                dismiss(driver.trackedVelocity())
+                val at = NbClock.nowNanos()
+                val velocity = driver.releaseVelocity(at)
+                val origin = driver.releaseOrigin(at)
+                dismiss(velocity)
+                // The hide continues the finger's motion (R7), not a new start at the dismiss request.
+                requestAt = origin
             }
 
             override fun back() {
@@ -259,6 +299,8 @@ class ModalState internal constructor(
     internal companion object {
         /** A downward fling faster than this (dp/s) hides the panel (the platform's minimum fling velocity, 50 dp/s x 20). */
         const val MIN_FLING_DP = 1000f
+
+        private const val NANOS_PER_MS = 1_000_000L
     }
 }
 
@@ -311,13 +353,17 @@ fun <T : Any> ModalHost(
     val retained = remember { RetainedValue<T>() }
     if (value != null) retained.value = value
     val wanted = value != null
+    if (wanted && !state.target) state.requestAt = NbClock.nowNanos()
     state.target = wanted
+    state.branch = LocalNbBackScope.current
     LaunchedEffect(state, wanted) {
         if (wanted) {
             state.show()
         } else {
             state.hide()
             retained.value = null
+            // The next open measures its panel again (R8).
+            state.panelHeight = 0f
         }
     }
     val present by remember(state) { derivedStateOf { state.target || state.p > 0f } }
@@ -327,7 +373,7 @@ fun <T : Any> ModalHost(
     val close = stringResource(R.string.a11y_close)
     val modalScope = remember(state) { ModalScope(state) }
     CompositionLocalProvider(LocalOverscrollFactory provides null) {
-        Box(modifier.fillMaxSize(), contentAlignment = state.kind.alignment) {
+        Box(modifier.fillMaxSize().onSizeChanged { state.hostWidth = it.width.toFloat() }, contentAlignment = state.kind.alignment) {
             Box(
                 Modifier
                     .matchParentSize()

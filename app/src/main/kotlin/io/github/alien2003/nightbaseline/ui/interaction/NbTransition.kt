@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
@@ -18,6 +19,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
+
+private const val NANOS_PER_MS = 1_000_000L
 
 /**
  * The change one host is running (ADR 0011): from one state ([from]) to another ([to]) of one [kind], drawn as two
@@ -77,6 +80,15 @@ class NbTransition internal constructor(
     private var pendingVelocity by mutableFloatStateOf(0f)
     private var job: Job? = null
     private var runJob: Job? = null
+
+    /** [NbClock.nowNanos] when the pending change was asked for (rule R7: its time origin). */
+    private var requestAt: Long? = null
+
+    /**
+     * True when the layer of a state has content to draw: it emitted and measured some (rule R8). Set by the host
+     * ([NbLayer]); a change waits for its entering state's content before its time starts.
+     */
+    internal var hasContent: (Any) -> Boolean = { true }
 
     /** Bumped on every change made outside composition (gesture start, settle): the host recomposes its layers. */
     internal var version by mutableIntStateOf(0)
@@ -194,6 +206,7 @@ class NbTransition internal constructor(
         kind: NbKind,
         toIsUpper: Boolean,
         e: Int,
+        v0: Float = 0f,
     ) {
         if (to == b && from == a) return
         if (isReverseOf(a, b, kind)) {
@@ -209,7 +222,8 @@ class NbTransition internal constructor(
         this.e = e
         // A layout change re-projects the state with a snap (R6): the change starts at its end.
         pendingStart = if (reprojecting()) 1f else 0f
-        pendingVelocity = 0f
+        pendingVelocity = v0
+        requestAt = NbClock.nowNanos()
         runId++
     }
 
@@ -230,8 +244,15 @@ class NbTransition internal constructor(
         if (kind == NbKind.Pager) e = -e
         pendingStart = 1f - p
         pendingVelocity = -v
+        requestAt = NbClock.nowNanos()
         runId++
     }
+
+    /** A change from rest ([start] 0) whose [entering] state has nothing to draw yet waits for it (R8). */
+    private fun waitsForContent(
+        start: Float,
+        entering: Any,
+    ): Boolean = start == 0f && !reduced && !hasContent(entering)
 
     /** Tests: draws the change set up by [go] at [p] (as if its spring had run so far). */
     @VisibleForTesting
@@ -239,15 +260,36 @@ class NbTransition internal constructor(
         pendingStart = p
     }
 
-    /** Runs the change set up by [go]; the host calls it from an effect keyed on [runId]. */
+    /**
+     * Runs the change set up by [go]; the host calls it from an effect keyed on [runId].
+     *
+     * Rule R8 (a change moves only what is drawn): a change from rest whose entering state has no content yet (its
+     * page was just composed and its state is still loading, or it has not been measured) holds p at its start, which
+     * draws exactly the frame before the change, until the entering layer has content, at most
+     * [NbPhysics.ENTER_WAIT_MS]; its time origin (R7) is then the frame after that content was laid out, so an
+     * expensive first composition never shows up as a jump of the motion. Otherwise the origin is the request.
+     */
     internal suspend fun runPending() {
         val start = pendingStart ?: return
         job?.cancel()
         runJob = currentCoroutineContext()[Job]
+        var origin = requestAt
+        val entering = to
+        if (entering != null && waitsForContent(start, entering)) {
+            var first = Long.MIN_VALUE
+            while (true) {
+                val frame = withFrameNanos { it }
+                if (first == Long.MIN_VALUE) first = frame
+                if (hasContent(entering) || frame - first >= NbPhysics.ENTER_WAIT_MS * NANOS_PER_MS) break
+            }
+            origin = NbClock.nowNanos()
+        }
         driver.snapTo(start)
         pendingStart = null
-        val v0 = NbRelease.startVelocity(start, pendingVelocity, 1f, kind.spring, visibleTarget = false)
-        driver.run(1f, v0)
+        // A pager's or a swap's end state rests on screen: its start velocity is capped (lemma 1, no crossing).
+        val visible = kind == NbKind.Pager || kind == NbKind.Swap
+        val v0 = NbRelease.startVelocity(start, pendingVelocity, 1f, kind.spring, visibleTarget = visible)
+        driver.run(1f, v0, origin)
         finish()
     }
 
@@ -327,9 +369,11 @@ class NbTransition internal constructor(
     ): Boolean {
         if (!gesture || token != gestureToken) return false
         gesture = false
+        val at = NbClock.nowNanos()
+        // Undispatched: the spring is set up at the release instant (R7), before the frame the release falls in.
         job =
-            scope.launch {
-                driver.release(if (commit) 1f else 0f, visibleTarget = !commit)
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                driver.release(if (commit) 1f else 0f, visibleTarget = !commit, at = at)
                 finish()
             }
         return true
@@ -386,13 +430,26 @@ internal fun Modifier.blockInput(blocked: () -> Boolean): Modifier =
         }
     }
 
-/** The pose layer of [key] in [transition]. */
+/**
+ * The pose layer of [key] in [transition]. A [parked] layer (the id of its host; null when it is shown) is placed and
+ * drawn ahead but invisible: alpha 0, so the renderer skips it while its display lists stay recorded.
+ */
 internal fun Modifier.poseLayer(
     transition: NbTransition,
     key: Any,
     shift: SectionShift? = null,
+    parked: String? = null,
 ): Modifier =
     graphicsLayer {
         shift?.width = size.width
-        with(transition) { applyPose(key) }
+        if (parked != null) {
+            translationX = 0f
+            translationY = 0f
+            scaleX = 1f
+            scaleY = 1f
+            alpha = 0f
+            NbMotionProbe.parked?.invoke(parked, key)
+        } else {
+            with(transition) { applyPose(key) }
+        }
     }
