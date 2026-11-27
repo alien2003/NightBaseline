@@ -613,6 +613,7 @@ the old page spring (1.0 / 220 on Compose's 0.01 px default threshold) ran about
 | `PRESS_SCALE_LARGE` | 0.98 | press scale of the bar, tiles, full-width buttons |
 | `OVERSCROLL_FOLLOW` | 0.5 | share of a pull past the edge the content follows at o = 0 |
 | `OVERSCROLL_MAX_DP` | 240 | largest overscroll translation |
+| `STEP_SWIPE_DP` | 56 | a step swipe (night, month) steps when the decay projects the released travel past this, towards a side; one threshold for every sequence |
 
 The small top-bar title is a pure function of the scroll offset through `easing.title` (0.33, 0, 0.67, 1) over
 40 -> 72 dp; the top-bar material is `scroll / 10 dp` clamped to [0, 1]. Neither has a clock of its own.
@@ -624,9 +625,9 @@ s is the shown share of the upper layer of a stack pair: s = p for a push, s = 1
 
 | kind | relation it comes from | pose | gesture -> p |
 |---|---|---|---|
-| Page | one level deeper or shallower in a stack: app routes, settings sub-pages (every layout), the two-pane detail pane's own stack, onboarding steps, the debug catalog | upper `tx = e W (1 - s^2.2)`; lower `tx = -e W/3 s`, dim `0.3 s`; no scale, no fade, no corners | the leaving page stays under the finger: `1 - s^2.2 = u0 + (1 - u0) g` |
+| Page | one level deeper or shallower in a stack: app routes, settings sub-pages (every layout), the two-pane detail pane's own stack, onboarding steps, the debug catalog | upper `tx = e W (1 - s^2.2)`; lower `tx = -e W/3 s`, dim `0.3 s`; no scale, no fade, no corners | the leaving page stays under the finger: `1 - s^2.2 = u0 + (1 - u0) g`, g = the touch position's travel since the gesture's start event over the host width (the platform's shaped progress only without a touch position) |
 | Tab | the top-level sections in bar order (bar, rail, Ctrl+1/2/3, "See all", "See history", Glance "More", back to Home) | the Page geometry, the higher bar index is the upper layer; e from the bar order whatever the swipe edge; the bar and rail stay in place | as Page |
-| Pager | neighbours in a sequence: previous / next night (button, swipe, arrow keys), month (buttons, swipe, keys), the History detail pane's night | outgoing `tx = -e p W`, incoming `tx = e (1 - p) W`; newer values come from the end side | (a swipe decides by fling projection, then runs p) |
+| Pager | neighbours in a sequence: previous / next night (button, swipe, arrow keys, Page Up / Down), month (buttons, swipe, keys), the History detail pane's night | outgoing `tx = -e p W`, incoming `tx = e (1 - p) W`; newer values come from the end side; the night pager spans the window width (pages enter and leave at the screen edges, the gutters are inside each page) | (a swipe decides by fling projection past `STEP_SWIPE_DP`, then runs p). One step area: the whole page answers the swipe, the arrows in the reading direction and Page Up / Down, with focus inside it or without focus through the router |
 | Swap | unordered peers in a fixed place: Home's detail pane metric, Settings section in two panes | outgoing alpha `max(0, 1 - 2p)`, incoming `max(0, 2p - 1)` | - |
 | Sheet | overlay from the bottom | `ty = (1 - p) H`, scrim alpha p | drag `p = 1 - dy / H`; back `p = 1 - g` |
 | Dialog | centred overlay | scale `0.8 + 0.2 p`, alpha `min(1, p / 0.35)`, scrim alpha p | back `p = 1 - g` |
@@ -641,8 +642,14 @@ fling: the platform decay projects the travel; past half (or the step threshold)
 
 ### 9.4 Press, highlight, glow
 
+- **One press model** (`NbPressModel`): every pressable (clickables, shell controls, the primary button's light, the
+  default indication) takes its springs and tweens from one place, so the same press of the same size draws the same
+  curve everywhere (tested frame by frame).
 - **Press shrink**: 0.96 (side <= 40 dp) ... 0.98 (side >= 150 dp or aspect >= 4), linear between, on `PressIn`
-  (`PressInWide` from 0.97); release on `PressOut`, never above 1.0. Rows inside a grouped card only light up.
+  (`PressInWide` from 0.97, shell controls included); release on `PressOut`, ending at its first return to 1.0 (it
+  never goes above 1.0 and never dips again). Rows inside a grouped card only light up.
+- **A tap stays within the touch slop**: once the finger has moved beyond it, the press is cancelled and the element
+  does not fire, so a swipe that starts on a tile, a row or a button is never its click.
 - Every press, shell controls included, follows the clickable's press interactions: inside a scrolling container it
   starts after the tap timeout and ends as soon as a scroll takes the gesture.
 - **Pressed highlight** `state.pressed` under the content on `HighlightIn` / `HighlightOut` (rows on the row springs).
@@ -656,8 +663,9 @@ fling: the platform decay projects the travel; past half (or the step threshold)
   (`nbVerticalScroll`, `nbHorizontalScroll`, `NbLazyColumn`) [decision: ColorOS fling feel is unmeasured].
 - Overscroll translates without distortion [measured: `reference-analysis.md` 8.2]: a pull adds
   `0.5 (1 - |o| / 240 dp)` of the leftover (it saturates); a drag away from the edge takes o back 1:1 and scrolls the
-  remainder in the same event; a fling is always performed and the velocity the content cannot use seeds the
-  `Overscroll` spring 1:1; a finger landing during the return stops it where it is. Content shorter than its
+  remainder in the same event; a fling is always performed and the velocity the content cannot use (the fling's
+  velocity minus what the content consumed) seeds the `Overscroll` spring 1:1, so a fling that comes to rest inside
+  the content moves no offset (no bump); a finger landing during the return stops it where it is. Content shorter than its
   viewport bounces the same way. None under reduced motion.
 - Horizontal gestures inside a vertical scroll claim the pointer only when the finger has moved more than the touch
   slop and more horizontally than vertically at that moment (rule A).

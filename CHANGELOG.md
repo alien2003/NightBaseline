@@ -19,8 +19,25 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
   goes at once ([ADR 0009](https://github.com/alien2003/NightBaseline/blob/main/docs/adr/0009-predictive-back.md),
   [ADR 0011](https://github.com/alien2003/NightBaseline/blob/main/docs/adr/0011-interaction-framework.md)).
 
+### Fixed
+
+- **A flick no longer bounces when it stops.** Every page used to overshoot a little and spring back at the end of a
+  flick, even far from the top or bottom; now a flick comes to rest where it slows down, like it does in the sheets,
+  and only bounces at the end of the content.
+- **A swipe is never a tap.** A sideways swipe that starts on a measurement tile, a row or a button no longer opens
+  it. On a night, a sideways swipe anywhere on the page steps to the previous or next night.
+- **The back gesture follows your finger exactly** on every phone and on the inner screen of a foldable, and the page
+  you go back to is ready at the first frame, so the gesture no longer hesitates at the start.
+- **Bar and round buttons.** The bar now shows the section you are going to from the start of every tab change (it
+  used to show the old one while going back towards Home), and the bar, round buttons and tiles now shrink and light up
+  in exactly the same way.
+- **Folding back.** Folding the phone right after opening a night from History no longer breaks the next Back.
+
 ### Changed
 
+- **Keyboard.** The left and right arrow keys and Page Up / Down step to the previous or next night even when nothing
+  is selected, in the reading direction of the language. As in every app, Android uses the first such key after you
+  touch the screen to switch to keyboard navigation.
 - **Every movement in the app now follows the same rules.** Opening and closing a page, switching tabs (with the
   bar, the rail, a keyboard shortcut or a "See all" link), stepping to the previous or next night or month,
   selecting in a two-pane layout, sheets and dialogs all use the same motion with the same timing, fitted to the

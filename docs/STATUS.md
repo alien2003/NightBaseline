@@ -50,13 +50,17 @@ Live project state. A new session starts here. Updated after every step. Last fu
   spring registry with pure poses (`ui/interaction`), hosts for stacks, sections, pagers, swaps, reveals and modals,
   one back router, one scroll / overscroll / press model. Root causes fixed by construction (1 s page spring with no
   visibility threshold, NavHost restarting pops from rest, frozen preview pose, overscroll dropping flings). Verified
-  on the JVM and Robolectric only: `NbPhysicsTest`, `InteractionCatalogTest`, `ScrollInvariantTest`,
+  on the JVM and Robolectric only: `NbPhysicsTest`, `InteractionCatalogTest`, `InteractionSweep*` (round 2: every
+  registered screen, container and pressable at three window sizes), `FrameworkHostsTest`, `OverscrollFlingTest`,
   `PredictiveBackTest`, `InteractionBoundaryTest`, `MotionTokensDocTest`. Not yet felt on the phone (ask): reports
   (a) to (d) on a release build. HYPOTHESIS: Nav spring 1.2 / 860 with page exponent 2.2 (fit of the recording's
   table, rms 2.7 / 1.7 px; a pixel re-measure of the frames is open), Tab = Page geometry (no OPPO tab recording),
-  overscroll follow 0.5. Open: the page under a pushed page is composed only during a change (first gesture frame
-  over History costs a composition); night / month pagers do not drag the neighbour under the finger; the boundary
-  check is a regex source scan (no type-resolved detekt rule, no public API snapshot).
+  overscroll follow 0.5. Round 2 (ADR 0011 "Round 2"): fling bump (V1, consumed vs leftover velocity), swipe -> tap
+  (V3), page below composed ahead (V5), fold + back (V7, entries completed during a running change), one press model,
+  touch-position gesture, key intents, registries. V2 (dropped flings on the emulator) is the platform pointer-stop
+  rule meeting the injector's 56-59 ms gaps, not app logic. Open: first sheet open stall (V4) and tab frame cost (V6,
+  two glass bars per tab change) are unmeasured on the phone and not changed; night / month pagers do not drag the
+  neighbour under the finger; the boundary check is a regex source scan (no type-resolved detekt rule).
 
 ## Next
 1. Fix → build dev.6 → install (ask) → confirm the night is processed automatically; then a further new night without

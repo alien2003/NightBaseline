@@ -178,15 +178,20 @@ Pager towards the newer side, without one a Swap. An element that appears and di
 `NbReveal(value) { … }`. A sheet or a dialog: `ModalHost(value, onDismiss, kind = ModalKind.…)` with a `GlassSheet` or
 `GlassDialog`; Back, the scrim, a drag and the close button are handled there.
 
-**Scrolling:** `Modifier.nbVerticalScroll(rememberNbScrollState())`, `NbLazyColumn(state = rememberNbLazyListState())`
-or `Modifier.nbHorizontalScroll(...)`. They carry the one fling and the one overscroll, and register the container for
-`ScrollInvariantTest`, which then covers the new screen without being edited (add the screen to its list of screens
-if it needs a route to open).
+**Scrolling:** `Modifier.nbVerticalScroll(rememberNbScrollState(), id = "...")`, `NbLazyColumn(id = "...", state =
+rememberNbLazyListState())` or `Modifier.nbHorizontalScroll(..., id = "...")`. The id is required and unique on its
+screen. They carry the one fling and the one overscroll, and register the container for `InteractionSweep*`, which
+then covers it at three window sizes without being edited. A new destination of the navigation graph goes into
+`AppScreens` (nav), with every value of its page argument; the sweep fails until it is there.
 
 **Presses:** `Modifier.nbClickable(onClick, shape)` for every control; shell controls use `ShellRoundButton` or
 `shellClickable` with `rememberShellPressState()` and `interactionSource = press.source`. A horizontal gesture inside
-a scrolling column: `nbStepSwipe` (steps) or `nbScrub` (charts), both on the axis rule. Keys: `Modifier.nbKeys`,
-turning a key into the same change a tap makes (`LocalNbBackRouter.current?.back()` for Back).
+a scrolling column: `nbStepArea` (a sequence: swipe, arrows and Page Up / Down, with or without focus), `nbStepSwipe`
+(the swipe alone) or `nbScrub` (charts), all on the axis rule. Every framework pressable registers itself for the
+sweep (`NbPressable`) and follows the one press model, a tap included (no click after a move beyond the touch slop).
+Keys: `Modifier.nbKeyIntents { intent -> ... }` answers decoded intents (`NbKeyIntent`: Back, Section, Command,
+Move, Page, Edge, in the reading direction); a screen never sees a raw key, and navigation intents go through
+`LocalNbBackRouter.current?.key(intent)`.
 
 **A value that animates** (a control's knob, a marker): `animateNbFloat(target, NbPhysics.<role>)`. A new role is a
 new entry in `Physics.kt` and in `tokens.md` 9.1 or 9.2, in the same commit (`MotionTokensDocTest` compares them); a

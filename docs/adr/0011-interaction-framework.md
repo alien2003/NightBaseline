@@ -79,10 +79,12 @@ rendering of every kind (a snap).
   complete only then (its ViewModel is cleared then, and a pushed entry is resumed then, so a double tap pushes once).
   No timeout, no pose held after the end. During a gesture both layers swallow input; during a tap-driven change
   the leaving one does.
-- **R4 back routing.** One `PredictiveBackHandler` at the root, enabled only while some target can go back (so at the
-  root the system's back-to-home plays). The target of a gesture is chosen at its start: the deepest enabled target
-  of the shown branch (modal above everything; a sub-page stack above the page stack above the section host). Esc,
-  Alt+Left, 3-button Back and TalkBack take the same targets without a gesture.
+- **R4 back routing.** One back callback at the root (`OnBackPressedCallback`), enabled only while some target can
+  go back (so at the root the system's back-to-home plays). The target of a gesture is chosen at its start event:
+  the deepest enabled target of the shown branch (modal above everything; a sub-page stack above the page stack above
+  the section host; each layer of a swap is its own branch, so a leaving layer is no target). Esc, Alt+Left,
+  3-button Back and TalkBack take the same targets without a gesture. The finger's travel is the touch position's
+  distance from the start event over the host's width, not the platform's progress (shaped on Android 14+).
 - **R5 reduced motion**, one rule at the root: animations removed (animator scale 0) or battery saver on
   [decision: battery saver also removes decoration, as before]. Every p snaps; press scale, glow and overscroll are
   off; a back gesture goes back at once. Fling stays (content physics). Other duration scales come from the
@@ -123,6 +125,47 @@ the earlier hand bound `max(v0, omega a / e)` to be false); the test samples it.
 
 All values are mirrored in `tokens.md` 9 and compared with the registry by `MotionTokensDocTest`.
 
+### Round 2 (2026-11-27): measured violations and their root causes
+
+Emulator measurements of the first round (frame-by-frame, injected input) and a review found these; each fix is in the
+framework and each has a test that fails without it.
+
+- **V1 bump after every fling.** Compose's `OverscrollEffect.applyToFling` hands a `performFling` that returns the
+  velocity the content **consumed**; the effect took it as the leftover, so every fling threw the content about
+  40 px past its rest and back (measured on every page, absent in the sheet). Fix: leftover = velocity - consumed
+  (`OverscrollFlingTest`; `InteractionSweep*`: no overscroll frame during a fling that rests inside the content).
+- **V2 dropped flings.** Measured with logging on the emulator: every dropped flick had a gap of 56-59 ms before its
+  last sample, every kept flick at most 39 ms. The platform's velocity tracker takes a pointer that reports nothing
+  for 40 ms as stopped (velocity 0). The gaps come from `adb shell input swipe` injecting each event after the busy
+  emulator handled the previous one; a real touchscreen timestamps samples in hardware. The fling itself was never
+  lost. [decision: the platform's stop rule stays; a pause before lifting is not a fling] `FrameworkHostsTest`
+  reproduces both cases; the first round's scroll test counted a fling at velocity 0 as a fling, and
+  `InteractionSweep*` now require a release velocity above 1000 px/s, at rest, 50 and 150 ms after a bounce, and from
+  a pressable, at three window sizes.
+- **V3 a swipe became a tap.** The tap rule is now part of the press model: once the finger moves beyond the touch
+  slop, the press is cancelled. The night step area is the whole page (one rule for every sequence), and Page Up /
+  Down and the arrows step it with or without focus through the router's key path. Observed on the emulator: after
+  a tap the first `DPAD_LEFT` changes nothing and every following arrow or Page key steps; the platform spends the
+  first navigation key in touch mode on leaving touch mode before the activity sees it (the same in every app), which
+  is what the first round measured as "DPAD does not step".
+- **V5 / review 4 first gesture frame stalls.** The page below the top of a stack is composed and measured ahead,
+  parked (not placed, not drawn, no semantics, no input); a gesture or pop only places it.
+- **V7 broken back after a fold.** A fold dropped a running push and the settle of that drop completed every entry in
+  transition, including the page the fold's snap was still showing; its ViewModel store was destroyed while it was
+  drawn (reproduced deterministically by opening a night in two panes). Fix: entries are completed only when the host
+  is at rest.
+- **Review 1** the bar of a leaving section showed the old section: every section's fixed elements read the host's
+  selection (`nbShownSection`). **Review 3** the page followed the platform's progress, not the finger. **Review 6**
+  shell controls pressed on another spring: one press model (`NbPressModel`). **Review 9** keys: screens get decoded
+  intents (`NbKeyIntent`) only; scroll commands, `VelocityTracker`, `PointerEventPass`, `Modifier.indication`,
+  `BackEventCompat` and `NbSpring(` (now an internal constructor) are forbidden outside the framework. **Review 10**
+  `go()` writes snapshot state only (a discarded composition rolls it back); the reprojection flag lives on the app's
+  router, not in a global. **Review 11** overscroll in-progress is a count. **Review 13** the night pager spans the
+  window width.
+- Registries: `AppScreens` (every destination with every page argument; a test fails for an unregistered
+  destination), `NbScrollContainer` (the id is required and unique per screen) and `NbPressable` (set by every
+  framework pressable). The sweep enumerates screens, containers and pressables from them.
+
 ### Enforcement
 
 - `tools/check-interaction.sh` (pre-commit hook and the CI checks job) and `InteractionBoundaryTest` (`./gradlew
@@ -132,9 +175,13 @@ All values are mirrored in `tokens.md` 9 and compared with the registry by `Moti
 - `NbPhysicsTest` (I1, I2, I3, R1, I12), `InteractionCatalogTest` (I1, I7, I8 on the real app: every trigger of the
   inventory's table 2 that changes what is shown runs its kind with >= 3 frames on the one spring object and
   settles; bar / "See all" / Ctrl+2 and round Back / Esc / 3-button Back draw identical p sequences),
-  `ScrollInvariantTest` (I4: the same flick scrolls the same and flings on every screen's framework container, also
-  50 and 150 ms after an edge bounce), `PredictiveBackTest` (every level under the finger, cancel, commit, R1 during
-  a push, R6, reduced motion).
+  `InteractionSweepPhoneTest` / `FoldClosedTest` / `FoldOpenTest` (every registered screen, container and pressable
+  at 412, 380 and 749 dp in two panes: fling occurrence, equal fling distance within 1 px, no bump, flings after a
+  bounce and from a pressable, a swipe is never a click, and every trigger of one kind draws the identical p curve on
+  the Nav spring), `PredictiveBackTest` (every level under the finger, also with a shaped progress; cancel, commit,
+  release velocity continuity, the page below composed ahead, R1 during a push, R6, reduced motion),
+  `FrameworkHostsTest` (section bar, swap back scope, one press model, tap slop, the pointer-stop rule, the key
+  decoder), `OverscrollFlingTest` (no bump, exact throw).
 
 ## Consequences
 
@@ -142,9 +189,9 @@ All values are mirrored in `tokens.md` 9 and compared with the registry by `Moti
   reverses it, and nothing outlives its spring. (b, c) every section change, from any trigger, and every page change
   run the same kind on the same spring object. (d) the fling can no longer be dropped and the same flick scrolls the
   same on every screen; every press follows the same rules (tap timeout, cancel on scroll).
-- The page underneath a pushed page is composed only while a change runs (the first gesture frame over History
-  composes it, about 40-60 ms in Robolectric) [not changed: keeping it composed while covered needs lifecycle and
-  focus rules for hidden entries, left for later].
+- The page underneath the top of a stack is composed ahead and parked (round 2): unplaced nodes take no focus, no
+  semantics and no input; its navigation entry stays in its lifecycle state (CREATED), so its flows keep the last
+  values they collected while it was shown.
 - Night and month pagers step on a release decided by the fling projection; the neighbouring page is not dragged
   under the finger (the view models have no neighbour content) [not changed].
 - Item placement animations of the History list, the shared-bounds morphs and pane resize animations do not exist;
