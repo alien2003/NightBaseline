@@ -208,6 +208,15 @@ tasks.withType<Test>().configureEach {
     maxHeapSize = providers.gradleProperty("testMaxHeap").getOrElse("3g")
     // Robolectric's native graphics keeps memory outside the Java heap; CI starts a fresh JVM per test class.
     forkEvery = providers.gradleProperty("testForkEvery").map(String::toLong).getOrElse(0L)
+    // CI splits the app tests into parallel shards: one shard runs `--tests` patterns, the rest excludes them with
+    // -PtestExclude=<pattern>,<pattern> (.github/workflows/ci.yml, app-tests matrix).
+    providers
+        .gradleProperty("testExclude")
+        .orNull
+        ?.split(',')
+        ?.map(String::trim)
+        ?.filter(String::isNotEmpty)
+        ?.forEach { filter.excludeTestsMatching(it) }
 }
 
 /**
