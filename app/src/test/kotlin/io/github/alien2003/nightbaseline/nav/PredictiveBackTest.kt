@@ -45,6 +45,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
@@ -242,15 +243,20 @@ class PredictiveBackTest {
         startGesture()
         progress(0.5f)
         assertEquals(metric, last("pages")?.from)
-        // Commit and start the next gesture before the pop has settled.
+        // Commit and start the next gesture before the pop has settled. R9: the pop is applied when its motion ends,
+        // so 100 ms in the state still shows Metric leaving; the next gesture lands it (the pop happens now) and goes
+        // back from Night, as two Backs do.
         compose.mainClock.autoAdvance = false
         back.onBackPressed()
         compose.mainClock.advanceTimeBy(100)
-        val night = nav.currentBackStackEntry!!.id
-        assertTrue(route(), route().contains("NightRoute"))
+        assertTrue("the pop is applied after its motion (R9): ${route()}", route().contains("MetricRoute"))
         back.dispatchOnBackStarted(BackEventCompat(0f, TOUCH_Y, 0f, BackEventCompat.EDGE_LEFT))
+        compose.mainClock.advanceTimeByFrame()
+        val night = nav.currentBackStackEntry!!.id
+        assertTrue("the first Back landed at the second gesture's start: ${route()}", route().contains("NightRoute"))
         back.dispatchOnBackProgressed(BackEventCompat(100f, TOUCH_Y, 0.3f, BackEventCompat.EDGE_LEFT))
         compose.mainClock.advanceTimeBy(100)
+        assertEquals("the second gesture moves Night, not the leaving Metric", night, last("pages")?.from)
         // Cancel while the first pop is still settling: everything comes to rest on Night.
         back.dispatchOnBackCancelled()
         compose.mainClock.autoAdvance = true
@@ -526,6 +532,7 @@ class PredictiveBackTest {
     }
 
     @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun `the page below is composed ahead, so the first gesture frame composes no page`() {
         val parked = CopyOnWriteArrayList<Pair<String, Any>>()
         NbMotionProbe.parked = { host, key -> parked += host to key }
@@ -533,7 +540,18 @@ class PredictiveBackTest {
         val below = nav.currentBackStackEntry!!.id
         openNight()
         idle()
-        // R1-3: placed and drawn ahead as well (an invisible layer), not only measured.
+        // R1-3: placed and drawn ahead as well (an invisible layer), not only measured. The probe runs in the layer's
+        // draw (V9), which Robolectric runs only on request.
+        val view = activity.window.decorView
+        view.draw(
+            android.graphics.Canvas(
+                android.graphics.Bitmap.createBitmap(
+                    view.width.coerceAtLeast(1),
+                    view.height.coerceAtLeast(1),
+                    android.graphics.Bitmap.Config.ARGB_8888,
+                ),
+            ),
+        )
         assertTrue("the page below has its layer ahead: $parked", parked.any { it.first == "pages" && it.second == below })
         val home = count("HomeScreen")
         assertTrue("Home is composed while Night is on top (parked below it)", home > 0)

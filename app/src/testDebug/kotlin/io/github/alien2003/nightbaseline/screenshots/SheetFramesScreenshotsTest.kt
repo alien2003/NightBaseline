@@ -129,6 +129,8 @@ class SheetFramesScreenshotsTest(
             .onFirst()
             .performScrollTo()
             .performClick()
+        // P1: the click runs after the frame that shows its press (two frames).
+        compose.mainClock.advanceTimeBy(FRAME_MS * 2)
         // 0 %: the first frame; ~50 %: the critically damped spring.sheet (250) or the 250 ms dialog tween half way.
         val half = if (kind == ModalKind.Sheet) SHEET_HALF_MS else DIALOG_HALF_MS
         var t = 0L

@@ -58,6 +58,38 @@ class InteractionBoundaryTest {
         assertEquals(emptyList<String>(), hits)
     }
 
+    /** The ids of [lines]' scroll containers, or "MISSING:<line>" for a call with no literal id within its lookahead. */
+    private fun containerIds(lines: List<String>): List<String> {
+        val call = Regex("""(nbVerticalScroll|nbHorizontalScroll|NbLazyColumn)\(""")
+        val id = Regex("""id = "([^"]+)"""")
+        return lines.indices.filter { call.containsMatchIn(code(lines[it])) }.map { i ->
+            (i until minOf(i + ID_LOOKAHEAD, lines.size)).firstNotNullOfOrNull { id.find(lines[it])?.groupValues?.get(1) }
+                ?: "MISSING:${i + 1}"
+        }
+    }
+
+    @Test
+    fun `registration - every scroll container passes a literal id, unique in the app (review V10)`() {
+        // The rule's own check: a call without an id is caught, a call with one gives it.
+        assertEquals(listOf("MISSING:1"), containerIds(listOf("Modifier.nbVerticalScroll(state)", "", "", "", "", "", "")))
+        assertEquals(listOf("x-1"), containerIds(listOf("NbLazyColumn(", "    state = s,", "    id = \"x-1\",", ")")))
+        val ids =
+            sources()
+                .filterNot { it.invariantSeparatorsPath.startsWith(framework) }
+                .flatMap { file -> containerIds(file.readLines()).map { if (it.startsWith("MISSING:")) "${file.path}:$it" else it } }
+        assertEquals(emptyList<String>(), ids.filter { "MISSING:" in it }, "containers without a literal id")
+        assertEquals(
+            emptyList<String>(),
+            ids
+                .groupBy { it }
+                .filter { it.value.size > 1 }
+                .keys
+                .toList(),
+            "ids used twice",
+        )
+        assertTrue(ids.size > 10, "the app has scroll containers")
+    }
+
     @Test
     fun `the allowlist is empty`() {
         // A ratchet: an exception may be added only with a reason, and the migration left none.
@@ -122,6 +154,17 @@ class InteractionBoundaryTest {
                 "val t = androidx.compose.animation.core.rememberInfiniteTransition()",
                 "androidx.compose.animation.core.animate(0f, 1f) { v, _ -> }",
                 "t.animateFloat(0f, 1f, spec)",
+                // Review round 3 (V11): pagers, grids, marquees, view animations and raw motion events.
+                "HorizontalPager(state) { }",
+                "val s = rememberPagerState { 3 }",
+                "import androidx.compose.foundation.pager.PagerDefaults",
+                "LazyHorizontalGrid(GridCells.Fixed(2)) { }",
+                "LazyVerticalStaggeredGrid(columns) { }",
+                "Modifier.basicMarquee()",
+                "import android.view.animation.DecelerateInterpolator",
+                "val i = android.view.animation.LinearInterpolator()",
+                "Modifier.pointerInteropFilter { true }",
+                "Modifier.motionEventSpy { }",
             )
         samples.forEach { sample -> assertTrue(patterns.any { it.containsMatchIn(sample) }, "not caught: $sample") }
         // And the framework's own entry points are not.
@@ -129,3 +172,6 @@ class InteractionBoundaryTest {
             .forEach { ok -> assertTrue(patterns.none { it.containsMatchIn(ok) }, "false positive: $ok") }
     }
 }
+
+/** Lines after a scroll container call in which its id is looked for. */
+private const val ID_LOOKAHEAD = 6

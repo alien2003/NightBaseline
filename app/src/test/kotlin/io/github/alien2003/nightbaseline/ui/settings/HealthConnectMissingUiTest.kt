@@ -54,6 +54,8 @@ class HealthConnectMissingUiTest {
         compose.onAllNodesWithText(string(R.string.settings_never_read)).assertCountEquals(0)
         compose.onAllNodesWithText(string(R.string.settings_hc_permissions)).assertCountEquals(0)
         compose.onNodeWithText(string(R.string.settings_hc_install)).performClick()
+        // P1: the click runs after the frame that shows its press.
+        compose.waitForIdle()
         assertEquals(1, installs)
     }
 
@@ -76,6 +78,7 @@ class HealthConnectMissingUiTest {
         show { SourcePickerContent(empty, SettingsActions(onCheckSources = { checks++ })) }
         compose.onNodeWithText(string(R.string.onb_nosource_title)).assertExists()
         compose.onNodeWithText(string(R.string.action_check_again)).performClick()
+        compose.waitForIdle()
         assertEquals(1, checks)
     }
 

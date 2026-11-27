@@ -156,15 +156,29 @@ class FrameworkRound2Test {
                 }
             }
         }
+        // The parked probe runs in the layer's draw (V9); Robolectric draws only on request.
+        drawWindow()
         assertTrue("the page below the top has its layer ahead: $parked", parked.contains("s" to "a"))
         selected = 1
         idle()
         parked.clear()
         selected = 2
         idle()
+        drawWindow()
         // Both visited sections not shown are parked: the gesture back to the first and a tap to either start on an
         // existing layer (the section host used to measure only the layers of the running change).
         assertTrue("visited sections are parked: $parked", parked.contains("sec" to 0) && parked.contains("sec" to 1))
+    }
+
+    private fun drawWindow() {
+        val view = activity.window.decorView
+        val bitmap =
+            android.graphics.Bitmap.createBitmap(
+                view.width.coerceAtLeast(1),
+                view.height.coerceAtLeast(1),
+                android.graphics.Bitmap.Config.ARGB_8888,
+            )
+        view.draw(android.graphics.Canvas(bitmap))
     }
 
     @Test

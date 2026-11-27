@@ -405,13 +405,16 @@ internal class ManualClock : MonotonicFrameClock {
     /** Runs after every frame (tests read what the frame drew). */
     var afterFrame: (() -> Unit)? = null
 
+    /** The intervals (ns) of the next frames, then [FRAME_NANOS] (a stalled frame is a long interval). */
+    val gaps = ArrayDeque<Long>()
+
     /** Moves the clock without a frame. */
     fun advance(by: Long) {
         nanos += by
     }
 
     override suspend fun <R> withFrameNanos(onFrame: (frameTimeNanos: Long) -> R): R {
-        nanos += FRAME_NANOS
+        nanos += gaps.removeFirstOrNull() ?: FRAME_NANOS
         return onFrame(nanos).also { afterFrame?.invoke() }
     }
 

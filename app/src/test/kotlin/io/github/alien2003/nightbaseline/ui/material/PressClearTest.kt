@@ -80,6 +80,8 @@ class PressClearTest {
     fun tapThatStartsAnActivityLeavesNoPressedRow() {
         show { SettingsScreenRow(onClick = { activity.startActivity(Intent(activity, ComponentActivity::class.java)) }) }
         quickTap(ROW)
+        // P1: the click runs after the frame that shows the press (two frames after the lift).
+        frames(FRAME_MS * 2)
         assertNotNull("the click starts the other activity", shadowOf(activity).nextStartedActivity)
         // The other activity covers this one right away.
         controller.windowFocusChanged(false)
