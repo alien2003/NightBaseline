@@ -747,7 +747,16 @@ private fun HomeDestination(
                         onNight = { navController.push(NightRoute(it.toString(), TopLevel.Home.name)) },
                         onSeeAll = { onSelectTab(TopLevel.History) },
                         onStateAction = { onStateAction(it, state.source) },
-                        onStateSecondary = onStateSecondary,
+                        // "Check again" on the Health Connect card says so when it is still missing.
+                        onStateSecondary = {
+                            if (it ==
+                                NightState.HealthConnectUpdate
+                            ) {
+                                vm.recheckHealthConnect()
+                            } else {
+                                onStateSecondary(it)
+                            }
+                        },
                         onHowItWorks = { onSheet(AppSheet.Explainer, state.source, "") },
                         onBannerAction = onBannerAction,
                         onBannerDismiss = vm::dismissBanner,
@@ -912,6 +921,8 @@ private fun SettingsDestination(
                     onConfirmSource = vm::confirmSource,
                     onCancelSource = vm::cancelSource,
                     onOpenHealthConnect = system::openHealthConnect,
+                    onInstallHealthConnect = system::openStore,
+                    onCheckSources = vm::checkSources,
                     onSetupAgain = vm::askSetupAgain,
                     onRequestNotifications = { system.requestNotifications { vm.refresh() } },
                     onOpenNotificationSettings = system::openNotificationSettings,

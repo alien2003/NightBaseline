@@ -2,6 +2,8 @@ package io.github.alien2003.nightbaseline.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -29,6 +31,7 @@ import io.github.alien2003.nightbaseline.ui.material.GlassPreference
 import io.github.alien2003.nightbaseline.ui.material.solidCard
 import io.github.alien2003.nightbaseline.ui.model.UiText
 import io.github.alien2003.nightbaseline.ui.model.rememberUiText
+import io.github.alien2003.nightbaseline.ui.onboarding.HealthConnectStatus
 import io.github.alien2003.nightbaseline.ui.theme.NbDimens
 import io.github.alien2003.nightbaseline.ui.theme.NbShapes
 import io.github.alien2003.nightbaseline.ui.theme.NbSpace
@@ -46,27 +49,39 @@ internal fun SourcePickerContent(
         verticalArrangement = Arrangement.spacedBy(NbDimens.cardGap),
     ) {
         NbText(stringResource(R.string.onb_source_body), style = NbTheme.typography.body, color = NbTheme.colors.textSecondary)
+        val missing = state.healthConnectMissingTitle
+        if (missing != null) {
+            // Health Connect is missing or needs an update: no source can be listed until it works.
+            val body =
+                if (state.healthConnect ==
+                    HealthConnectStatus.NeedsUpdate
+                ) {
+                    R.string.state_hc_update_body
+                } else {
+                    R.string.state_hc_none_body
+                }
+            EmptySourcesCard(
+                title = stringResource(missing),
+                body = stringResource(body),
+                action = stringResource(R.string.action_open_store),
+                onAction = actions.onInstallHealthConnect,
+                state = state,
+                actions = actions,
+                note = stringResource(R.string.hc_still_missing),
+            )
+            return@Column
+        }
         if (state.sources.isEmpty()) {
-            // No app wrote sleep in the lookback (or Health Connect can't be read): say so instead of an empty card.
-            NbCard(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }) {
-                NbText(
-                    stringResource(R.string.onb_nosource_title),
-                    style = NbTheme.typography.body,
-                    color = NbTheme.colors.textPrimary,
-                    modifier = Modifier.semantics { heading() },
-                )
-                NbText(
-                    stringResource(R.string.onb_nosource_body),
-                    style = NbTheme.typography.bodySmall,
-                    color = NbTheme.colors.textSecondary,
-                )
-                NbTextButton(
-                    stringResource(R.string.action_open_hc),
-                    onClick = actions.onOpenHealthConnect,
-                    color = NbTheme.colors.data.primaryText,
-                    modifier = Modifier.offset(x = -NbSpace.s4),
-                )
-            }
+            // No app wrote sleep in the lookback: say so instead of an empty card, with a way to look again.
+            EmptySourcesCard(
+                title = stringResource(R.string.onb_nosource_title),
+                body = stringResource(R.string.onb_nosource_body),
+                action = stringResource(R.string.action_open_hc),
+                onAction = actions.onOpenHealthConnect,
+                state = state,
+                actions = actions,
+                note = stringResource(R.string.sources_still_none),
+            )
             return@Column
         }
         GroupCard(Modifier.selectableGroup()) {
@@ -78,6 +93,48 @@ internal fun SourcePickerContent(
                     showDivider = i > 0,
                 )
             }
+        }
+    }
+}
+
+/**
+ * The card of a source page with nothing to list: [title], [body], the [action] that can fix it and "Check again",
+ * which reads "Checking…" while it runs and is followed by [note] when it still found nothing (announced once).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EmptySourcesCard(
+    title: String,
+    body: String,
+    action: String,
+    onAction: () -> Unit,
+    state: SettingsState,
+    actions: SettingsActions,
+    note: String,
+) {
+    NbCard(Modifier.fillMaxWidth()) {
+        NbText(
+            title,
+            style = NbTheme.typography.body,
+            color = NbTheme.colors.textPrimary,
+            modifier = Modifier.semantics { heading() },
+        )
+        NbText(body, style = NbTheme.typography.bodySmall, color = NbTheme.colors.textSecondary)
+        if (state.sourcesRechecked && !state.checkingSources) {
+            NbText(
+                note,
+                style = NbTheme.typography.bodySmall,
+                color = NbTheme.colors.textSecondary,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        FlowRow(Modifier.offset(x = -NbSpace.s4)) {
+            NbTextButton(action, onClick = onAction, color = NbTheme.colors.data.primaryText)
+            NbTextButton(
+                stringResource(if (state.checkingSources) R.string.action_checking else R.string.action_check_again),
+                onClick = if (state.checkingSources) ({}) else actions.onCheckSources,
+                color = NbTheme.colors.data.primaryText,
+            )
         }
     }
 }

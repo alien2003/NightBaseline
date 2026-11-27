@@ -6,6 +6,7 @@ import io.github.alien2003.nightbaseline.R
 import io.github.alien2003.nightbaseline.algo.MetricId
 import io.github.alien2003.nightbaseline.ui.material.EffectsReason
 import io.github.alien2003.nightbaseline.ui.material.GlassPreference
+import io.github.alien2003.nightbaseline.ui.onboarding.HealthConnectStatus
 import java.time.LocalDate
 
 /**
@@ -175,9 +176,25 @@ data class SettingsState(
     val licenses: List<LicenseEntry> = DefaultLicenses,
     /** A source the person picked that waits for the `ST-SOURCE-CHANGE` confirmation dialog. */
     val pendingSource: SourceOption? = null,
+    /** Health Connect availability (the source group and page say when it is missing or needs an update). */
+    val healthConnect: HealthConnectStatus = HealthConnectStatus.Available,
+    /** The source page's "Check again" runs. */
+    val checkingSources: Boolean = false,
+    /** The last "Check again" on the source page still found no source. */
+    val sourcesRechecked: Boolean = false,
 ) {
     /** Notification switches can change only when the system allows notifications. */
     val notificationsBlocked: Boolean get() = notificationAccess == NotificationAccess.Blocked
+
+    /** The title of a missing Health Connect ("needs an update" / "isn't available here"), or null when it works. */
+    @get:StringRes
+    val healthConnectMissingTitle: Int?
+        get() =
+            when (healthConnect) {
+                HealthConnectStatus.NeedsUpdate -> R.string.state_hc_update_title
+                HealthConnectStatus.Unavailable -> R.string.state_hc_none_title
+                HealthConnectStatus.Available, HealthConnectStatus.Checking -> null
+            }
 
     /** Defaults. */
     companion object {
@@ -203,6 +220,10 @@ data class SettingsActions(
     val onCancelSource: () -> Unit = {},
     /** Open the Health Connect permission screen of the app. */
     val onOpenHealthConnect: () -> Unit = {},
+    /** Open the store page of Health Connect (install or update). */
+    val onInstallHealthConnect: () -> Unit = {},
+    /** "Check again" on the source page: re-read Health Connect and its sources. */
+    val onCheckSources: () -> Unit = {},
     /** Restart onboarding at the source step. */
     val onSetupAgain: () -> Unit = {},
     /** Ask for the notification permission (API 33+). */

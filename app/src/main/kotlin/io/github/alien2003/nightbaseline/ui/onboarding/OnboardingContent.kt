@@ -158,7 +158,13 @@ private fun sourceButtons(
         }
 
         HealthConnectStatus.Unavailable -> {
-            StepButtons(stringResource(R.string.action_about), actions.onAbout, back = true)
+            StepButtons(
+                stringResource(R.string.action_about),
+                actions.onAbout,
+                secondary = stringResource(R.string.action_check_again),
+                onSecondary = actions.onCheckAgain,
+                back = true,
+            )
         }
 
         HealthConnectStatus.Available -> {
@@ -323,11 +329,13 @@ private fun SourceBody(
         HealthConnectStatus.NeedsUpdate -> {
             BadgeLine(NightGlyph.Download, StatusTone.Info)
             BodyText(stringResource(R.string.state_hc_update_body))
+            RecheckNote(state.recheck)
         }
 
         HealthConnectStatus.Unavailable -> {
             BadgeLine(NightGlyph.SlashedCircle, StatusTone.Neutral)
             BodyText(stringResource(R.string.state_hc_none_body))
+            RecheckNote(state.recheck)
         }
 
         HealthConnectStatus.Available -> {
@@ -337,6 +345,7 @@ private fun SourceBody(
             } else if (state.sources.isEmpty()) {
                 BadgeLine(NightGlyph.DashCircle, StatusTone.Neutral)
                 BodyText(stringResource(R.string.onb_nosource_body))
+                RecheckNote(state.recheck)
             } else {
                 BodyText(stringResource(R.string.onb_source_body))
                 Column(
@@ -573,3 +582,20 @@ internal fun StepIndicator(
 private val DOT = 6.dp
 private val DOT_CURRENT = 16.dp
 private val BADGE_GLYPH = 28.dp
+
+/** The calm result line of a "Check again" that changed nothing (announced once). */
+@Composable
+private fun RecheckNote(recheck: SourceRecheck?) {
+    val text =
+        when (recheck) {
+            SourceRecheck.HealthConnectStillMissing -> stringResource(R.string.hc_still_missing)
+            SourceRecheck.StillNoSources -> stringResource(R.string.sources_still_none)
+            null -> return
+        }
+    NbText(
+        text,
+        style = NbTheme.typography.bodySmall,
+        color = NbTheme.colors.textSecondary,
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+    )
+}

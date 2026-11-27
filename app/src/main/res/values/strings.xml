@@ -343,6 +343,10 @@
     <string name="settings_title">Settings</string>
     <string name="settings_group_source">Data source</string>
     <string name="settings_hc_permissions">Health Connect permissions</string>
+    <string name="settings_hc_install">Install or update Health Connect</string>
+    <!-- After "Check again" changed nothing (onboarding source step, Home, Settings source page). -->
+    <string name="hc_still_missing">Health Connect is still not available.</string>
+    <string name="sources_still_none">Checked again. Still no sleep data in Health Connect.</string>
     <string name="settings_last_read_title">Last read</string>
     <string name="settings_setup_again">Set up again</string>
     <string name="setup_again_title">Set up again?</string>

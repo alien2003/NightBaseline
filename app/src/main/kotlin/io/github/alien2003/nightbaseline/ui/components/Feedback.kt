@@ -229,7 +229,22 @@ fun NightStateCard(
         onPrimary = onPrimary,
         secondaryAction = text.nightSecondaryLabel(night, busy),
         onSecondary = unlessBusy(busy, onSecondary),
-        note = if (checks) text.checkNote(check, source) else null,
+        note =
+            when {
+                checks -> {
+                    text.checkNote(check, source)
+                }
+
+                night.state == NightState.HealthConnectUpdate || night.state == NightState.HealthConnectNone -> {
+                    text.healthConnectNote(
+                        check,
+                    )
+                }
+
+                else -> {
+                    null
+                }
+            },
     )
 }
 

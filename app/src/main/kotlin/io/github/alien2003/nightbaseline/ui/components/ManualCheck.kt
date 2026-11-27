@@ -43,6 +43,10 @@ fun UiText.checkNote(
     source: String,
 ): String? = (check as? ManualCheckUi.NothingNew)?.let { string(R.string.check_result_nothing_new, it.time, source) }
 
+/** "Health Connect is still not available." after a "Check again" that found it missing, or null. */
+fun UiText.healthConnectNote(check: ManualCheckUi): String? =
+    if (check == ManualCheckUi.HealthConnectStillMissing) string(R.string.hc_still_missing) else null
+
 /** The result line of a manual check: calm secondary text, announced once. */
 @Composable
 internal fun CheckNote(text: String) {

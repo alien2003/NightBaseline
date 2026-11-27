@@ -66,10 +66,11 @@ class HomeViewModel
                 data.settings,
                 data.access.status,
                 data.currentNights,
-                combine(data.checks.running(), data.manualCheck, ::Pair),
+                combine(data.checks.running(), data.manualCheck, data.healthConnectStillMissing, ::Triple),
                 data.recentRuns,
-            ) { settings, access, records, (running, check), runs -> Inputs(settings, access, records, running, runs, check) }
-                .mapLatest(::build)
+            ) { settings, access, records, (running, check, hcMissing), runs ->
+                Inputs(settings, access, records, running, runs, check, hcMissing)
+            }.mapLatest(::build)
                 .flowOn(data.compute)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), HomeUi.Pending)
 
@@ -80,6 +81,7 @@ class HomeViewModel
             val running: Boolean,
             val runs: List<RunLogLine>,
             val check: ManualCheck,
+            val healthConnectStillMissing: Boolean = false,
         )
 
         private fun build(inputs: Inputs): HomeUi {
@@ -109,7 +111,12 @@ class HomeViewModel
                     lastResult = r.lastResult,
                     lastNightShort = r.lastNightShort,
                     quietDays = r.quietDays,
-                    check = checkUi(inputs.check, records, zone),
+                    check =
+                        if (inputs.healthConnectStillMissing) {
+                            ManualCheckUi.HealthConnectStillMissing
+                        } else {
+                            checkUi(inputs.check, records, zone)
+                        },
                 ),
             )
         }
@@ -147,9 +154,14 @@ class HomeViewModel
         /** "Check now" (`E-SYNC`, `E-NODATA`, `B-WAIT`, `B-READ-FAILED`). */
         fun checkNow() = data.checkNow()
 
-        /** "Check again" and resume: re-reads the platform status. */
+        /** Resume: re-reads the platform status. */
         fun refresh() {
             viewModelScope.launch { data.refresh() }
+        }
+
+        /** "Check again" on the Health Connect update card: re-reads it and says so when it is still missing. */
+        fun recheckHealthConnect() {
+            viewModelScope.launch { data.recheckHealthConnect() }
         }
 
         /** The dismiss button of `B-NOTIF-OFF` (30 days) and `B-RANGE-READY` (once). */

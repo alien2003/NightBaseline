@@ -112,7 +112,8 @@ class OnboardingViewModel
 
         /** Health Connect availability and the source list, again. */
         fun checkAgain() {
-            state.update { it.copy(healthConnect = HealthConnectStatus.Checking) }
+            val before = state.value
+            state.update { it.copy(healthConnect = HealthConnectStatus.Checking, recheck = null) }
             viewModelScope.launch {
                 val availability = withContext(data.io) { data.reader.availability() }
                 val status =
@@ -142,9 +143,32 @@ class OnboardingViewModel
                         sources = sources,
                         selectedSource = selected?.packageName,
                         sourcesNeedAccess = needAccess,
+                        recheck = recheckOf(before, status, sources, needAccess),
                     )
                 }
                 selected?.let { handle[KEY_SOURCE] = it.packageName }
+            }
+        }
+
+        /** What a "Check again" from [before] found when nothing changed; null on the first check or a change. */
+        private fun recheckOf(
+            before: OnboardingState,
+            status: HealthConnectStatus,
+            sources: List<SourceOption>,
+            needAccess: Boolean,
+        ): SourceRecheck? {
+            val missing = setOf(HealthConnectStatus.NeedsUpdate, HealthConnectStatus.Unavailable)
+            return when {
+                before.healthConnect in missing && status in missing -> SourceRecheck.HealthConnectStillMissing
+
+                before.healthConnect == HealthConnectStatus.Available &&
+                    !before.sourcesNeedAccess &&
+                    before.sources.isEmpty() &&
+                    status == HealthConnectStatus.Available &&
+                    !needAccess &&
+                    sources.isEmpty() -> SourceRecheck.StillNoSources
+
+                else -> null
             }
         }
 

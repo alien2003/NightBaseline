@@ -1,5 +1,6 @@
 package io.github.alien2003.nightbaseline.app
 
+import io.github.alien2003.nightbaseline.data.hc.HcAvailability
 import io.github.alien2003.nightbaseline.data.hc.HealthDataReader
 import io.github.alien2003.nightbaseline.data.local.NightRecord
 import io.github.alien2003.nightbaseline.data.local.NightRepository
@@ -152,6 +153,24 @@ class AppData(
     suspend fun keepEvaluationsCurrent() {
         settings.map { it.algoParams() }.distinctUntilChanged().collect { reevaluator.reevaluateIfNeeded(it) }
     }
+
+    private val healthConnectRecheck = MutableStateFlow(false)
+
+    /**
+     * "Check again" while Health Connect is missing or needs an update: re-reads the platform status; when it is
+     * still not available, [healthConnectStillMissing] says so until it becomes available (visible feedback).
+     */
+    suspend fun recheckHealthConnect() {
+        refresh()
+        healthConnectRecheck.value = access.status.value?.healthConnect != HcAvailability.AVAILABLE
+    }
+
+    /** A "Check again" found Health Connect still not available (cleared once it is). */
+    val healthConnectStillMissing: Flow<Boolean>
+        get() =
+            combine(healthConnectRecheck, access.status) { asked, status ->
+                asked && status?.healthConnect != HcAvailability.AVAILABLE
+            }.distinctUntilChanged()
 
     private val manualCheckAt = MutableStateFlow<Long?>(null)
 

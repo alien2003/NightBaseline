@@ -314,6 +314,9 @@ sealed interface ManualCheckUi {
     data class NothingNew(
         val time: String,
     ) : ManualCheckUi
+
+    /** "Check again" found Health Connect still not available: a calm line says so on its state card. */
+    data object HealthConnectStillMissing : ManualCheckUi
 }
 
 /** One night on a metric chart. */

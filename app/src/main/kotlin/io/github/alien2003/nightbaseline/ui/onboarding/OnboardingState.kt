@@ -68,6 +68,15 @@ enum class PermissionStatus {
     Granted,
 }
 
+/** A "Check again" that changed nothing, said in words so the tap visibly did something. */
+enum class SourceRecheck {
+    /** Health Connect is still missing or still needs an update. */
+    HealthConnectStillMissing,
+
+    /** Health Connect works, but still no app wrote sleep to it. */
+    StillNoSources,
+}
+
 /** What the first run shows. Stateless input of [OnboardingScreen]; the ViewModel builds it later. */
 @Immutable
 data class OnboardingState(
@@ -95,6 +104,8 @@ data class OnboardingState(
      * asks for access instead of claiming there is no sleep data.
      */
     val sourcesNeedAccess: Boolean = false,
+    /** What the last "Check again" found when nothing changed (a calm line under the step's text), or null. */
+    val recheck: SourceRecheck? = null,
 ) {
     /** The selected source option, if any. */
     val selected: SourceOption? get() = sources.firstOrNull { it.packageName == selectedSource }

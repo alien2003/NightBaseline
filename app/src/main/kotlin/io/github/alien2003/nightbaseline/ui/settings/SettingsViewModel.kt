@@ -7,12 +7,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alien2003.nightbaseline.algo.Evaluator
 import io.github.alien2003.nightbaseline.app.AppData
 import io.github.alien2003.nightbaseline.app.SourceDiscovery
+import io.github.alien2003.nightbaseline.data.hc.HcAvailability
 import io.github.alien2003.nightbaseline.data.local.NightRecord
 import io.github.alien2003.nightbaseline.data.local.settings.AppSettings
 import io.github.alien2003.nightbaseline.data.local.settings.GlassMode
 import io.github.alien2003.nightbaseline.data.local.settings.SensitivityLevel
 import io.github.alien2003.nightbaseline.data.local.settings.ThemeMode
 import io.github.alien2003.nightbaseline.ui.material.GlassPreference
+import io.github.alien2003.nightbaseline.ui.onboarding.HealthConnectStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +34,8 @@ private data class SettingsOptions(
     val section: SettingsSection,
     val sources: List<SourceOption> = emptyList(),
     val pending: SourceOption? = null,
+    val checkingSources: Boolean = false,
+    val sourcesRechecked: Boolean = false,
 )
 
 /**
@@ -99,6 +103,14 @@ class SettingsViewModel
                     glass = if (s.glassMode == GlassMode.OFF) GlassPreference.Off else GlassPreference.Automatic,
                     version = data.platform.versionName,
                     pendingSource = o.pending,
+                    healthConnect =
+                        when (access?.healthConnect) {
+                            HcAvailability.UPDATE_REQUIRED -> HealthConnectStatus.NeedsUpdate
+                            HcAvailability.NOT_SUPPORTED -> HealthConnectStatus.Unavailable
+                            else -> HealthConnectStatus.Available
+                        },
+                    checkingSources = o.checkingSources,
+                    sourcesRechecked = o.sourcesRechecked,
                 )
             }.flowOn(data.compute)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
@@ -193,6 +205,20 @@ class SettingsViewModel
             viewModelScope.launch {
                 val found = SourceDiscovery.discover(data)
                 options.update { it.copy(sources = found) }
+            }
+        }
+
+        /**
+         * "Check again" on the source page: re-reads Health Connect and its sources. The button reads "Checking…"
+         * meanwhile; when still nothing is listed, a calm line says so.
+         */
+        fun checkSources() {
+            if (options.value.checkingSources) return
+            options.update { it.copy(checkingSources = true, sourcesRechecked = false) }
+            viewModelScope.launch {
+                data.refresh()
+                val found = SourceDiscovery.discover(data)
+                options.update { it.copy(sources = found, checkingSources = false, sourcesRechecked = found.isEmpty()) }
             }
         }
 

@@ -45,25 +45,37 @@ import io.github.alien2003.nightbaseline.ui.theme.NbSpace
 import io.github.alien2003.nightbaseline.ui.theme.NbTheme
 import io.github.alien2003.nightbaseline.ui.theme.controls
 
-/** Data source group: source (opens the picker), Health Connect permissions, last read, set up again. */
+/**
+ * Data source group: source (opens the picker), Health Connect permissions, last read, set up again. Without a usable
+ * Health Connect the source row says so and the permissions row becomes the install / update action.
+ */
 @Composable
 internal fun SourceGroup(
     state: SettingsState,
     actions: SettingsActions,
     title: Boolean = true,
 ) {
+    val missing = state.healthConnectMissingTitle
     GroupOrCard(if (title) stringResource(R.string.settings_group_source) else null) {
         SettingsRow(
             stringResource(R.string.settings_source),
             onClick = { actions.onOpenPage(SettingsPage.SourcePicker) },
-            summary = lastReadSummary(state),
+            summary = missing?.let { stringResource(it) } ?: lastReadSummary(state),
             trailing = SettingsTrailing.Value(state.sourceLabel),
         )
-        SettingsRow(
-            stringResource(R.string.settings_hc_permissions),
-            onClick = actions.onOpenHealthConnect,
-            showDivider = true,
-        )
+        if (missing != null) {
+            SettingsRow(
+                stringResource(R.string.settings_hc_install),
+                onClick = actions.onInstallHealthConnect,
+                showDivider = true,
+            )
+        } else {
+            SettingsRow(
+                stringResource(R.string.settings_hc_permissions),
+                onClick = actions.onOpenHealthConnect,
+                showDivider = true,
+            )
+        }
         SettingsRow(
             stringResource(R.string.settings_setup_again),
             onClick = actions.onSetupAgain,
