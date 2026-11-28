@@ -32,6 +32,13 @@ Live project state. A new session starts here. Updated after every step. Last fu
   split width, theme, rotation; frames: scroll 0.71 % janky, tab switch 3.6 %.
 
 ## In progress
+- Round 7 of ADR 0011 (2026-11-28, on top of wip/nav-core 98f9067): a release leaves on the side the finger moved the
+  page (sections take the finger's side; a caught page from the other side changes side at its rest; bunched move
+  samples no longer inflate the release velocity; a release takes at least two frames), the take-over after a cancel
+  (P3 and P4 checked by tests, not the cause; the cause was S1), time-true frames (no step cap) and one parked page
+  below the top that is not drawn. Verified by unit and Robolectric frame tests (`NavRound7Test`, each shown to fail on
+  its mutation) and the updated suites. Not measured on the emulator or the phone yet (ask): the right-edge release,
+  the second swipe during a cancel, and the wall-time settle.
 - Round 6 of ADR 0011 (2026-11-28, branch on top of wip/nav-core): path-position navigation (H1), lifecycle cap and
   two parked pages below the top (H2), M1 to M5, L1 to L3, the key Back (measurement 5). Verified by unit and frame
   tests (NavMachineTest, NavRound6Test; each shown to fail on its mutation). Open: measurement 1 (pages that slide in

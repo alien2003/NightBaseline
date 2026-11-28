@@ -100,7 +100,8 @@ rendering of every kind (a snap).
   reversal or a retarget is the last frame the motion drew. Two bounds (`NbPlayClock`): a run **from rest** (no start
   velocity) is at most one display frame into the spring in its first frame, so the time a slow set-up frame took is
   never caught up as a jump (the screen showed the start pose until then); and no frame advances any run by more than
-  `FRAME_STALL_MS` (50 ms): a stalled frame slows the motion instead of jumping it. Compose's `Animatable` starts its
+  `FRAME_STALL_MS` (50 ms): a stalled frame slows the motion instead of jumping it (round 7: replaced by time-true
+  frames after a run's first, see Round 7 S3; `FRAME_STALL_MS` is gone). Compose's `Animatable` starts its
   clock at its first frame and draws its start value there, so every spring of the framework runs on one frame loop
   (`nbRunSpring` on `TargetBasedAnimation`): the hosts' p, the reveal and the overscroll return.
 - **R8 a change moves only what is drawn** (round 5: modal panels only; pages, sections and switchers move in
@@ -487,6 +488,73 @@ frame test still compares worst frames), measurement 6 (an edge stroke must belo
 measurement 8 (the bar in cancel-then-gesture), R3-9 (the first key after a touch, emulator diagnosis), the frame
 tests through every production trigger against the closed-form curve (M6 beyond the reducer), and a re-measure on
 the emulator.
+
+### Round 7 (2026-11-28): the release on the finger's side, a take-over after a cancel, time-true frames
+
+Three findings of the round 6 measurement: (1) after a back swipe from the right edge the leaving page vanished in one
+frame at release, on every posture; (2) a second swipe started while a cancel still returned did not follow the
+finger and then went from its edge to the end in one frame (owner bug a, R3-1 again); (3) every motion settled 15 to
+60 % later in wall time than its spring and a release held 100 to 400 ms.
+
+**S1 the page leaves to the side the finger moves it (finding 1).** Since P3 the finger maps in screen space, so a
+right-edge finger slides the page left. Three paths made a release leave elsewhere or at once. (a) A section kept its
+bar-order side (e = +1) whatever the edge: a right-edge finger could not move it (the map clamps at its rest) and the
+commit then left to the right. (b) A gesture that caught a motion entering from the other side (the tail of a push,
+which lasts until the spring's 1e-3 threshold) kept that motion's side, with the same result. (c) Moves that the
+platform delivers in one pass share their receipt time where it gives no frame time (the platform before API 36, a
+busy main thread); round 6 spaced such samples 1 ms apart, the tracker then reported tens of times the finger's speed,
+and the commit crossed its whole distance in its first frame (lemma 2 ends a pop at its first crossing): the page
+vanished at release. Fixes: every host's gesture takes the finger's side (`e = dir`, sections too); a caught upper
+layer on the other side is moved by the finger to its rest and then on to the finger's side, the side changing where
+the upper layer covers the lower one (u = 0, nothing jumps; the motion keeps `dir`); a sample at the time of the last
+one replaces it; a release never covers its distance in fewer than two display frames (`MIN_RELEASE_FRAMES`, a cap on
+an absurd tracker value only: a real fling is far below it). Commit and cancel continue from the released (q, v) on
+the side the page is on, for e = +1 and e = -1.
+
+**S2 the take-over after a cancel (finding 2).** Both hypotheses were checked with a test: P3's rule (the motion more
+than one page from the held top) does not stop a take-over whose pair contains the gesture's target, also on a path
+over three pages; the P4 gesture id never lets a stale release resolve the finger that took over (`NavRound7Test`, P3
+and P4). Neither reproduces the bug on the reducer or in the hosts; what does is S1: on a section from the right edge
+the first gesture never moved, and after a take-over the commit's velocity came from bunched samples (S1 c), which is
+the measured "from its edge to the end in one frame". The take-over rule itself is unchanged (N3, P3).
+
+**S3 time-true frames, nothing drawn while hidden (finding 3).** The two measured causes are removed. (a) Round 6
+parked the two pages below the top and drew both, invisibly, in every frame. Now one page below is parked, composed,
+measured and placed but not drawn (its layer records nothing until it is shown; the modifier chain is the same parked
+or shown, so showing it at a gesture's start only changes layer properties); a motion does not park a new page (a pop
+composes nothing in its commit, H2), the new page below is parked once the host is at rest, and a path over more pages
+(a double Back) composes the next one when q reaches it. Visited sections are parked the same way. (b)
+`NbClock.stepCap` stretched every slow frame to two display frames (and `FRAME_STALL_MS`): a motion with slow frames
+settled late in wall time. Now every frame after a run's first advances by the time it took (a slow frame skips
+time), so a run ends at the first frame at or after its closed form's duration. The first frame of a run stays
+bounded: from rest one display frame in (R7), a continuation (a release, a take-over) at most one display frame from
+its origin, so a slow release frame never jumps; the run then follows its spring's own law from there.
+`FRAME_STALL_MS` and `stepCap` are gone; the reducer and `NbPlayClock` share the law.
+
+Superseded: P2's two parked pages and their invisible draw; P3's section side (a section now leaves to the finger's
+side like a page); round 6's step cap and round 4's 50 ms stall bound (R7's first-frame bounds stay).
+
+Tests (`NavRound7Test`; each fails on its mutation): a back gesture from both edges, committed and cancelled, timed
+and untimed, on a stack, on the app's page stack (`NbNavStack`), on a section host and on a stack nested in a section
+(the Settings sub-pages): the page follows the finger, no frame moves it by more than 0.3 W, it never shows on the
+other side, it is drawn over at least four frames after the release and a commit ends out on the finger's side
+(fails with the round 6 section side and without the side change at rest); a right-edge gesture on the tail of a push
+(fails without the side change); moves sharing one time stamp (fails with 1 ms spacing: a 317 px first frame); a
+release faster than its distance (fails without the cap: the page is out in its first frame); a second gesture 1, 2,
+4 and 8 frames into a cancel's return, from both edges, on a stack and a section: the start holds the page, its edge
+follows the finger within 1.5 px, no frame step above 0.3 W, a single pop (fails on the section without S1); P3 and P4
+as above; a parked page is composed ahead but never drawn, at rest and while a push runs, and only one page below is
+composed (fails when the parked layer draws its content, and when two pages are parked); with slow frames of 80 to
+200 ms a tap settles at its closed form's duration and a release whose first frame took 250 ms moves at most one
+display frame in it and then settles on its spring's duration (fails with the round 6 step cap: 767 ms against 460).
+Updated to the new law: `NbClockLawTest` (a stall is time-true), `NavMachineTest` (each later frame advances by its
+interval exactly; the M3 case of a section from the right edge now follows the finger), `PredictiveBackTest` (a
+right-edge swipe on a section follows the finger), `FrameworkRound3Test` V8 and V9, `FrameworkRound2Test` R1-3 and
+`NavRound6Test` (one page below).
+
+Not verified on a device: the platform's event order on the owner's phone (finding 2 was not reproduced through the
+reducer's take-over rule, only through S1) and the wall-time gain (finding 3) need a re-measure on the emulator and
+the phone.
 
 ### Enforcement
 

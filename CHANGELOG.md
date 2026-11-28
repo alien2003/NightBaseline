@@ -12,6 +12,14 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 
 ### Fixed
 
+- **A back swipe from the right edge no longer makes the page disappear when you let go.** The page leaves, or comes
+  back, on the side your finger moved it to, from where you let go, on pages, tabs and Settings pages alike; a tab now
+  follows a swipe from the right edge too.
+- **A back swipe started while a cancelled one still returns follows your finger and then goes back smoothly**,
+  instead of jumping to the end in one frame.
+- **Pages and tabs settle sooner.** A slow frame no longer stretches the motion, and the pages below the shown one are
+  no longer drawn while hidden.
+
 - **Going back twice quickly, paging quickly or opening a link while a page moves no longer makes a page vanish.**
   The page that was moving keeps moving from where it was; a second Back, a second step or a page opened over it
   continues the same motion.

@@ -615,7 +615,6 @@ the old page spring (1.0 / 220 on Compose's 0.01 px default threshold) ran about
 | `STEP_SWIPE_DP` | 56 | a step swipe (night, month) steps when the decay projects the released travel past this, towards a side; one threshold for every sequence |
 | `POINTER_STOPPED_MS` | 40 | a finger that rested this long before it let go has no release velocity and its release starts from rest (the platform's stopped-pointer rule) |
 | `ENTER_WAIT_MS` | 300 | an opening sheet or dialog not measured yet holds at p = 0 at most this long after the request (R8, modals only since round 5) |
-| `FRAME_STALL_MS` | 50 | no frame advances a motion by more than this: a stalled frame slows it instead of jumping it (R7) |
 
 The small top-bar title is a pure function of the scroll offset through `easing.title` (0.33, 0, 0.67, 1) over
 40 -> 72 dp; the top-bar material is `scroll / 10 dp` clamped to [0, 1]. Neither has a clock of its own.
@@ -647,10 +646,10 @@ change starts with the swipe's velocity.
 Time (R7): without stalls every frame draws its spring at `frame time - origin`. A tap's origin is its request; a
 release continues from the frame that drew the finger's last sample, or starts from rest at the release when the
 finger rested longer than `POINTER_STOPPED_MS`. A run from rest is at most one display frame into its spring in its
-first frame (a slow set-up frame is never caught up), and no frame advances a run by more than `FRAME_STALL_MS`.
-Round 6: the first frame of a continuation (a release, a catch) is at most one display frame from its origin (a long
-release frame holds the pose, it never jumps), and every later frame advances a run by at most two display frames
-(`NbClock.stepCap`, never more than `FRAME_STALL_MS`). Navigation of stacks and pagers is one position q over an
+first frame (a slow set-up frame is never caught up). Round 6: the first frame of a continuation (a release, a catch)
+is at most one display frame from its origin (a long release frame holds the pose, it never jumps). Round 7: every
+later frame advances a run by the time it took (time-true: a slow frame skips time, so a motion settles in the wall
+time of its closed form; round 6 stretched slow frames to two display frames). Navigation of stacks and pagers is one position q over an
 ordered path, layer i drawing the round 5 pose of `i - q`.
 Navigation (ADR 0011 N1 to N8, round 5): every host is one state machine (logical stack, one motion (from, to, p, v,
 drive, target)); every input is an event applied at once. A motion from rest is set up one display frame into its
