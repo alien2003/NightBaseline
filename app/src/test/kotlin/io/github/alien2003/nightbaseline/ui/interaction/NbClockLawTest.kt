@@ -107,15 +107,16 @@ class NbClockLawTest {
         var maxStep = 0.0
         var previous = 0.0
         frames.forEachIndexed { k, (frame, p) ->
-            play += if (k == 0) minOf(frame - last, PERIOD) else minOf(frame - last, NbPhysics.FRAME_STALL_MS * MS)
+            play += if (k == 0) minOf(frame - last, PERIOD) else minOf(frame - last, NbClock.stepCap(PERIOD))
             last = frame
-            val expected = spring(play / 1e9)
+            // Compose runs a spring on whole milliseconds.
+            val expected = spring((play / MS) / 1e3)
             if (p < 1f - NbPhysics.P_EPS) assertEquals(expected, p.toDouble(), 2e-3, "frame $k at ${play / MS} ms of play")
             maxStep = maxOf(maxStep, p - previous)
             previous = p.toDouble()
         }
-        // The largest step of the whole run is the spring's own over FRAME_STALL_MS at its fastest, never the 200 ms.
-        val bound = (0 until 1000).maxOf { i -> spring((i + NbPhysics.FRAME_STALL_MS) / 1e3) - spring(i / 1e3) }
+        // The largest step of the whole run is the spring's own over the step cap (two frames, round 6) at its fastest.
+        val bound = (0 until 1000).maxOf { i -> spring((i + NbClock.stepCap(PERIOD) / MS) / 1e3) - spring(i / 1e3) }
         assertTrue(maxStep <= bound + 1e-3, "largest step $maxStep <= $bound")
         // Old law: the stalled frame showed the spring at 232 ms (p ~ 0.99) straight after 32 ms (p ~ 0.25).
         assertTrue(frames[2].second < spring(0.232) - 0.2, "the stalled frame is not caught up (${frames[2].second})")
@@ -161,7 +162,8 @@ class NbClockLawTest {
                     state = NbNavReducer.reduce(state, NbNavEvent.GestureMove(u * w, u, t, t * MS)).state
                     t += dt
                 }
-                val v = NbNavReducer.velocityAt(state.motion!!, (t - dt) * MS)
+                // The pop path is (below, top) with q = 1 - p: the velocity of p is minus that of q.
+                val v = -NbNavReducer.velocityAt(state.motion!!, (t - dt) * MS)
                 // dp/dt = dp/du * du/dt at the release, from the map's derivative.
                 val h = 1e-3f
                 val dpdu = (NbGestureMap.stackPop(end + h, 0f) - NbGestureMap.stackPop(end - h, 0f)) / (2 * h)

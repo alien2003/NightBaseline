@@ -433,11 +433,12 @@ class FrameworkRound3Test {
         idle()
         val motionFrames = moving("s").size
         val a = composedAt.firstOrNull { it.first == "a" }
-        // Before the fix: page "a" was composed from scratch at the settle, after every moving frame.
-        assertTrue(
-            "the next page below is composed during the pop ($a of $motionFrames moving frames)",
-            a != null && a.second < frames.size,
-        )
+        // Round 6 (H2): the two pages below the top are parked at rest, so the page that is below after the pop was
+        // composed before it and nothing is composed while the pop runs (round 5 composed it in the pop's first
+        // frame; before round 3 at the settle).
+        assertTrue("the pop moved ($motionFrames frames)", motionFrames > 0)
+        assertEquals("nothing is composed during the pop", null, a)
+        assertFalse("the page below the next one stays composed: $disposed", "a" in disposed)
         assertEquals(listOf("a", "b"), stack)
     }
 
