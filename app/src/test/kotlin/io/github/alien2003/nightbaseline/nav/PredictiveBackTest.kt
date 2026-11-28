@@ -343,10 +343,14 @@ class PredictiveBackTest {
         assertEquals("no recomposition per progress frame", home, count("HomeScreen"))
         cancel()
         assertTrue(route(), route().contains("HistoryRoute"))
-        // A right-edge swipe still moves the section the bar-order way (Home is at the start).
+        // A right-edge swipe: the section leaves the bar-order way (Home is at the start, the upper section leaves to
+        // the right), so a finger moving left never moves it against the finger (round 6, M3: screen-space map; round
+        // 5 moved the page right by the finger's leftward travel). The commit still goes Home.
         startGesture(BackEventCompat.EDGE_RIGHT)
         progress(0.5f, BackEventCompat.EDGE_RIGHT)
-        assertUnderFinger("sections", TopLevel.History, TopLevel.Home, 0.5f, kind = NbKind.Tab)
+        val held = last("sections")
+        assertTrue("the section is held by the finger", held != null && held.gesture && held.kind == NbKind.Tab)
+        assertEquals("never against the finger", 0f, held!!.fromPose.tx, PX)
         commit()
         assertTrue(route(), route().contains("HomeRoute"))
         assertFalse(back.hasEnabledCallbacks())

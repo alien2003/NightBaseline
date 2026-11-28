@@ -1,5 +1,5 @@
 // The reducer and its pure helpers (path, poses, springs, finger): one state machine, its cases spelled out.
-@file:Suppress("TooManyFunctions", "ReturnCount", "CyclomaticComplexMethod", "ComplexCondition")
+@file:Suppress("TooManyFunctions", "ReturnCount", "CyclomaticComplexMethod", "ComplexCondition", "LongMethod")
 
 package io.github.alien2003.nightbaseline.ui.interaction
 
@@ -118,8 +118,23 @@ data class NbMotion(
     /** The distance from where the motion started ([home]). */
     val drawnP: Float get() = abs(q - home)
 
-    /** The path indices whose layer can be visible now: `|i - q| < 1` (q itself when it is an index). */
-    val visible: IntRange get() = floor(q).toInt().coerceIn(0, path.lastIndex)..ceil(q).toInt().coerceIn(0, path.lastIndex)
+    /**
+     * The path pair drawn now: the indices around q (`|i - q| < 1`). At an index, the pair the motion moves into (the
+     * page below a held page, the side a spring heads to) is drawn too, so a gesture's start or a run's first frame
+     * composes nothing new when q leaves the index.
+     */
+    val visible: IntRange
+        get() {
+            val lo = floor(q).toInt().coerceIn(0, path.lastIndex)
+            val hi = ceil(q).toInt().coerceIn(0, path.lastIndex)
+            if (lo != hi) return lo..hi
+            val toward = if (drive == NbDrive.Finger && grip >= 0) grip - 1f else target
+            return when {
+                toward < q && lo > 0 -> (lo - 1)..lo
+                toward > q && hi < path.lastIndex -> hi..(hi + 1)
+                else -> lo..hi
+            }
+        }
 }
 
 /** Page and Tab draw the stack pair (an upper layer over a lower one). */
@@ -446,8 +461,36 @@ object NbNavReducer {
             val b = m.path.indexOf(backTop)
             // The finger takes the motion over only between the held page and the page below it: anything else (the
             // motion is further away) stays as it runs, and the gesture's commit is a Back (the host's target).
-            if (t < 1 || b != t - 1 || m.q < b || m.q > t || !m.kind.stacked) return NbNavResult(state)
-            base = m
+            val catchable = t >= 1 && b == t - 1 && m.q >= b && m.q <= t && m.kind.stacked
+            val settling = m.drive == NbDrive.Spring && m.targetKey == state.top && m.kind == event.kind && m.residual == null
+            base =
+                when {
+                    catchable -> {
+                        m
+                    }
+
+                    // A gesture from the top while the change that led to it still settles (a second Back gesture
+                    // during a pop): that change runs on as the residual group of the held top, the finger holds the
+                    // group from where it is, nothing jumps.
+                    settling -> {
+                        NbMotion(
+                            path = listOf(backTop, state.top),
+                            kind = event.kind,
+                            e = event.e,
+                            q = 1f,
+                            v = 0f,
+                            drive = NbDrive.Spring,
+                            target = 0f,
+                            home = 1,
+                            residual = m,
+                            slot = 1,
+                        )
+                    }
+
+                    else -> {
+                        return NbNavResult(state)
+                    }
+                }
             ended = null
         }
         val grip = base.path.indexOf(state.top)
@@ -830,7 +873,12 @@ object NbNavReducer {
         val group = res?.let { r -> (r.visible.map { r.path[it] } + r.targetKey).distinct().sortedBy { r.path.indexOf(it) } }.orEmpty()
         return buildList {
             for (i in m.visible) {
-                if (res != null && i == m.slot) addAll(group) else add(m.path[i])
+                // A key the group draws is drawn once, in the group (its order is the group's).
+                if (res != null && i == m.slot) {
+                    addAll(group)
+                } else if (m.path[i] !in group) {
+                    add(m.path[i])
+                }
             }
             // The group outside the visible pair is still drawn while it moves (under or over the pair by its index).
             if (res != null && m.slot !in m.visible) {

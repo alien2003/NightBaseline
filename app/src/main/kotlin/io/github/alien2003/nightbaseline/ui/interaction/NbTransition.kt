@@ -183,7 +183,8 @@ class NbTransition internal constructor(
     @Suppress("ReturnCount") // At rest, a held finger, already pumping.
     internal fun ensurePump() {
         val m = state.motion ?: return
-        if (m.drive == NbDrive.Finger) {
+        // A held finger with no residual needs no frames; a residual group still runs on its own spring.
+        if (m.drive == NbDrive.Finger && m.residual == null) {
             // A held finger needs no frames (the app stays idle while it rests): only the frame that draws its last
             // sample is recorded, the origin of its release (R7).
             if (m.sampleDrawnAt == Long.MIN_VALUE && m.lastSampleAt != Long.MIN_VALUE) {
@@ -196,7 +197,14 @@ class NbTransition internal constructor(
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 val scale = currentCoroutineContext()[MotionDurationScale]?.scaleFactor ?: 1f
-                while (state.motion?.drive == NbDrive.Spring) withFrameNanos { frame(it, scale) }
+                while (state.motion.let { it != null && (it.drive == NbDrive.Spring || it.residual != null) }) {
+                    withFrameNanos {
+                        frame(
+                            it,
+                            scale,
+                        )
+                    }
+                }
             } finally {
                 pumping = false
             }
