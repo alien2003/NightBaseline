@@ -14,9 +14,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.withFrameNanos
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 /**
  * Something Back can close (ADR 0011 R4): a stack level, a section, a modal. The router hands one gesture to one
@@ -125,9 +122,7 @@ class NbBackRouter {
     }
 
     /** Back without a gesture through the same targets (Esc, Alt+Left); false when nothing took it. */
-    @Suppress("ReturnCount") // Deferred, nothing to take it, taken.
     fun back(): Boolean {
-        if (afterPendingClicks { back() }) return true
         val target = top() ?: return false
         target.back()
         return true
@@ -154,34 +149,12 @@ class NbBackRouter {
      * than every page, so while one is open ([modalOpen]) a step key reaches nothing behind it, exactly as Back closes
      * the modal instead of popping the page (review: the arrows used to step the night behind an open sheet).
      */
-    @Suppress("ReturnCount") // Deferred, Back, a step.
     fun key(intent: NbKeyIntent): Boolean {
-        if (afterPendingClicks { key(intent) }) return true
         if (intent == NbKeyIntent.Back) return back()
         val delta = intent.stepDelta()
         var best: NbStepTarget? = null
         if (delta != null && !modalOpen()) for (t in steps) if (t.enabled() && (best == null || t.depth >= best.depth)) best = t
         return delta != null && best?.step?.invoke(if (delta < 0) -1 else 1) == true
-    }
-
-    /** The root's scope (input that waits for the composition of a click's state change runs in it). */
-    internal var scope: CoroutineScope? = null
-
-    /**
-     * Input in order (P1): a click still waiting for its press frame runs first, and [then] (this input) runs once
-     * that click's state change has been composed (two frames: the one that composes it, then the one after its
-     * effects), so a Back right after a tap goes back from what the tap opened. True when it was deferred.
-     */
-    @Suppress("ReturnCount") // No scope, no click waiting, deferred.
-    private fun afterPendingClicks(then: () -> Unit): Boolean {
-        val scope = scope ?: return false
-        if (!NbPendingClicks.flush()) return false
-        scope.launch {
-            withFrameNanos { }
-            withFrameNanos { }
-            then()
-        }
-        return true
     }
 
     /** True while an enabled modal (a sheet or dialog of the shown branch) is open. */
@@ -298,8 +271,6 @@ private class RootBackCallback(
     private var target: NbBackTarget? = null
 
     override fun handleOnBackStarted(backEvent: BackEventCompat) {
-        // A tap's click still waiting for its press frame (P1) comes first: the gesture goes back from its result.
-        NbPendingClicks.flush()
         target = if (reduced()) null else router.top()?.also { it.start(backEvent.swipeEdge, backEvent.touchX) }
     }
 
@@ -327,9 +298,9 @@ private fun eventTime(event: BackEventCompat): Long {
 }
 
 /**
- * A Back button's action: the router's Back (the same path as Esc, Alt+Left and the gesture, so the same motion and
- * the same deferred state change, R9), or [fallback] when no target takes it. Only for a control whose [fallback] is
- * not itself a host's `onBack` (that would ask the router again).
+ * A Back button's action: the router's Back (the same path as Esc, Alt+Left, 3-button Back and the gesture: one event
+ * into the deepest host's state machine, ADR 0011 N7), or [fallback] when no target takes it. Every Back control of
+ * the app uses it (the shell's round Back button and the settings back row do so themselves).
  */
 @Composable
 fun rememberNbBack(fallback: () -> Unit): () -> Unit {

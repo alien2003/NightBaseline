@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigation.NavBackStackEntry
@@ -41,6 +42,22 @@ class NbPageNavigator : Navigator<NbPageNavigator.Destination>() {
 
     /** The pages in the stack. */
     internal val backStack get() = state.backStack
+
+    /** The state machine of the host that draws the pages, and its layout side (set by [NbNavStack]). */
+    internal var machine: NbTransition? = null
+    internal var side: Int = 1
+
+    /**
+     * Applies the controller's stack to the pages' state machine at once (outside composition): a navigation made
+     * through the framework's calls ([nbPush], [nbGo], [nbReset], [nbPopTo], [nbPop]) is an event of its input, so its
+     * first frame is the next display frame and a Back right after it goes back from what it opened.
+     */
+    internal fun sync() {
+        val m = machine ?: return
+        val keys = backStack.value.map { it.id }
+        if (keys.isEmpty() || keys == m.state.stack) return
+        m.dispatch(stackGo(m.state.stack, keys, side))
+    }
 
     /** Entries whose change has not settled yet. */
     internal val inTransition get() = state.transitionsInProgress
@@ -127,16 +144,70 @@ fun NbNavStack(
     navController.graph = graph
     val stack by navigator.backStack.collectAsState()
     val holder = rememberSaveableStateHolder()
-    NbStackHost(
+    StackHost(
         stack = stack,
         key = { it.id },
+        // The machine has gone back already (one event, ADR 0011 N2); the controller follows at once, and its
+        // entries stay in transition (the leaving page alive, the page below not resumed) until the motion settles.
         onBack = { navController.popBackStack() },
         modifier = modifier,
         id = "pages",
+        backEnabled = true,
         saveable = false,
         onSettled = { navigator.settleAll() },
+        machine = { machine, side ->
+            navigator.machine = machine
+            navigator.side = side
+        },
     ) { entry ->
         val destination = entry.destination as? NbPageNavigator.Destination
         if (destination != null) entry.LocalOwnersProvider(holder) { destination.content(entry) }
     }
+}
+
+/*
+ * The app's page navigation (ADR 0011 N7): the only calls that change the page stack. Each one changes the
+ * controller and applies the result to the pages' state machine in the same input event. Direct calls of the
+ * controller's navigate and popBackStack are forbidden outside this package (tools/interaction-forbidden.txt).
+ */
+
+/**
+ * Pushes [route] from a tap: only while the top entry is resumed. During a motion the entries are in transition (not
+ * resumed), so a second tap (a fast double tap, a tap on another row) does not push a second page over the first.
+ */
+fun <T : Any> NavHostController.nbPush(route: T) {
+    val top = currentBackStackEntry ?: return
+    if (top.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) nbGo(route)
+}
+
+/** Pushes [route] whatever runs (a deep link, a fold that re-projects a pane as a page). */
+fun <T : Any> NavHostController.nbGo(route: T) {
+    navigate(route)
+    pageNavigator().sync()
+}
+
+/** Replaces the whole stack with [route] (onboarding done, onboarding restarted). */
+fun <T : Any> NavHostController.nbReset(route: T) {
+    navigate(route) { popUpTo(0) { inclusive = true } }
+    pageNavigator().sync()
+}
+
+/** Pops back to the topmost entry of route [T] (kept); true when one was found. */
+inline fun <reified T : Any> NavHostController.nbPopTo(): Boolean = nbPopTo(T::class)
+
+/** [nbPopTo] for [route]. */
+fun <T : Any> NavHostController.nbPopTo(route: KClass<T>): Boolean {
+    val popped = popBackStack(route, inclusive = false)
+    pageNavigator().sync()
+    return popped
+}
+
+/**
+ * Pops the top page without a Back (a layout change that folds a page into a pane, inside [nbReproject]). A Back of
+ * the person goes through the router ([rememberNbBack]), never here.
+ */
+fun NavHostController.nbPop(): Boolean {
+    val popped = popBackStack()
+    pageNavigator().sync()
+    return popped
 }

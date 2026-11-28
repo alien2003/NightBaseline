@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import io.github.alien2003.nightbaseline.ui.interaction.ForcedInteraction
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbBack
 import io.github.alien2003.nightbaseline.ui.interaction.rememberShellPressState
 import io.github.alien2003.nightbaseline.ui.interaction.shellClickable
 import io.github.alien2003.nightbaseline.ui.interaction.shellPressGlow
@@ -25,6 +26,10 @@ import io.github.alien2003.nightbaseline.ui.theme.ShellTokens
  * back and "more" buttons): a solid convex 40 dp circle (vertical gradient, thin top rim, brighter bottom rim, soft
  * shadow; never blurred) with a 20 dp glyph, centred in a 48 dp touch target. Press: shrink and touch-following glow.
  * The caller places the target so the visible circle sits 16 dp from the screen edge (target edge at 12 dp).
+ *
+ * A Back button (the [NbIcons.ArrowBack] glyph) always goes through the app's router first ([rememberNbBack], ADR 0011
+ * N7): one event into the deepest host's navigation state machine, the same as Esc, 3-button Back and the gesture;
+ * [onClick] runs only when no host takes it.
  */
 @Composable
 fun ShellRoundButton(
@@ -34,6 +39,8 @@ fun ShellRoundButton(
     modifier: Modifier = Modifier,
     forced: ForcedInteraction? = null,
 ) {
+    val back = rememberNbBack(onClick)
+    val click = if (icon == NbIcons.ArrowBack) back else onClick
     val inset = (NbDimens.targetMin - ShellDimens.roundButton) / 2
     val press = rememberShellPressState()
     Box(
@@ -41,7 +48,7 @@ fun ShellRoundButton(
             .size(NbDimens.targetMin)
             .shellPressInput(press)
             .shellClickable(
-                onClick = onClick,
+                onClick = click,
                 shape = NbShapes.circle,
                 visualInset = inset,
                 forced = forced,

@@ -4,11 +4,9 @@ import androidx.compose.animation.core.calculateTargetValue
 import androidx.compose.animation.splineBasedDecay
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -36,6 +34,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
@@ -381,8 +380,10 @@ fun <T : Any> ModalHost(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     kind: ModalKind = ModalKind.Sheet,
+    prewarm: T? = null,
     content: @Composable ModalScope.(T) -> Unit,
 ) {
+    if (prewarm != null) Prewarm(kind) { content(prewarm) }
     val reduced = LocalNbMotion.current.reduced
     val scope = rememberCoroutineScope()
     val dismissNow by rememberUpdatedState(onDismiss)
@@ -417,8 +418,19 @@ fun <T : Any> ModalHost(
     val shown = value ?: retained.value
     if (!present || shown == null) return
     if (wanted) RegisterBackTarget(state.backTarget)
-    val close = stringResource(R.string.a11y_close)
     val modalScope = remember(state) { ModalScope(state) }
+    ModalLayer(modifier, state, wanted) { modalScope.content(shown) }
+}
+
+/** The scrim and the panel of a modal (shared by the host and its prewarm, so the prewarm runs the same code). */
+@Composable
+private fun ModalLayer(
+    modifier: Modifier,
+    state: ModalState,
+    wanted: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val close = stringResource(R.string.a11y_close)
     CompositionLocalProvider(LocalOverscrollFactory provides null) {
         Box(modifier.fillMaxSize().onSizeChanged { state.hostWidth = it.width.toFloat() }, contentAlignment = state.kind.alignment) {
             Box(
@@ -429,18 +441,14 @@ fun <T : Any> ModalHost(
                     .background(NbTheme.colors.scrim)
                     .then(
                         if (wanted) {
-                            Modifier
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = { state.dismiss() },
-                                ).semantics { contentDescription = close }
+                            // The framework's tap (tap slop, the click path of every pressable; review P1-1).
+                            Modifier.nbTap { state.dismiss() }.semantics { contentDescription = close }
                         } else {
                             Modifier
                         },
                     ),
             )
-            modalScope.content(shown)
+            content()
         }
     }
 }
@@ -504,6 +512,50 @@ fun Modifier.sheetNestedScroll(state: ModalState): Modifier {
 private class RetainedValue<T : Any> {
     var value: T? by mutableStateOf(null)
 }
+
+/**
+ * Composes, measures and draws [content] once, shortly after the host first appears, invisibly (alpha 1/100 for
+ * [PREWARM_FRAMES] frames, no semantics, no input), then drops it (review R3-5: the first open of a sheet after
+ * launch stalled while its content was composed and its glass rendered for the first time). The first real open then
+ * runs on warm code, resources and render paths.
+ */
+@Composable
+private fun Prewarm(
+    kind: ModalKind,
+    content: @Composable ModalScope.() -> Unit,
+) {
+    val reduced = LocalNbMotion.current.reduced
+    val phase = remember { PrewarmPhase() }
+    LaunchedEffect(phase) {
+        repeat(PREWARM_AFTER_FRAMES) { withFrameNanos { } }
+        phase.on = true
+        repeat(PREWARM_FRAMES) { withFrameNanos { } }
+        phase.on = false
+    }
+    if (!phase.on || reduced) return
+    val scope = remember(kind) { ModalScope(ModalState(kind, reduced = false, initial = 1f, scope = null)) }
+    ModalLayer(
+        Modifier
+            .graphicsLayer { alpha = PREWARM_ALPHA }
+            .clearAndSetSemantics {}
+            .blockInput { true },
+        scope.state,
+        wanted = true,
+    ) { scope.content() }
+}
+
+private class PrewarmPhase {
+    var on: Boolean by mutableStateOf(false)
+}
+
+/** Frames after the host appears before the prewarm (the launch's own frames come first). */
+private const val PREWARM_AFTER_FRAMES = 12
+
+/** Frames the prewarm is drawn. */
+private const val PREWARM_FRAMES = 2
+
+/** The prewarm's alpha: drawn (an alpha of 0 is skipped by the renderer), imperceptible. */
+private const val PREWARM_ALPHA = 0.01f
 
 /** A panel drawn at rest outside a host (component catalog, previews). */
 @Composable

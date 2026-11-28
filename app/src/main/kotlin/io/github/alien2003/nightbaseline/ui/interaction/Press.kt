@@ -343,71 +343,27 @@ fun Modifier.nbClickable(
 }
 
 /**
- * The scope clicks run in ([rememberPressFirst]): the root's, so a click is never lost when its element leaves the
- * composition in the frame that shows its press. Null outside [NbInteractionRoot]: clicks run at once.
+ * A tap without press feedback (a modal's scrim): the same tap rule (touch slop: a swipe is never a tap) and the
+ * same click path as every pressable of the framework.
  */
-internal val LocalNbClickScope = staticCompositionLocalOf<CoroutineScope?> { null }
+@Composable
+internal fun Modifier.nbTap(onTap: () -> Unit): Modifier =
+    this
+        .nbTapSlop()
+        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = rememberPressFirst(onTap))
 
 /**
- * Rule P1 of ADR 0011 (round 3): a click runs after the frame that shows its press has been drawn, as a platform
- * view posts its click after showing the pressed state. A tap whose click composes a whole page (a push, a tab) used
- * to change nothing on screen until that composition was done, 170 to 600 ms on the emulator, with no frame of press
- * feedback in between (V2-5): now the press is on screen first, and the change follows one frame later. Clicks keep
- * their order with every other input: a Back or a navigation key runs the clicks still waiting first
- * ([NbPendingClicks.flush]).
+ * Rule P1 of ADR 0011 (round 5): the press runs in parallel with the click, never before it. A click runs in the lift
+ * event, so a tap's navigation is set up in the first frame after the input and that frame already moves (the
+ * navigation state machine pre-advances a motion from rest by one display frame); the press is drawn in the same
+ * frame (a press released before any frame drew it is still drawn lit for one frame). Round 4 ran the click two frames
+ * later, behind its press frame, which made every tap-driven push start two or more frames after the tap while a Back
+ * or a key started at once (owner report c, R3-3).
  */
 @Composable
 internal fun rememberPressFirst(onClick: () -> Unit): () -> Unit {
-    val scope = LocalNbClickScope.current
     val current by rememberUpdatedState(onClick)
-    return remember(scope) {
-        {
-            if (scope == null) {
-                current()
-            } else {
-                // The action of the element as it was tapped (a recomposition before the click runs cannot retarget it).
-                val action = current
-                val click: () -> Unit = { action() }
-                NbPendingClicks.add(click)
-                scope.launch {
-                    // The frame that draws the press; the click runs at the start of the next one, so its state
-                    // change is composed in that next frame, after the press is on screen.
-                    withFrameNanos { }
-                    withFrameNanos { }
-                    NbPendingClicks.run(click)
-                }
-            }
-        }
-    }
-}
-
-/** The clicks that wait for their press frame (P1), in input order; main thread only. */
-internal object NbPendingClicks {
-    private val queue = ArrayDeque<() -> Unit>()
-
-    fun add(click: () -> Unit) {
-        queue.addLast(click)
-    }
-
-    /** Runs [click] and every click before it, in order (nothing when a flush already ran it). */
-    fun run(click: () -> Unit) {
-        if (click !in queue) return
-        while (queue.isNotEmpty()) {
-            val next = queue.removeFirst()
-            next()
-            if (next === click) return
-        }
-    }
-
-    /**
-     * Runs every waiting click now, in order: input that comes after them (Back, keys) must find their result.
-     * Returns true when one ran (its state change is composed in the next frame).
-     */
-    fun flush(): Boolean {
-        val any = queue.isNotEmpty()
-        while (queue.isNotEmpty()) queue.removeFirst()()
-        return any
-    }
+    return remember { { current() } }
 }
 
 /** The colours of [nbClickable]'s feedback. */

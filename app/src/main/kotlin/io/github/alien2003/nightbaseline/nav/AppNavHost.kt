@@ -25,7 +25,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -60,8 +59,13 @@ import io.github.alien2003.nightbaseline.ui.interaction.NbNavStack
 import io.github.alien2003.nightbaseline.ui.interaction.NbPageNavigator
 import io.github.alien2003.nightbaseline.ui.interaction.NbSectionHost
 import io.github.alien2003.nightbaseline.ui.interaction.NbStackHost
+import io.github.alien2003.nightbaseline.ui.interaction.nbGo
 import io.github.alien2003.nightbaseline.ui.interaction.nbKeyIntents
+import io.github.alien2003.nightbaseline.ui.interaction.nbPop
+import io.github.alien2003.nightbaseline.ui.interaction.nbPopTo
+import io.github.alien2003.nightbaseline.ui.interaction.nbPush
 import io.github.alien2003.nightbaseline.ui.interaction.nbReproject
+import io.github.alien2003.nightbaseline.ui.interaction.nbReset
 import io.github.alien2003.nightbaseline.ui.interaction.nbStepArea
 import io.github.alien2003.nightbaseline.ui.interaction.page
 import io.github.alien2003.nightbaseline.ui.interaction.rememberNbBack
@@ -181,7 +185,7 @@ fun AppNavHost(
         when (link) {
             is DeepLink.Night -> {
                 navController.toTop(TopLevel.Home)
-                if (link.date != newestNight) navController.navigate(NightRoute(link.date, TopLevel.Home.name))
+                if (link.date != newestNight) navController.nbGo(NightRoute(link.date, TopLevel.Home.name))
             }
 
             is DeepLink.Fix -> {
@@ -197,7 +201,7 @@ fun AppNavHost(
 
                     FixProblem.SourceSync -> {
                         navController.toTop(TopLevel.Settings)
-                        navController.navigate(SettingsRoute(SettingsPage.SourcePicker.name))
+                        navController.nbGo(SettingsRoute(SettingsPage.SourcePicker.name))
                     }
                 }
             }
@@ -213,7 +217,7 @@ fun AppNavHost(
                 ?.route
                 ?.contains("OnboardingRoute") == true
         if (!onboardingDone && !onOnboarding && navController.currentBackStackEntry != null) {
-            navController.navigate(OnboardingRoute(OnboardingStep.Source.name)) { popUpTo(0) { inclusive = true } }
+            navController.nbReset(OnboardingRoute(OnboardingStep.Source.name))
         }
     }
 
@@ -240,11 +244,11 @@ fun AppNavHost(
             }
 
             NightState.SourceGone -> {
-                navController.push(SettingsRoute(SettingsPage.SourcePicker.name))
+                navController.nbPush(SettingsRoute(SettingsPage.SourcePicker.name))
             }
 
             NightState.HealthConnectNone -> {
-                navController.push(SettingsRoute(SettingsPage.About.name))
+                navController.nbPush(SettingsRoute(SettingsPage.About.name))
             }
 
             NightState.Loading, NightState.AllWithin -> {
@@ -259,12 +263,12 @@ fun AppNavHost(
         when (kind) {
             BannerKind.Background -> requestFor(setOf(HcPermissions.READ_HEALTH_DATA_IN_BACKGROUND))
             BannerKind.ReadFailed, BannerKind.Wait -> onCheckNow()
-            BannerKind.SourceQuiet -> navController.push(SettingsRoute(SettingsPage.SourcePicker.name))
+            BannerKind.SourceQuiet -> navController.nbPush(SettingsRoute(SettingsPage.SourcePicker.name))
             BannerKind.NotificationsOff -> system.openNotificationSettings()
             BannerKind.RangeReady -> Unit
         }
     }
-    val about: () -> Unit = { navController.push(SettingsRoute(SettingsPage.About.name)) }
+    val about: () -> Unit = { navController.nbPush(SettingsRoute(SettingsPage.About.name)) }
     val more: () -> Unit = { sheet = AppSheet.More }
 
     // Ctrl+1/2/3, Ctrl+R, Esc and Alt+Left, and the pager keys without focus (layouts.md 10.2), decoded by the
@@ -340,6 +344,8 @@ fun AppNavHost(
             sheet,
             onDismiss = { sheet = null },
             kind = if (sheet == AppSheet.More) ModalKind.Sheet else infoModalKind(layout),
+            // The explainer, the most opened sheet, is composed and drawn once invisibly after launch (R3-5).
+            prewarm = AppSheet.Explainer,
         ) { open ->
             when (open) {
                 AppSheet.Explainer -> {
@@ -445,7 +451,7 @@ private fun NavGraphBuilder.graph(
             // Unfolded into two panes while this night was opened from History: back to History's detail pane.
             FoldBack(layout.twoPanes && route.section == TopLevel.History.name) {
                 navController.previousBackStackEntry?.savedStateHandle?.set(SELECT_NIGHT, vm.shownDate.value.toString())
-                navController.popBackStack()
+                navController.nbPop()
             }
             state?.let { s ->
                 NightDetailScreen(
@@ -453,11 +459,11 @@ private fun NavGraphBuilder.graph(
                     layout.forDetail(),
                     actions =
                         NightDetailActions(
-                            onBack = rememberNbBack { navController.popBackStack() },
+                            onBack = rememberNbBack { navController.nbPop() },
                             onPrevious = vm::show,
                             onNext = vm::show,
                             onMetric = { m ->
-                                navController.push(MetricRoute(m.key, vm.shownDate.value.toString(), route.section))
+                                navController.nbPush(MetricRoute(m.key, vm.shownDate.value.toString(), route.section))
                             },
                             onStateAction = { nightActions(it, s.source) },
                             onStateSecondary = nightSecondary,
@@ -500,7 +506,7 @@ private fun NavGraphBuilder.graph(
                     home[SELECT_POINT] = selection ?: -1
                     home[SELECT_METRIC] = route.metric
                 }
-                navController.popBackStack()
+                navController.nbPop()
             }
             state?.let { s ->
                 MetricDetailScreen(
@@ -508,16 +514,16 @@ private fun NavGraphBuilder.graph(
                     layout.forDetail(),
                     actions =
                         MetricDetailActions(
-                            onBack = rememberNbBack { navController.popBackStack() },
+                            onBack = rememberNbBack { navController.nbPop() },
                             onPeriod = {
                                 selection = null
                                 vm.setPeriod(it)
                             },
                             onSelect = { selection = it },
-                            onOpenNight = { navController.push(NightRoute(it.toString(), route.section)) },
+                            onOpenNight = { navController.nbPush(NightRoute(it.toString(), route.section)) },
                             onOpenExplainer = { explainer = true },
                             onCloseExplainer = { explainer = false },
-                            onChooseSource = { navController.push(SettingsRoute(SettingsPage.SourcePicker.name)) },
+                            onChooseSource = { navController.nbPush(SettingsRoute(SettingsPage.SourcePicker.name)) },
                             onOpenPermissions = requestPermissions,
                             onOpenStore = system::openStore,
                             onAbout = about,
@@ -586,21 +592,11 @@ const val TOP_LEVEL_TAB: String = "top_level_tab"
 fun NavHostController.toTop(tab: TopLevel) {
     val root = currentBackStack.value.lastOrNull { it.destination.hasRoute<TopLevelRoute>() }
     if (root == null) {
-        navigate(TopLevelRoute) { popUpTo(0) { inclusive = true } }
+        nbReset(TopLevelRoute)
     } else if (currentBackStackEntry != root) {
-        popBackStack<TopLevelRoute>(inclusive = false)
+        nbPopTo<TopLevelRoute>()
     }
     getBackStackEntry<TopLevelRoute>().savedStateHandle[TOP_LEVEL_TAB] = tab.name
-}
-
-/**
- * A push from a tap: only while the top entry is resumed. During a push or pop transition the leaving page stays
- * composed and keeps taking touches, but its entry is no longer resumed, so a second tap (a fast double tap, or a tap
- * on another row) does not push a second page over the first.
- */
-fun <T : Any> NavHostController.push(route: T) {
-    val top = currentBackStackEntry ?: return
-    if (top.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) navigate(route)
 }
 
 /** The selected section when [this] is the [TopLevelRoute] entry, else null. */
@@ -654,7 +650,7 @@ private fun HomeDestination(
     // the pane's period and selected night.
     FoldBack(!layout.twoPanes && explicit && selected != null, active) {
         explicit = false
-        selected?.let { navController.navigate(MetricRoute(it, period = period.name, point = selection ?: -1)) }
+        selected?.let { navController.nbGo(MetricRoute(it, period = period.name, point = selection ?: -1)) }
     }
     when (val u = ui) {
         HomeUi.Pending -> {
@@ -668,8 +664,8 @@ private fun HomeDestination(
                 actions =
                     LearningActions(
                         onHowItWorks = { onSheet(AppSheet.Explainer, u.state.source, "") },
-                        onMetric = { navController.push(MetricRoute(it.key)) },
-                        onNight = { navController.push(NightRoute(it.wakeDate.toString(), TopLevel.Home.name)) },
+                        onMetric = { navController.nbPush(MetricRoute(it.key)) },
+                        onNight = { navController.nbPush(NightRoute(it.wakeDate.toString(), TopLevel.Home.name)) },
                         onSeeAll = { onSelectTab(TopLevel.History) },
                         onAbout = onAbout,
                         onMore = onMore,
@@ -692,10 +688,10 @@ private fun HomeDestination(
                                 explicit = true
                                 selection = null
                             } else {
-                                navController.push(MetricRoute(m.key))
+                                navController.nbPush(MetricRoute(m.key))
                             }
                         },
-                        onNight = { navController.push(NightRoute(it.toString(), TopLevel.Home.name)) },
+                        onNight = { navController.nbPush(NightRoute(it.toString(), TopLevel.Home.name)) },
                         onSeeAll = { onSelectTab(TopLevel.History) },
                         onStateAction = { onStateAction(it, state.source) },
                         // "Check again" on the Health Connect card says so when it is still missing.
@@ -766,7 +762,7 @@ private fun HistoryDestination(
     }
     FoldBack(!layout.twoPanes && explicit && state.selected != null, active) {
         explicit = false
-        state.selected?.let { navController.navigate(NightRoute(it.toString(), TopLevel.History.name)) }
+        state.selected?.let { navController.nbGo(NightRoute(it.toString(), TopLevel.History.name)) }
     }
     HistoryScreen(
         state,
@@ -780,7 +776,7 @@ private fun HistoryDestination(
                     vm.select(it)
                     explicit = layout.twoPanes
                 },
-                onOpenNight = { navController.push(NightRoute(it.toString(), TopLevel.History.name)) },
+                onOpenNight = { navController.nbPush(NightRoute(it.toString(), TopLevel.History.name)) },
                 onFixAccess = { access ->
                     if (access == HistoryAccess.Permission) requestPermissions() else system.openStore()
                 },
@@ -819,14 +815,14 @@ private fun HistoryDestination(
                             onPrevious = vm::select,
                             onNext = vm::select,
                             onMetric = { m ->
-                                navController.push(MetricRoute(m.key, night.wakeDate.toString(), TopLevel.History.name))
+                                navController.nbPush(MetricRoute(m.key, night.wakeDate.toString(), TopLevel.History.name))
                             },
                         ),
                     )
                 }
             } else {
                 HistoryNightPreview(night, state.source, interactive, onOpen = {
-                    navController.push(NightRoute(night.wakeDate.toString(), TopLevel.History.name))
+                    navController.nbPush(NightRoute(night.wakeDate.toString(), TopLevel.History.name))
                 })
             }
         },
@@ -856,7 +852,7 @@ private fun SettingsDestination(
                 open = setupAgain,
                 onConfirm = {
                     vm.cancelSetupAgain()
-                    navController.push(OnboardingRoute(OnboardingStep.Source.name, rerun = true))
+                    navController.nbPush(OnboardingRoute(OnboardingStep.Source.name, rerun = true))
                 },
                 onCancel = vm::cancelSetupAgain,
             )
@@ -866,7 +862,7 @@ private fun SettingsDestination(
     // In two panes the detail pane has its own structural stack (About -> Licenses), so the route's root is the list.
     val paned = layout.twoPanes && layout.mode != LayoutMode.Tabletop && layout.mode != LayoutMode.Glance
     val root = rootPage?.takeIf { it != SettingsPage.Main && !paned }
-    val back: () -> Unit = { if (page == root || !vm.back()) navController.popBackStack() }
+    val back: () -> Unit = { if (page == root || !vm.back()) navController.nbPop() }
     state?.let { s ->
         // The page comes straight from the ViewModel: what is shown and what Back closes are the same page. The
         // screen draws its sub-pages as a framework stack (ADR 0011).
@@ -927,7 +923,7 @@ private fun OnboardingDestination(
     val actions =
         OnboardingActions(
             onNext = vm::next,
-            onBack = { if (leaves) navController.popBackStack() else vm.back() },
+            onBack = rememberNbBack { if (leaves) navController.nbPop() else vm.back() },
             onSelectSource = vm::select,
             onUseSource = vm::useSource,
             onCheckAgain = {
@@ -942,7 +938,7 @@ private fun OnboardingDestination(
             onSkipNotifications = vm::skipNotifications,
             onDone = {
                 vm.done {
-                    navController.navigate(TopLevelRoute) { popUpTo(0) { inclusive = true } }
+                    navController.nbReset(TopLevelRoute)
                 }
             },
         )

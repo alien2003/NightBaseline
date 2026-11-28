@@ -47,3 +47,9 @@ import android\.view\.animation\.
 # Material components bring their own motion (and the ripple)
 import androidx\.compose\.material3\.
 import androidx\.compose\.material\.
+# Navigation (round 5): every change of a page stack is an event of the framework's navigation state machine
+# (nbPush, nbGo, nbReset, nbPopTo, nbPop and the router's Back); NavHost and its transition parameters are gone.
+\.navigate\(
+\.popBackStack\b
+\b(enterTransition|exitTransition|popEnterTransition|popExitTransition|sizeTransform|predictivePopEnterTransition|predictivePopExitTransition)\b
+\bcomposable<

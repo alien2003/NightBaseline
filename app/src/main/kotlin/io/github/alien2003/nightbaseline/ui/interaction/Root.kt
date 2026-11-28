@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -30,8 +29,6 @@ fun NbInteractionRoot(
     val indication = remember(pressed, reduced) { NbPressIndication(pressed, reduced) }
     val overscroll = remember(density, reduced) { if (reduced) null else NbOverscrollFactory(density) }
     val router = remember { NbBackRouter() }
-    val clickScope = rememberCoroutineScope()
-    SideEffect { router.scope = clickScope }
     // The display's frame period: the longest first step of a run from rest (R7, NbPlayClock).
     val view = LocalView.current
     SideEffect {
@@ -43,7 +40,6 @@ fun NbInteractionRoot(
         LocalIndication provides indication,
         LocalOverscrollFactory provides overscroll,
         LocalNbBackRouter provides router,
-        LocalNbClickScope provides clickScope,
     ) {
         NbBackRoot(router)
         content()

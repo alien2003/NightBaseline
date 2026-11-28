@@ -54,9 +54,11 @@ import io.github.alien2003.nightbaseline.ui.components.TopLevel
 import io.github.alien2003.nightbaseline.ui.components.rememberPaneScrollState
 import io.github.alien2003.nightbaseline.ui.interaction.NbLazyColumn
 import io.github.alien2003.nightbaseline.ui.interaction.NbSwitcher
+import io.github.alien2003.nightbaseline.ui.interaction.nbSwapLayer
 import io.github.alien2003.nightbaseline.ui.interaction.nbVerticalScroll
 import io.github.alien2003.nightbaseline.ui.interaction.rememberNbLazyListState
 import io.github.alien2003.nightbaseline.ui.interaction.rememberNbScrollState
+import io.github.alien2003.nightbaseline.ui.interaction.rememberNbSwap
 import io.github.alien2003.nightbaseline.ui.layout.LayoutMode
 import io.github.alien2003.nightbaseline.ui.layout.LayoutSpec
 import io.github.alien2003.nightbaseline.ui.layout.NavigationKind
@@ -148,7 +150,10 @@ fun HistoryScreen(
             }
         },
     ) { padding ->
-        val content = HistoryContent(state, actions, arrangement, nightPreview)
+        // The view toggle and the filters change the results in place: one Swap of the framework (ADR 0011 MIG-1),
+        // the old results fade out, the new ones fade in, on the Nav spring like every other change.
+        val swap = rememberNbSwap(state, key = { it.view to it.filter }, id = "history-results")
+        val content = HistoryContent(state, actions, arrangement, nightPreview, results = swap.shown, fade = Modifier.nbSwapLayer(swap))
         when (layout.mode) {
             LayoutMode.Glance -> {
                 GlanceHistory(state, actions, padding, listState)
@@ -278,6 +283,10 @@ private class HistoryContent(
     val actions: HistoryActions,
     val arrangement: HistoryArrangement,
     val nightPreview: NightPreviewSlot,
+    /** The results shown (the state being left during the first half of a view or filter change). */
+    val results: HistoryUiState = state,
+    /** The results' fade of that change. */
+    val fade: Modifier = Modifier,
 ) {
     private fun tap(date: LocalDate) = if (arrangement.selectsInPlace) actions.onSelect(date) else actions.onOpenNight(date)
 
@@ -302,7 +311,7 @@ private class HistoryContent(
                 item(key = "empty") { EmptyHistory(Modifier.widthIn(max = NbDimens.textMax).padding(top = GAP)) }
             }
 
-            state.view == HistoryView.List -> {
+            results.view == HistoryView.List -> {
                 listItems()
             }
 
@@ -331,14 +340,14 @@ private class HistoryContent(
 
     private fun LazyListScope.listItems() {
         controlRow(filters = true)
-        if (state.visibleNights.isEmpty()) {
+        if (results.visibleNights.isEmpty()) {
             item(key = "filter-empty") {
                 HistoryEmptyCard(
-                    modifier = Modifier.widthIn(max = NbDimens.textMax).padding(top = GAP),
+                    modifier = fade.widthIn(max = NbDimens.textMax).padding(top = GAP),
                     title = null,
                     body =
                         stringResource(
-                            if (state.filter == HistoryFilter.Gaps) R.string.history_filter_empty_gaps else R.string.history_filter_empty,
+                            if (results.filter == HistoryFilter.Gaps) R.string.history_filter_empty_gaps else R.string.history_filter_empty,
                         ),
                     action = stringResource(R.string.action_show_all),
                     onAction = { actions.onFilter(HistoryFilter.All) },
@@ -347,10 +356,10 @@ private class HistoryContent(
             return
         }
         val selected = state.selectedNight?.wakeDate
-        state.visibleByMonth.forEach { (month, nights) ->
+        results.visibleByMonth.forEach { (month, nights) ->
             stickyHeader(key = "month:$month") {
                 val text = rememberUiText()
-                Box(Modifier.fillMaxWidth().background(NbTheme.colors.background), contentAlignment = Alignment.TopCenter) {
+                Box(fade.fillMaxWidth().background(NbTheme.colors.background), contentAlignment = Alignment.TopCenter) {
                     HistoryMonthHeader(text.month(month.atDay(1)), Modifier.widthIn(max = NbDimens.textMax))
                 }
             }
@@ -358,6 +367,7 @@ private class HistoryContent(
                 NightRow(
                     night,
                     onClick = { tap(night.wakeDate) },
+                    modifier = fade,
                     selected = showSelection && night.wakeDate == selected,
                     position = GroupPosition.of(i, nights.size),
                 )
@@ -372,7 +382,7 @@ private class HistoryContent(
     private fun LazyListScope.calendarItems(minHeight: Dp) {
         controlRow(filters = false)
         item(key = "calendar") {
-            Column(Modifier.heightIn(min = minHeight), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(fade.heightIn(min = minHeight), horizontalAlignment = Alignment.CenterHorizontally) {
                 HistoryCalendar(
                     month = state.month,
                     nights = state.byDate,

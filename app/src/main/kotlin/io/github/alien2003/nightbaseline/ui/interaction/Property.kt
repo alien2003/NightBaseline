@@ -59,8 +59,12 @@ fun <T : Any> NbReveal(
     }
     LaunchedEffect(wanted, reduced) {
         val target = if (wanted) 1f else 0f
-        val v = driver.v
-        driver.run(target, v, if (v != 0f) driver.continueOrigin() else asked.at)
+        // A reversal continues from (p, v) under the release rule R0 (review REV-1: the raw velocity, away from the new
+        // target, ran the value into the far bound, so a hidden banner vanished in one frame or a wanted one stayed
+        // at height 0): velocity away from the target is dropped, and towards the visible rest it is capped.
+        val moving = driver.v != 0f
+        val v = NbRelease.startVelocity(driver.p, driver.v, target, NbPhysics.Nav, visibleTarget = target == 1f)
+        driver.run(target, v, if (moving) driver.continueOrigin() else asked.at)
         if (target == 0f) retained.value = null
     }
     val present by remember { derivedStateOf { driver.p > 0f } }
