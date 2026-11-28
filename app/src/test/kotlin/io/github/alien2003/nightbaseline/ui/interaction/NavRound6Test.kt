@@ -101,6 +101,7 @@ class NavRound6Test {
         var compositions = 0
         var measures = 0
         var subscriptions = 0
+        var alive = false
     }
 
     private val counts = HashMap<Int, Counts>()
@@ -112,6 +113,10 @@ class NavRound6Test {
         val f = remember(n) { flow.onStart { c.subscriptions++ }.onCompletion { } }
         val value by f.collectAsStateWithLifecycle(initialValue = -1)
         SideEffect { c.compositions++ }
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            c.alive = true
+            onDispose { c.alive = false }
+        }
         Box(
             Modifier.fillMaxSize().layout { m, k ->
                 c.measures++
@@ -186,6 +191,8 @@ class NavRound6Test {
         val twoBelow = counts.getValue(0)
         val m0 = below.measures
         val c0 = below.compositions
+        val t0 = twoBelow.compositions
+        val twoAlive = twoBelow.alive
         val w =
             activity.resources.displayMetrics.widthPixels
                 .toFloat()
@@ -200,7 +207,8 @@ class NavRound6Test {
         // Metric) and the page below was measured again.
         assertEquals("zero measure passes of the page below", m0, below.measures)
         assertEquals("zero compositions of the page below", c0, below.compositions)
-        assertTrue("the page two below was parked before the gesture", twoBelow.compositions > 0)
+        assertTrue("the page two below is parked (composed) at rest and through the gesture", twoAlive && twoBelow.alive)
+        assertEquals("zero compositions of the page two below", t0, twoBelow.compositions)
         compose.runOnUiThread { back.dispatchOnBackCancelled() }
         settle()
     }
