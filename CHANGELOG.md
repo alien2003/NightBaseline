@@ -10,6 +10,18 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Going back twice quickly, paging quickly or opening a link while a page moves no longer makes a page vanish.**
+  The page that was moving keeps moving from where it was; a second Back, a second step or a page opened over it
+  continues the same motion.
+- **Going back from a night or a measurement no longer stalls halfway.** The pages under the top one are prepared
+  ahead, and the page that comes back waits until the motion ends before it refreshes, so nothing heavy runs while it
+  moves.
+- **The Back key moves like every other Back.** A Back key that the system sends as a gesture now runs the app's own
+  motion, the same as Esc and the round Back button.
+- **The last Back at the start page always leaves the app**, even right after another Back.
+
 ### Changed
 
 - **Every way of moving between pages now starts at once and at the same speed.** A tap on a row, a tile, a link, the

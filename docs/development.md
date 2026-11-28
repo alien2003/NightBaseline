@@ -160,11 +160,16 @@ Every animation, back, gesture, press, key, scroll, fling and overscroll of the 
 `app/src/main/kotlin/…/ui/interaction` ([ADR 0011](adr/0011-interaction-framework.md)). Outside that package these
 APIs are forbidden (`tools/interaction-forbidden.txt`), checked by `tools/check-interaction.sh` (pre-commit hook, CI)
 and by `InteractionBoundaryTest` (`./gradlew test`). The allowlist `tools/interaction-allowlist.txt` is empty and may
-only shrink. Screens state what changed; the host the state lives in decides how it moves.
+only shrink. Screens state what changed; the host the state lives in decides how it moves. The activity extends
+`NbActivity` (the window's raw key and touch dispatch lives in the framework: override `onWindowKey` and
+`onTouchAction`, never `dispatchKeyEvent` or `dispatchTouchEvent`). A page that collects flows with its lifecycle is
+held at CREATED while its host moves (round 6), so it shows the state it has and draws what arrived after the motion.
 
 **A new screen (a route).** Add the route to `nav/Routes.kt` and a `page<YourRoute> { entry -> … }` block to the graph
-in `nav/AppNavHost.kt`. Push with `navController.nbPush(YourRoute(...))` (a push is ignored while the top page is still
-moving in, so a double tap pushes once; `nbGo`, `nbReset`, `nbPopTo` and `nbPop` for deep links and layout changes)
+in `nav/AppNavHost.kt`. Push with `navController.nbPush(YourRoute(...))` (round 6: no lifecycle gate; a tap during a
+motion is caught by the machine like every input, and the leaving page takes no taps, so a double tap pushes once;
+`nbGo`, `nbReset`, `nbPopTo` and `nbPop` for deep links and layout changes, `nbBatch { toTop(...); nbGo(...) }` when
+one change of the person is several calls, so it runs as one motion)
 and go back with a Back control through the router (`rememberNbBack`; `ShellRoundButton` with the Back glyph does it
 itself); nothing else: the controller's `navigate` and `popBackStack` are forbidden outside the framework. Every
 host is one navigation state machine (`NbNavReducer`, ADR 0011 N1 to N8): each of these calls is one event of it. The push, the

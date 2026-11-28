@@ -32,6 +32,13 @@ Live project state. A new session starts here. Updated after every step. Last fu
   split width, theme, rotation; frames: scroll 0.71 % janky, tab switch 3.6 %.
 
 ## In progress
+- Round 6 of ADR 0011 (2026-11-28, branch on top of wip/nav-core): path-position navigation (H1), lifecycle cap and
+  two parked pages below the top (H2), M1 to M5, L1 to L3, the key Back (measurement 5). Verified by unit and frame
+  tests (NavMachineTest, NavRound6Test; each shown to fail on its mutation). Open: measurement 1 (pages that slide in
+  empty: needs a shared view model cache and skeletons), the explainer sheet kept composed (R3-5), the edge claim of
+  the night pager (measurement 6), the bar case of measurement 8 and R3-9 on the emulator; the Metric gesture freeze
+  (measurement 2) has a likely cause removed (the page two below was composed in the gesture's first frame) but no
+  trace yet [HYPOTHESIS until measured].
 - BUG (found 2026-11-26): a complete night was in Health Connect (all channels written to the end of the session, the
   person already up), but NightBaseline kept showing "Last night isn't in yet", even after "Check now". Reproduced
   locally with the exported dataset; cause: the "source still writing" rule counted every record of the source written

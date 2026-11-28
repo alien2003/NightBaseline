@@ -427,6 +427,67 @@ R3-3 / R3-4 (a tap, a Back, a bar change, a gesture commit and a pager step move
 at most one spring frame in); R3-8 (the edge equals the finger's travel within 1 px both ways, from any start); R3-5 /
 R3-7 (the first sheet open and the first gesture frames within twice the median frame).
 
+### Round 6 (2026-11-28): one position over a path
+
+The review of round 5 found that the third-state rule of N3 is reached by normal use (a double Back in a three-deep
+stack, paging faster than the spring, a tab then a back swipe, a deep link while on a page): the running upper layer
+disappeared in one frame (H1). The emulator measured the gesture on Metric freezing 0.2 to 0.9 s in its first frames,
+a hold then a jump at every release, the Back key on a different curve, and pages sliding in empty.
+
+**P1 path-position model (H1).** A host's motion is one scalar q over an ordered path of its states (stack: bottom
+up; pager: sequence order; tab: the pair in bar order; swap: the two peers). Layer i draws `f(kind, i - q)`: the round
+5 two-layer pose for `|i - q| <= 1`, nothing beyond, so at most two path layers are visible by construction. A Go to a
+state on the path, or one that extends it (a deeper page of the same stack, a page further down, the next value
+beyond the one a pager heads to), only moves the target of q from the current (q, v): a double Back, a double push and
+multi-step paging are retargets, C1 in q. The pose is Lipschitz in q (2.2 W per index for the stack pair), so no layer
+can move without q moving; the property test asserts exactly that bound. A layer changes role at an integer q (lower
+to upper): the pose is continuous there but its slope is not (the canon's page geometry), a decision, not a defect.
+Swap substitution: a third peer replaces the value that is invisible now (q < 1/2: the one being reached, else the
+one being left); q and v stay. A change off the path (a reset, a replaced top, a third section) keeps the interrupted
+motion as a visual-only residual group that runs on to its own target in the place (slot) of its target state; its
+layers draw the residual's pose composed with the slot's pose and are clipped to the slot's bounds (a member beside
+the group never shows beside it). A third change off the path while a residual still runs snaps that older residual
+to its end: the one remaining discontinuity, counted by the property test. Composite navigations of one input (a
+deep link: back to a section, then a page) are one change (`nbBatch`).
+
+**P2 nothing heavy in a commit or a gesture's first frame (H2).** The two pages below the top are parked (composed,
+measured, drawn invisibly) at rest; a motion never adds a parked page (round 5 composed the page two below in every
+motion's first frame, the likely cause of the Metric freeze [HYPOTHESIS until a frame trace on the emulator]). Every
+page that was composed before the motion and is not the page it leaves is held at `min(entry, CREATED)` through
+`LocalLifecycleOwner` while its host moves, released when it is at rest: Navigation raises the revealed entry to
+STARTED at the commit of a pop, and its flows restarted while it moved (shown by `NavRound6Test`, which fails without
+the cap). A page that enters in the motion is not capped: it must load its state. The first frame of a continuation
+(a release, a catch) is at most one display frame from its origin and every later frame at most two display frames
+(`NbClock.stepCap`): a long release frame holds the pose and never jumps by 50 ms of spring.
+
+**P3 velocity and finger (M2, M3).** A catch keeps v even away from the target (a reversal), capped so that the closed
+form excursion never passes the far end of the pair q lies in; a release still drops velocity away from its side (R0).
+The finger maps in screen space, `u = u0 + e (x - x0) / W` with e the side the upper layer lies at: the page never
+moves against the finger, from either edge, fresh or caught. A gesture that starts while the motion is more than one
+page from the held top does not take it; its commit is a Back. L3: a gesture's start sets v = 0 (the page is under
+the finger from then on), so a catch by a finger is continuous in q but not C1; N3 said C1, which held only for Go.
+
+**P4 one rule for input during motion (M1, L2, M4, L1, measurement 5).** `nbPush` has no lifecycle gate: the machine
+catches a tap like any input; the leaving layer takes no taps. A gesture has an id; a commit of a gesture that was
+resolved otherwise (a key Back while the finger held) does nothing. Every Back of the machine expects its caller to
+follow; a caller that does not within 500 ms is reported (`NbMotionProbe.unfollowedBack`, tests fail on it) and then
+followed; the two-frame resync is gone. A Back that no target takes reaches the system's Back. A back sequence that
+does not start at a swipe edge (`BackEventCompat.swipeEdge` neither left nor right: the 3-button Back key that the
+platform sends as a predictive sequence with synthetic progress) drives no finger: its commit is the app's own Back,
+the same spring as Esc [HYPOTHESIS: the emulator's Back key carries EDGE_NONE; not re-measured in this round].
+
+**P5 boundary (M5).** The forbidden list also catches `navigate(`, `popBackStack(`, `navigateUp(`, `clearBackStack(`,
+`handleDeepLink(` without a receiver, the back dispatcher, `addCallback`, `onBackPressed`, the platform Dialog and
+Popup windows, `.animate(` and raw key and touch dispatch. The activity's two dispatch overrides moved into the
+framework (`NbActivity`); the allowlist stays empty. `AppScreens` opens screens with `nbGo`.
+
+Open after round 6 (not done in its time box): measurement 1 (a shared in-memory state cache with a synchronous seed,
+prefetch in nbPush and final-geometry skeletons), R3-5 (the explainer sheet kept composed and drawn parked; the R3-5
+frame test still compares worst frames), measurement 6 (an edge stroke must belong to Back, not to the night pager),
+measurement 8 (the bar in cancel-then-gesture), R3-9 (the first key after a touch, emulator diagnosis), the frame
+tests through every production trigger against the closed-form curve (M6 beyond the reducer), and a re-measure on
+the emulator.
+
 ### Enforcement
 
 - Navigation: `NavMachineTest` (reducer properties over random event sequences) and `NavFramesTest` (frames of
@@ -457,7 +518,9 @@ R3-7 (the first sheet open and the first gesture frames within twice the median 
   invisible layer (round 3): no focus can enter them, they have no semantics and take no input; the page's navigation
   entry stays in its lifecycle state (CREATED), so its flows keep the last values they collected while it was shown.
   They are laid out when their content changes, a cost paid while they are hidden instead of in a gesture's frame.
-- A pushed page whose state is still loading enters up to 300 ms later (R8) instead of sliding in empty.
+- A pushed page enters at once (N4, round 5) and shows what it has; R8's wait is gone for pages (round 6, L3: this
+  line used to say it enters up to 300 ms later). A page whose view model has no state yet still slides in empty
+  (measurement 1 of round 5, open).
 - Night and month pagers step on a release decided by the fling projection and start with the swipe's velocity; the
   neighbouring page is not dragged under the finger (the view models have no neighbour content) [not changed].
 - Item placement animations of the History list, the shared-bounds morphs and pane resize animations do not exist;

@@ -648,6 +648,10 @@ Time (R7): without stalls every frame draws its spring at `frame time - origin`.
 release continues from the frame that drew the finger's last sample, or starts from rest at the release when the
 finger rested longer than `POINTER_STOPPED_MS`. A run from rest is at most one display frame into its spring in its
 first frame (a slow set-up frame is never caught up), and no frame advances a run by more than `FRAME_STALL_MS`.
+Round 6: the first frame of a continuation (a release, a catch) is at most one display frame from its origin (a long
+release frame holds the pose, it never jumps), and every later frame advances a run by at most two display frames
+(`NbClock.stepCap`, never more than `FRAME_STALL_MS`). Navigation of stacks and pagers is one position q over an
+ordered path, layer i drawing the round 5 pose of `i - q`.
 Navigation (ADR 0011 N1 to N8, round 5): every host is one state machine (logical stack, one motion (from, to, p, v,
 drive, target)); every input is an event applied at once. A motion from rest is set up one display frame into its
 spring, so the first frame after a tap, a Back, a bar tap or a key already moves; a click runs in the lift event, its
