@@ -115,7 +115,7 @@ class FrameworkRound2Test {
     private fun moving(host: String): List<NbFrame> = frames.filter { it.host == host && it.p > 0f && it.p < 1f }
 
     @Test
-    fun `a stack's page below and a section host's visited sections are placed and drawn ahead (R1-3)`() {
+    fun `a stack's page below and a section host's visited sections are placed ahead, not drawn (R1-3, round 7)`() {
         var selected by mutableStateOf(0)
         show {
             Column {
@@ -129,7 +129,7 @@ class FrameworkRound2Test {
                 }
             }
         }
-        // The parked probe runs in the layer's draw (V9); Robolectric draws only on request.
+        // The parked probe runs in the layer's update (round 7: a parked layer is placed, never drawn).
         drawWindow()
         assertTrue("the page below the top has its layer ahead: $parked", parked.contains("s" to "a"))
         selected = 1

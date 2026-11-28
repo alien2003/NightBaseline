@@ -141,13 +141,6 @@ object NbPhysics {
      */
     const val ENTER_WAIT_MS: Long = 300L
 
-    /**
-     * A frame later than this (ms) after the previous one is a stall: the motion advances this much in it, never more
-     * (ADR 0011 R7). A stall slows the motion instead of jumping it; without stalls every frame is the spring at its
-     * time (20 fps and faster).
-     */
-    const val FRAME_STALL_MS: Long = 50L
-
     /** A dialog starts at this scale. */
     const val DIALOG_START_SCALE: Float = 0.8f
 

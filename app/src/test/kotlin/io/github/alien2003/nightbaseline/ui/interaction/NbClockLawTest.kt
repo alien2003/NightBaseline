@@ -19,8 +19,8 @@ import kotlin.math.sqrt
  *
  * - From rest, the first frame is at most one display frame into the spring, however long the set-up frame took
  *   (V2-3, V2-4: tap and key changes started at p 0.2 to 0.95; the first sheet open stalled and then jumped).
- * - A stalled frame advances the motion by at most [NbPhysics.FRAME_STALL_MS] (V2-1: a long commit frame was caught up
- *   in one frame, hundreds of px).
+ * - A stalled frame after the first is time-true (round 7): it skips time and the run settles at the closed form's
+ *   time (V2-1, a long commit frame caught up in one frame, is the first frame's case, which stays bounded).
  * - Without stalls every frame is the spring at `frame - origin` (pure in time; the round 2 law is kept).
  * - A release starts with the finger's velocity (gesture-release velocity continuity), measured on the hosts' p.
  */
@@ -97,29 +97,28 @@ class NbClockLawTest {
     }
 
     @Test
-    fun `stall - a long frame advances the motion by at most FRAME_STALL_MS, never by its own length`() {
+    fun `stall - a long frame after the first is time-true - it skips time and the run settles on the closed form`() {
+        // Round 7: round 6 stretched a slow frame to two display frames, so a motion with slow frames settled 15 to 60 %
+        // later in wall time. Now a slow frame advances by its own length: the run ends at the closed form's time.
         val stall = 200L * MS
-        clock.gaps.addAll(listOf(ManualClock.FRAME_NANOS, ManualClock.FRAME_NANOS, stall))
+        clock.gaps.addAll(listOf(ManualClock.FRAME_NANOS, ManualClock.FRAME_NANOS, stall, ManualClock.FRAME_NANOS, 3 * PERIOD))
         val origin = clock.now
         val frames = run(0f, 0f, origin)
         var play = 0L
         var last = origin
-        var maxStep = 0.0
-        var previous = 0.0
         frames.forEachIndexed { k, (frame, p) ->
-            play += if (k == 0) minOf(frame - last, PERIOD) else minOf(frame - last, NbClock.stepCap(PERIOD))
+            play += if (k == 0) minOf(frame - last, PERIOD) else frame - last
             last = frame
             // Compose runs a spring on whole milliseconds.
             val expected = spring((play / MS) / 1e3)
             if (p < 1f - NbPhysics.P_EPS) assertEquals(expected, p.toDouble(), 2e-3, "frame $k at ${play / MS} ms of play")
-            maxStep = maxOf(maxStep, p - previous)
-            previous = p.toDouble()
         }
-        // The largest step of the whole run is the spring's own over the step cap (two frames, round 6) at its fastest.
-        val bound = (0 until 1000).maxOf { i -> spring((i + NbClock.stepCap(PERIOD) / MS) / 1e3) - spring(i / 1e3) }
-        assertTrue(maxStep <= bound + 1e-3, "largest step $maxStep <= $bound")
-        // Old law: the stalled frame showed the spring at 232 ms (p ~ 0.99) straight after 32 ms (p ~ 0.25).
-        assertTrue(frames[2].second < spring(0.232) - 0.2, "the stalled frame is not caught up (${frames[2].second})")
+        // The stalled frame shows the spring at its time (it is not stretched).
+        assertEquals(spring((frames[2].first - origin) / 1e9), frames[2].second.toDouble(), 2e-3, "the stalled frame is time-true")
+        // Settle in wall time: the closed form's duration within one display frame.
+        val closed = (1..10_000).first { 1.0 - spring(it / 1e3) < NbPhysics.P_EPS } * MS
+        val wall = frames.last().first - origin
+        assertTrue(abs(wall - closed) <= PERIOD + MS, "settled after ${wall / MS} ms, closed form ${closed / MS} ms")
     }
 
     @Test

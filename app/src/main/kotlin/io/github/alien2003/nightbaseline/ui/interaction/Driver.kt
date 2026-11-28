@@ -72,18 +72,6 @@ internal object NbClock {
     /** 60 Hz, ns. */
     const val DEFAULT_FRAME_NANOS = 16_666_667L
 
-    /** [NbPhysics.FRAME_STALL_MS] in ns. */
-    const val STALL_NANOS = NbPhysics.FRAME_STALL_MS * 1_000_000L
-
-    /** A drawn frame after the first advances a run by at most this many display frames (one missed vsync). */
-    const val STEP_CAP_FRAMES = 2L
-
-    /**
-     * The most a drawn frame after a run's first advances it, ns (round 6): two display frames of [framePeriod], never
-     * more than [STALL_NANOS]. A long frame slows the motion instead of catching up (no hold-then-jump).
-     */
-    fun stepCap(framePeriod: Long = framePeriodNanos): Long = minOf(STALL_NANOS, STEP_CAP_FRAMES * framePeriod)
-
     /**
      * The time origin of a run whose first frame is at [frameNanos], asked for at [origin] ([nowNanos] at the request
      * or release, null when there is none): the earlier of the two, so the first frame already shows the motion that
@@ -105,9 +93,9 @@ internal object NbClock {
  * - The first frame of a run **from rest** is at most one display frame ([NbClock.framePeriodNanos]) into the spring:
  *   the screen showed the start pose until then, so the time a slow set-up frame took (composing the entering page,
  *   a first open) is never caught up as a jump (V2-3, V2-4: such runs started at p 0.2 to 0.95).
- * - Every later frame advances by the frame interval, at most [NbClock.stepCap] (two display frames, never more than
- *   [NbPhysics.FRAME_STALL_MS]): a stalled frame slows the
- *   motion instead of jumping it (V2-1: a long frame used to be caught up in one frame, hundreds of px).
+ * - Every later frame advances by the frame interval, whatever it was (round 7: time-true; round 6 stretched a slow
+ *   frame to two display frames, so motions with slow frames settled 15 to 60 % later in wall time). The jump that
+ *   V2-1 measured (a long commit frame caught up in one frame) is the first frame's, which stays bounded.
  *
  * Without stalls every frame is exactly the spring at `frame - origin` (a pure function of time).
  */
@@ -124,7 +112,7 @@ internal class NbPlayClock(
                 // A continuation's first frame too: at most one display frame from its origin (round 6).
                 (frameNanos - NbClock.startOf(origin, frameNanos)).coerceIn(0L, NbClock.framePeriodNanos)
             } else {
-                play + (frameNanos - last).coerceIn(0L, NbClock.stepCap())
+                play + (frameNanos - last).coerceAtLeast(0L)
             }
         last = frameNanos
         return play
@@ -431,7 +419,7 @@ object NbMotionProbe {
     @Volatile
     var overscrollNow: ((Float, Float) -> Unit)? = null
 
-    /** Receives (host id, layer key) whenever a parked layer (placed and drawn ahead, invisible) updates its layer. */
+    /** Receives (host id, layer key) whenever a parked layer (composed and placed ahead, not drawn) updates its layer. */
     @Volatile
     var parked: ((String, Any) -> Unit)? = null
 

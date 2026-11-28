@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -433,28 +434,33 @@ class FrameworkRound3Test {
         idle()
         val motionFrames = moving("s").size
         val a = composedAt.firstOrNull { it.first == "a" }
-        // Round 6 (H2): the two pages below the top are parked at rest, so the page that is below after the pop was
-        // composed before it and nothing is composed while the pop runs (round 5 composed it in the pop's first
-        // frame; before round 3 at the settle).
+        // Round 6 (H2): nothing is composed while the pop runs (round 5 composed the next page below in the pop's
+        // first frame). Round 7: only one page is parked below the top, so the page that is below after the pop is
+        // composed once the pop has settled, ahead of the next Back.
         assertTrue("the pop moved ($motionFrames frames)", motionFrames > 0)
-        assertEquals("nothing is composed during the pop", null, a)
-        assertFalse("the page below the next one stays composed: $disposed", "a" in disposed)
+        assertTrue("nothing is composed during the pop: $a", a == null || a.second >= motionFrames)
+        assertTrue("the new page below is composed ahead once at rest: $composedAt", composedAt.any { it.first == "a" })
         assertEquals(listOf("a", "b"), stack)
     }
 
     @Test
-    fun `V9 - the parked layer is recorded in the draw, not only placed`() {
+    fun `V9 - the parked layer is placed ahead and its content is never drawn (round 7)`() {
         val parked = CopyOnWriteArrayList<Pair<String, Any>>()
+        val drawn = CopyOnWriteArrayList<String>()
         NbMotionProbe.parked = { host, key -> parked += host to key }
         show {
             Box(Modifier.size(200.dp)) {
-                NbStackHost(listOf("a", "b"), key = { it }, onBack = {}, id = "s") { Box(Modifier.fillMaxSize()) }
+                NbStackHost(listOf("a", "b"), key = { it }, onBack = {}, id = "s") { page ->
+                    Box(Modifier.fillMaxSize().drawBehind { drawn += page })
+                }
             }
         }
-        // Laid out and placed, not drawn yet (Robolectric draws only on request): no parked report.
-        assertTrue("placement alone reports nothing: $parked", parked.isEmpty())
+        // Round 7: placed (its layer is updated) but not drawn; round 6 drew it, invisibly, in every frame.
+        assertTrue("the parked page is placed: $parked", parked.contains("s" to "a"))
         drawWindow()
-        assertTrue("drawing records the parked page: $parked", parked.contains("s" to "a"))
+        drawWindow()
+        assertTrue("the top page is drawn: $drawn", "b" in drawn)
+        assertFalse("the parked page is never drawn: $drawn", "a" in drawn)
     }
 
     private fun drawWindow() {

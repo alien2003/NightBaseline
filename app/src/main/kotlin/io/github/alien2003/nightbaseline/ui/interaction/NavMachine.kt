@@ -93,6 +93,8 @@ data class NbMotion(
     val commitStack: List<Any>? = null,
     /** Id of the gesture a finger drives (L2: a commit of a gesture that was resolved otherwise is a no-op). */
     val gestureId: Long = 0L,
+    /** The side a finger moves the page to on its way back (+1 right, -1 left; 0 without a finger), round 7. */
+    val dir: Int = 0,
     /**
      * The index the motion was asked to reach: a navigation's target, a gesture's commit side (kept by its cancel).
      * Only how the motion is reported to tests ([NbMotionProbe]); it changes nothing that is drawn.
@@ -242,9 +244,8 @@ data class NbNavResult(
  * - **GestureMove** maps the touch x linearly, in screen space, to the upper layer's edge (M3).
  * - **GestureEnd** commits (logical stack = Back's) or cancels, both on the spring from the finger's (q, v), with the
  *   pointer-stopped rule and the release rule R0.
- * - **Frame** advances a spring on the R7 clock (a run's first frame at most one display frame, every later one at
- *   most [NbClock.STEP_CAP_FRAMES] display frames and never more than the stall bound); when it settles the motion
- *   ends, and the host completes the change.
+ * - **Frame** advances a spring on the R7 clock (a run's first frame at most one display frame, every later one by
+ *   the time it took: time-true, round 7); when it settles the motion ends, and the host completes the change.
  */
 object NbNavReducer {
     /** Most finger samples kept (the platform tracker uses the last 20). */
@@ -257,6 +258,11 @@ object NbNavReducer {
 
     /** The smallest remaining travel share the gesture slope is taken at (the map is vertical at the end). */
     private const val MIN_REST = 1e-3f
+
+    /** A release crosses at least this many display frames before its upper page is off screen (round 7). */
+    private const val MIN_RELEASE_FRAMES = 2f
+
+    private const val NANOS_PER_SECOND = 1e9f
 
     /** Applies [event] to [state]. */
     fun reduce(
@@ -509,6 +515,7 @@ object NbNavReducer {
                 sampleDrawnAt = Long.MIN_VALUE,
                 commitStack = event.back,
                 gestureId = event.id,
+                dir = event.dir,
                 origin = null,
                 lastFrame = Long.MIN_VALUE,
             )
@@ -523,16 +530,29 @@ object NbNavReducer {
         if (m == null || m.drive != NbDrive.Finger) return NbNavResult(state)
         // M3: screen space. The upper layer is at tx = e W u, so the finger's travel dx moves it by exactly dx: the
         // page never moves against the finger, from either edge, fresh or caught.
+        val screen = if (event.x.isNaN() || m.x0.isNaN() || m.width <= 0f) Float.NaN else m.e * m.u0 + (event.x - m.x0) / m.width
+        // Round 7: a caught page on the other side of the finger's (a push from the right under a right-edge finger)
+        // is moved by the finger to its rest and then on to the finger's side: the side changes where the upper page
+        // covers the lower one (u = 0), so nothing jumps, and the release leaves to the side the page moves.
+        if (m.kind.stacked && m.dir != 0 && m.e != m.dir && m.residual == null && screen * m.dir > 0f) {
+            val crossing = m.x0 - m.e * m.u0 * m.width
+            val turned = m.copy(e = m.dir, u0 = 0f, x0 = crossing, samples = emptyList())
+            return gestureMove(state.copy(motion = turned), event)
+        }
         val u =
-            if (event.x.isNaN() || m.x0.isNaN() || m.width <= 0f) {
+            if (screen.isNaN()) {
                 (m.u0 + event.progress.coerceIn(0f, 1f)).coerceIn(0f, 1f)
             } else {
-                (m.u0 + m.e * (event.x - m.x0) / m.width).coerceIn(0f, 1f)
+                (screen * m.e).coerceIn(0f, 1f)
             }
         val q = qOfUpperShare(m, m.grip, u)
+        // Round 7: a sample at the time of the last one (events delivered in one pass share their receipt time where
+        // the platform gives no frame time) replaces it. Round 6 spaced such samples 1 ms apart, which made the
+        // tracker's velocity tens of times the finger's, and the release then crossed the screen in one frame.
         val last = m.samples.lastOrNull()?.timeMillis
-        val t = if (last != null && event.timeMillis <= last) last + 1 else event.timeMillis
-        val samples = (m.samples + NbFingerSample(t, u)).takeLast(MAX_SAMPLES)
+        val kept = if (last != null && event.timeMillis <= last) m.samples.dropLast(1) else m.samples
+        val t = if (last != null && event.timeMillis <= last) last else event.timeMillis
+        val samples = (kept + NbFingerSample(t, u)).takeLast(MAX_SAMPLES)
         val v = trackedVelocity(samples) * slope(m, u)
         return NbNavResult(
             state.copy(motion = m.copy(q = q, v = v, samples = samples, lastSampleAt = event.now, sampleDrawnAt = Long.MIN_VALUE)),
@@ -591,7 +611,6 @@ object NbNavReducer {
         }
         if (m.drive == NbDrive.Idle) return m
         val alreadyDrawn = event.drawnAt != Long.MIN_VALUE
-        val cap = NbClock.stepCap(env.framePeriod)
         val play =
             when {
                 // From rest (pre-advanced one display frame): the first two drawn frames are one display frame apart,
@@ -601,7 +620,10 @@ object NbNavReducer {
 
                 m.origin == null && m.drawn <= 1 -> m.play + env.framePeriod
 
-                m.lastFrame != Long.MIN_VALUE -> m.play + (frame - m.lastFrame).coerceIn(0L, cap)
+                // Round 7: time-true. A slow frame advances the spring by the time it took (round 6 stretched it to
+                // two display frames, so a motion with slow frames settled 15 to 60 % later in wall time); only the
+                // first frame of a run is bounded (from rest above, a continuation below).
+                m.lastFrame != Long.MIN_VALUE -> m.play + (frame - m.lastFrame).coerceAtLeast(0L)
 
                 // The first frame of a continuation (a release, a catch): at most one display frame from its origin,
                 // so a long frame at a release holds the pose instead of jumping it (round 6, measurement 3 and 4).
@@ -624,7 +646,10 @@ object NbNavReducer {
         release: Boolean,
     ): NbMotion {
         if (m.drive == NbDrive.Spring && m.target == side) return m
-        val v = velocityAt(m, now)
+        // Round 7: a release never covers its whole distance in less than [MIN_RELEASE_FRAMES] display frames (a
+        // tracker fed by bunched events reported tens of times the finger's speed, and the page left in one frame).
+        val limit = abs(side - m.q) * NANOS_PER_SECOND / (MIN_RELEASE_FRAMES * env.framePeriod.coerceAtLeast(1L))
+        val v = velocityAt(m, now).let { if (release) it.coerceIn(-limit, limit) else it }
         // A navigation asks for its side; a gesture's release keeps the side the gesture asked for.
         val toward = if (m.drive == NbDrive.Finger) m.toward else side
         val origin =

@@ -310,9 +310,11 @@ internal fun Modifier.blockInput(blocked: () -> Boolean): Modifier =
     }
 
 /**
- * The pose layer of [key] in [transition]. A [parked] layer (the id of its host; null when it is shown) is placed and
- * drawn ahead but invisible: alpha 0, so the renderer skips it while its display lists stay recorded. The parked
- * probe runs in the layer's draw (review V9: it ran in the layer block, which proves placement only).
+ * The pose layer of [key] in [transition]. A [parked] layer (the id of its host; null when it is shown) is composed,
+ * measured and placed ahead but not drawn (round 7): its content records nothing and draws nothing until it is shown
+ * (round 6 drew every parked page, invisibly, in every frame: a measured share of the slowdown of every motion). The
+ * parked probe runs in the layer's update (placement). The chain is the same parked or shown, so showing a parked
+ * page (a gesture's start) only changes this layer's properties and records its content once.
  */
 internal fun Modifier.poseLayer(
     transition: NbTransition,
@@ -328,16 +330,8 @@ internal fun Modifier.poseLayer(
             scaleX = 1f
             scaleY = 1f
             alpha = 0f
+            NbMotionProbe.parked?.invoke(parked, key)
         } else {
             with(transition) { applyPose(key) }
         }
-    }.then(
-        if (parked != null) {
-            Modifier.drawWithContent {
-                drawContent()
-                NbMotionProbe.parked?.invoke(parked, key)
-            }
-        } else {
-            Modifier
-        },
-    )
+    }.drawWithContent { if (parked == null) drawContent() }

@@ -300,7 +300,8 @@ class NavMachineTest {
                                 val w = NbPhysics.Nav.omega
 
                                 fun speed(r: NbMotion) = 1.6f * w * abs(r.start - r.target) + 1.9f * abs(r.v0) + 1e-3f
-                                val step = NbClock.stepCap(period) / 1e9f / scale.coerceAtMost(1f)
+                                // Round 7: time-true, a frame advances by its own interval (at most a stall here).
+                                val step = maxOf(STALL_MS * NANOS_PER_MS, period) / 1e9f / scale.coerceAtMost(1f)
                                 (if (m0.drive == NbDrive.Spring) speed(m0) * step else 1e-4f) +
                                     (m0.residual?.let { speed(it) * step } ?: 0f)
                             }
@@ -340,7 +341,11 @@ class NavMachineTest {
                 if (event is NbNavEvent.Frame && m0 != null && m != null && m0.drive == NbDrive.Spring && m.start == m0.start &&
                     m.v0 == m0.v0
                 ) {
-                    assertTrue("$where: step bound", m.play - m0.play <= NbClock.stepCap(period))
+                    // Round 7: time-true, a later frame advances by exactly its interval (no stretching).
+                    val f = event as NbNavEvent.Frame
+                    if (m0.lastFrame != Long.MIN_VALUE && (m0.origin != null || m0.drawn >= 2) && m0.start != m0.target) {
+                        assertEquals("$where: time-true step", (f.frameNanos - m0.lastFrame).coerceAtLeast(0L), m.play - m0.play)
+                    }
                     if (m0.origin != null && m0.lastFrame == Long.MIN_VALUE) assertTrue("$where: first frame", m.play <= period)
                 }
                 now += if (rnd.nextInt(20) == 0) STALL_MS * NANOS_PER_MS else rnd.nextLong(1, 20) * NANOS_PER_MS
@@ -633,9 +638,9 @@ class NavMachineTest {
         assertTrue("first frame play ${first.play} <= one frame", first.play <= period)
         val oneStep = abs(m0.v) * period / 1e9f + NbPhysics.Nav.omega * period / 1e9f
         assertTrue("q advanced ${abs(first.q - m0.q)} <= one frame step $oneStep", abs(first.q - m0.q) <= oneStep)
-        // And a later long frame advances at most the step cap.
-        val after = NbNavReducer.reduce(NbNavState(released.stack, first), NbNavEvent.Frame(now + 300 * NANOS_PER_MS)).state.motion
-        if (after != null) assertTrue("step cap", after.play - first.play <= NbClock.stepCap(period))
+        // And a later long frame is time-true (round 7): it advances by its own length, no stretching.
+        val after = NbNavReducer.reduce(NbNavState(released.stack, first), NbNavEvent.Frame(now + 30 * NANOS_PER_MS)).state.motion
+        if (after != null) assertEquals("time-true", 30 * NANOS_PER_MS, after.play - first.play)
     }
 
     @Test
@@ -653,12 +658,13 @@ class NavMachineTest {
             assertEquals("by exactly the finger's travel", lastTx - 40f, tx, 1f)
             lastTx = tx
         }
-        // A fresh gesture from the right edge on a section host (the page leaves to the right): a leftward finger
-        // never pushes it right.
+        // A gesture from the right edge on a motion whose upper layer lies on the right (round 6: a section on the
+        // bar-order side): a leftward finger never pushes it right; round 7: it changes side at its rest and follows
+        // the finger to the left (round 6 left it at rest under the finger and its commit went right).
         var t = NbNavState(listOf<Any>("history"))
         t = NbNavReducer.reduce(t, NbNavEvent.GestureStart(listOf("home"), NbKind.Tab, false, 1, 1000f, width, 0L, dir = -1)).state
         t = NbNavReducer.reduce(t, NbNavEvent.GestureMove(800f, 0f, 1, 0L)).state
-        assertEquals("no move against the finger", 0f, NbNavReducer.poseOf(t.motion!!, "history", width, false).tx, 1e-3f)
+        assertEquals("follows the finger", -200f, NbNavReducer.poseOf(t.motion!!, "history", width, false).tx, 1f)
     }
 
     @Test

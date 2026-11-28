@@ -136,8 +136,8 @@ private class HostMemory<T> : SyncMemory() {
  * a pop when the new top was below), and so is every Back: a back gesture's start, moves, cancel and commit, and Back
  * without a gesture (button, Esc, Alt+Left, 3-button, TalkBack). A Back is applied to the machine at once and then
  * reported to the caller through [onBack], which must pop [stack]; the caller's pop is then a no-op for the machine.
- * The page below the top is composed, placed and drawn ahead in an invisible layer (parked), so a gesture's first
- * frame only changes layer properties.
+ * The page below the top is composed, measured and placed ahead in a layer that is not drawn (parked), so a
+ * gesture's first frame only changes layer properties.
  *
  * @param saveable keep each page's saveable state (removed when the page leaves the stack); false when [content]
  *   provides its own (navigation entries).
@@ -204,17 +204,18 @@ internal fun <T : Any> StackHost(
         if (saveable) memory.forgotten(holder, live)
         settled.value()
     }
-    // The two pages below the top are composed, measured, placed and drawn ahead at rest, parked (an invisible layer:
-    // no semantics, no input, no focus): a back gesture, a pop or a double Back starts on pages whose layers and
-    // display lists already exist, so the start of a motion composes and measures nothing new (V5, R1-3; round 6 H2:
-    // the page two below used to be composed in a gesture's first frame). While a motion runs, the pages parked
-    // before it stay composed.
+    // The page below the top is composed, measured and placed ahead at rest, parked (a layer that is not drawn: no
+    // semantics, no input, no focus, no draw): a back gesture or a pop starts on a page that already exists, so the
+    // start of a motion composes and measures nothing new (V5, R1-3, round 6 H2). Round 7: only one page below is
+    // parked and a parked page is not drawn (round 6 parked two and drew both every frame, a measured share of the
+    // slowdown); a path motion over more pages (a double Back) composes the next one when q reaches it. While a
+    // motion runs, the page parked before it stays composed and no new one is parked (a pop composes nothing in its
+    // commit, H2): the new page below is parked once the host is at rest.
     val running = transition.moving
-    val ahead = listOfNotNull(logical.getOrNull(logical.size - 2), logical.getOrNull(logical.size - BELOW_NEXT))
+    val ahead = listOfNotNull(logical.getOrNull(logical.size - 2))
     val parkedKeys =
         buildList {
-            if (running) memory.parkedSet.filter { it in current || it in memory.values }.forEach { add(it) }
-            addAll(ahead)
+            if (running) memory.parkedSet.filter { it in current || it in memory.values }.forEach { add(it) } else addAll(ahead)
         }.filter { it !in layers }.distinct()
     SideEffect {
         if (!running) {
@@ -265,9 +266,6 @@ internal fun stackGo(
     return NbNavEvent.Go(keys, NbKind.Page, toIsUpper = !pop, e = side, now = NbClock.nowNanos())
 }
 
-/** The page two below the top: below the top once the top is popped. */
-private const val BELOW_NEXT = 3
-
 /** Saveable state of pages that left the stack is dropped. */
 private fun HostMemory<*>.forgotten(
     holder: SaveableStateHolder,
@@ -309,8 +307,10 @@ internal class HostBackTarget(
         taken = false
         val back = backOf(transition.state.stack) ?: return
         val dir = edgeSide(edge, side)
-        // A page leaves to the side of the swipe; a section to the bar-order side whatever the edge (Home is first).
-        val e = if (kind == NbKind.Tab) side else dir
+        // Round 7: a page and a section leave to the side the finger moves them (screen space, M3), from either edge.
+        // Round 6 kept a section on the bar-order side, so a right-edge finger could not move it (the map is screen
+        // space) and its commit then left to the right in one stroke.
+        val e = dir
         val id = nextGestureId++
         gestureId = id
         transition.dispatch(
@@ -467,7 +467,7 @@ private class SectionMemory<K : Any> : SyncMemory() {
  * Top-level sections in bar order (ADR 0011, kind Tab, relation Section; ADR 0006): every visited section stays
  * composed; a change of [selected] is one event into the host's state machine and runs the Page geometry with the
  * higher bar index as the upper layer, on the Nav spring, whatever triggered it (bar, rail, keyboard, "See all", a
- * gesture back to the first section). Visited sections that are not shown are parked: measured, placed and drawn
+ * gesture back to the first section). Visited sections that are not shown are parked: measured and placed, not drawn,
  * ahead in an invisible layer, with no semantics, input or focus.
  *
  * The bar and the rail show the machine's logical section ([nbShownSection]): one value, the target of a spring from
@@ -561,7 +561,7 @@ fun <K : Any> NbSectionHost(
             }
         },
     ) { measurables, constraints ->
-        // Every visited section is measured, placed and drawn: the ones not in the motion are parked (invisible, no
+        // Every visited section is measured and placed: the ones not in the motion are parked (not drawn, no
         // semantics, no input, no focus), so a tab change or the gesture back to the first section starts on a layer
         // that already exists.
         val placeables: List<Pair<Any?, Placeable>> = measurables.map { it.layoutId to it.measure(constraints) }

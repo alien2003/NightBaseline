@@ -207,7 +207,10 @@ class NavRound6Test {
         // Metric) and the page below was measured again.
         assertEquals("zero measure passes of the page below", m0, below.measures)
         assertEquals("zero compositions of the page below", c0, below.compositions)
-        assertTrue("the page two below is parked (composed) at rest and through the gesture", twoAlive && twoBelow.alive)
+        // Round 7: only the page below is parked; the page two below is not composed at rest, and the gesture does
+        // not compose it either (its pair is the top and the page below).
+        assertFalse("the page two below is not parked at rest (round 7)", twoAlive)
+        assertFalse("nor composed by the gesture", twoBelow.alive)
         assertEquals("zero compositions of the page two below", t0, twoBelow.compositions)
         compose.runOnUiThread { back.dispatchOnBackCancelled() }
         settle()
