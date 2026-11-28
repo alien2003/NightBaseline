@@ -56,6 +56,8 @@ data class NbMotion(
     val origin: Long? = null,
     /** Frame time of the last frame this run drew; MIN_VALUE before its first frame. */
     val lastFrame: Long = Long.MIN_VALUE,
+    /** Frames this run has drawn so far. */
+    val drawn: Int = 0,
     /** The upper layer's travel share when the finger took p (a gesture that catches a motion starts where it is). */
     val u0: Float = 0f,
     /** The touch x where the finger took p (NaN: the platform gives no position). */
@@ -344,7 +346,7 @@ object NbNavReducer {
         return NbNavResult(state.copy(motion = null), ended = m)
     }
 
-    @Suppress("ReturnCount") // Not a spring, first frame, settled or bound, running.
+    @Suppress("ReturnCount", "CyclomaticComplexMethod") // The R7 clock: finger, first two frames, continuation, end.
     private fun frame(
         state: NbNavState,
         event: NbNavEvent.Frame,
@@ -358,32 +360,26 @@ object NbNavReducer {
             return NbNavResult(state.copy(motion = m.copy(sampleDrawnAt = frame)))
         }
         val stall = NbClock.STALL_NANOS
+        val alreadyDrawn = event.drawnAt != Long.MIN_VALUE
         val play =
             when {
-                m.lastFrame != Long.MIN_VALUE -> {
-                    m.play + (frame - m.lastFrame).coerceIn(0L, stall)
-                }
+                // From rest (pre-advanced one display frame): the first two drawn frames are one display frame apart,
+                // whether the run was set up by an input (its first frame comes after this event) or in a composition
+                // (that composition's frame drew the first pose), so every trigger draws the same curve.
+                m.origin == null && m.drawn == 0 && !alreadyDrawn -> m.play
 
-                m.origin != null -> {
-                    if (abs(frame - m.origin) <= SAME_BASE_NANOS) (frame - m.origin).coerceIn(0L, stall) else 0L
-                }
+                m.origin == null && m.drawn <= 1 -> m.play + env.framePeriod
 
-                // From rest, pre-advanced one display frame: this frame shows that pose unless a frame already did.
-                event.drawnAt != Long.MIN_VALUE && abs(frame - event.drawnAt) <= SAME_BASE_NANOS -> {
-                    m.play + (frame - event.drawnAt).coerceIn(0L, stall)
-                }
+                m.lastFrame != Long.MIN_VALUE -> m.play + (frame - m.lastFrame).coerceIn(0L, stall)
 
-                event.drawnAt != Long.MIN_VALUE -> {
-                    m.play + env.framePeriod
-                }
+                m.origin != null && abs(frame - m.origin) <= SAME_BASE_NANOS -> (frame - m.origin).coerceIn(0L, stall)
 
-                else -> {
-                    m.play
-                }
+                else -> m.play
             }
+        val drawnNow = if (m.origin == null && m.drawn == 0 && alreadyDrawn) 2 else m.drawn + 1
         val (p, v, done) = evaluate(m, play, env)
         if (done) return NbNavResult(state.copy(motion = null), ended = m.copy(p = m.target, v = 0f))
-        return NbNavResult(state.copy(motion = m.copy(p = p, v = v, play = play, lastFrame = frame)))
+        return NbNavResult(state.copy(motion = m.copy(p = p, v = v, play = play, lastFrame = frame, drawn = drawnNow)))
     }
 
     /** The motion [m] continues as a spring towards [side] from its current (p, v) (R0, R7). */
@@ -424,7 +420,7 @@ object NbNavReducer {
         env: NbNavEnv,
     ): NbMotion {
         val v0 = NbRelease.startVelocity(start, v, m.target, m.kind.spring, visibleTarget = visibleRest(m))
-        val run = m.copy(p = start, v = v0, start = start, v0 = v0, play = 0L, lastFrame = Long.MIN_VALUE)
+        val run = m.copy(p = start, v = v0, start = start, v0 = v0, play = 0L, lastFrame = Long.MIN_VALUE, drawn = 0)
         // A continuation (a catch, a release) or a hand-over velocity: timed from its origin, p unchanged now (C1).
         if (origin != null || v0 != 0f) return run.copy(origin = origin ?: now)
         val first = env.framePeriod

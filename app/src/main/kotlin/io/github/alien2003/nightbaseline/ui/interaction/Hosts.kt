@@ -613,6 +613,7 @@ fun <T : Any> rememberNbSwap(
 ): NbSwapState<T> {
     val k = key(value)
     val transition = rememberTransition(id, listOf(k))
+    transition.reportFrames = true
     val memory = remember { HostMemory<T>() }
     HostSync(transition, memory, listOf(k)) { NbNavEvent.Go(listOf(k), NbKind.Swap, toIsUpper = true, e = 1, now = NbClock.nowNanos()) }
     SideEffect { memory.values[k] = value }
@@ -637,6 +638,7 @@ fun Modifier.nbSwapLayer(swap: NbSwapState<*>): Modifier =
             alpha = 1f
         } else {
             with(swap.transition) { applyPose(if (m.p < HALF) m.from else m.to) }
+            swap.transition.reportNow(size.width)
         }
     }
 

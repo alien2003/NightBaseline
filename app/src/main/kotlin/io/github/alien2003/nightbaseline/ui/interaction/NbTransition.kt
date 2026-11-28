@@ -159,6 +159,7 @@ class NbTransition internal constructor(
     ) {
         val result = NbNavReducer.reduce(state, NbNavEvent.Frame(nanos, drawnAt), env(scale))
         if (result.state != state) state = result.state
+        if (reportFrames) result.state.motion?.let { report(it, 0f) }
         if (result.ended != null && result.state.motion == null) settled++
     }
 
@@ -214,6 +215,17 @@ class NbTransition internal constructor(
         scaleX = pose.scale
         scaleY = pose.scale
         alpha = pose.alpha * (1f - pose.dim)
+    }
+
+    /**
+     * The host has no layer of its own that always draws (a lazy list's items): its states are reported per frame
+     * and by whichever item draws them.
+     */
+    internal var reportFrames = false
+
+    /** Reports the motion drawn now (an item of a [NbSwapState] draws it). */
+    internal fun reportNow(width: Float) {
+        state.motion?.let { report(it, width) }
     }
 
     /** The motion state last reported: one report per drawn state, however many layers or items draw it. */
