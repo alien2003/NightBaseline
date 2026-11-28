@@ -614,7 +614,7 @@ the old page spring (1.0 / 220 on Compose's 0.01 px default threshold) ran about
 | `OVERSCROLL_MAX_DP` | 240 | largest overscroll translation |
 | `STEP_SWIPE_DP` | 56 | a step swipe (night, month) steps when the decay projects the released travel past this, towards a side; one threshold for every sequence |
 | `POINTER_STOPPED_MS` | 40 | a finger that rested this long before it let go has no release velocity and its release starts from rest (the platform's stopped-pointer rule) |
-| `ENTER_WAIT_MS` | 300 | an entering page or panel without content yet holds its change at the start at most this long after the request (R8) |
+| `ENTER_WAIT_MS` | 300 | an opening sheet or dialog not measured yet holds at p = 0 at most this long after the request (R8, modals only since round 5) |
 | `FRAME_STALL_MS` | 50 | no frame advances a motion by more than this: a stalled frame slows it instead of jumping it (R7) |
 
 The small top-bar title is a pure function of the scroll offset through `easing.title` (0.33, 0, 0.67, 1) over
@@ -648,10 +648,13 @@ Time (R7): without stalls every frame draws its spring at `frame time - origin`.
 release continues from the frame that drew the finger's last sample, or starts from rest at the release when the
 finger rested longer than `POINTER_STOPPED_MS`. A run from rest is at most one display frame into its spring in its
 first frame (a slow set-up frame is never caught up), and no frame advances a run by more than `FRAME_STALL_MS`.
-Content (R8): a change whose entering page or panel has no content yet holds at its start (the frame before the
-change) until it has some, at most `ENTER_WAIT_MS` after the request. Back (R9): a Back, by gesture or not, runs its
-motion to the end and changes the host's state after it. Press (P1): a click runs after the frame that shows its
-press. The page below the
+Navigation (ADR 0011 N1 to N8, round 5): every host is one state machine (logical stack, one motion (from, to, p, v,
+drive, target)); every input is an event applied at once. A motion from rest is set up one display frame into its
+spring, so the first frame after a tap, a Back, a bar tap or a key already moves; a click runs in the lift event, its
+press in the same frame. A new event to either state of the running motion only changes its target from (p, v); a
+back gesture takes a running motion over at its current edge; its edge is the start edge plus the finger's travel
+(no hysteresis). The bar shows the machine's logical section. An opening modal panel still waits for its measure
+(R8, at most `ENTER_WAIT_MS`); the explainer sheet is prewarmed once after launch. The page below the
 top of a stack and every visited section are placed and drawn ahead in an invisible layer, so a gesture or a tab change
 starts on an existing layer.
 

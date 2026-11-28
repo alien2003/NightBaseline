@@ -163,8 +163,11 @@ and by `InteractionBoundaryTest` (`./gradlew test`). The allowlist `tools/intera
 only shrink. Screens state what changed; the host the state lives in decides how it moves.
 
 **A new screen (a route).** Add the route to `nav/Routes.kt` and a `page<YourRoute> { entry -> … }` block to the graph
-in `nav/AppNavHost.kt`. Push with `navController.push(YourRoute(...))` (a push is ignored while the top page is still
-moving in, so a double tap pushes once) and go back with `navController.popBackStack()`; nothing else. The push, the
+in `nav/AppNavHost.kt`. Push with `navController.nbPush(YourRoute(...))` (a push is ignored while the top page is still
+moving in, so a double tap pushes once; `nbGo`, `nbReset`, `nbPopTo` and `nbPop` for deep links and layout changes)
+and go back with a Back control through the router (`rememberNbBack`; `ShellRoundButton` with the Back glyph does it
+itself); nothing else: the controller's `navigate` and `popBackStack` are forbidden outside the framework. Every
+host is one navigation state machine (`NbNavReducer`, ADR 0011 N1 to N8): each of these calls is one event of it. The push, the
 pop, the round Back button, Esc, 3-button Back and the back gesture are then the framework's Page kind on the Nav
 spring, with the gesture under the finger. Give the screen its scaffold (`AppScaffold` or `ShellPage`) as the other
 screens do.

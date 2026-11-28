@@ -10,6 +10,25 @@ section are absolute ([docs/development.md](docs/development.md#releases)).
 
 ## [Unreleased]
 
+### Changed
+
+- **Every way of moving between pages now starts at once and at the same speed.** A tap on a row, a tile, a link, the
+  bar, a round button, a key or Back all move the page in the very next frame on the same motion; taps no longer wait
+  for their press to show first, the press lights up at the same time.
+- **History's list and calendar switch and its filters fade between results** instead of swapping them in one frame.
+
+### Fixed
+
+- **A back swipe right after a cancelled one moves the page with your finger.** Before, the page could stay still and
+  then disappear at once (for example a night opened from History).
+- **The bar and the rail no longer flicker during a back swipe between tabs.** They show where you are going from the
+  start of a tap, and switch once when a back swipe is let go.
+- **The page edge stays exactly under your finger** when you swipe back and forth.
+- **Every back button behaves like the back gesture**, including the ones on Settings pages, in the two-pane and
+  tabletop layouts and in setup; two quick Backs go back twice.
+- **The first sheet you open after launch no longer stalls.**
+- A banner that is shown and hidden again quickly no longer jumps.
+
 ## [0.1.1] - 2026-11-27
 
 Interaction update. Every page change, tab switch, sheet, scroll and press now runs on one shared motion model, the

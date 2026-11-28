@@ -1,7 +1,7 @@
 # ADR 0011: One interaction framework
 
 - Status: accepted
-- Date: 2026-11-27
+- Date: 2026-11-27 (round 5, the navigation state machine: 2026-11-28)
 - Supersedes: the page pose, the Leave / InPlace settles and the 1 s safety timeout of
   [ADR 0009](0009-predictive-back.md); ADR 0009's decision to preview every back level stays.
 
@@ -75,6 +75,7 @@ rendering of every kind (a snap).
 - **R1 reversal.** A change back to the state being left runs from (1 - p, -v) on the same layers, which draws the
   same frame; a back gesture that catches a running push takes it over from where it is.
 - **R2.** Any other new change while one runs snaps the running one to its end. Hosts are independent.
+  (Round 5: a change to either of the motion's two states is a new target of the same motion, N3.)
 - **R3 lifecycle.** The leaving state is dropped in the first frame after p settles; its navigation entry is marked
   complete only then (its ViewModel is cleared then, and a pushed entry is resumed then, so a double tap pushes once).
   No timeout, no pose held after the end. During a gesture both layers swallow input; during a tap-driven change
@@ -102,12 +103,14 @@ rendering of every kind (a snap).
   `FRAME_STALL_MS` (50 ms): a stalled frame slows the motion instead of jumping it. Compose's `Animatable` starts its
   clock at its first frame and draws its start value there, so every spring of the framework runs on one frame loop
   (`nbRunSpring` on `TargetBasedAnimation`): the hosts' p, the reveal and the overscroll return.
-- **R8 a change moves only what is drawn.** A change from rest whose entering layer has no content yet (the page was
+- **R8 a change moves only what is drawn** (round 5: modal panels only; pages, sections and switchers move in
+  their first frame, N4). A change from rest whose entering layer has no content yet (the page was
   just composed and its state is still loading; a panel not measured yet) holds p at its start, which draws exactly
   the frame before the change, until that layer has content, at most `ENTER_WAIT_MS` (300 ms) after the request; its
   first frame of motion is then at most one display frame into the spring (R7). A layer reports content when it
   emitted and measured some, and no content once it leaves the composition (`NbLayer`).
-- **R9 a Back moves first.** A Back of a stack or section host, by gesture or not (button, Esc, Alt+Left, 3-button,
+- **R9 a Back moves first** (superseded in round 5 by N2 and N7: the machine changes at once, the entries stay in
+  transition until the motion settles). A Back of a stack or section host, by gesture or not (button, Esc, Alt+Left, 3-button,
   TalkBack), runs its motion to the end and applies its state change (the pop, the section) when the motion has
   settled; the host's next composition completes the change. The cost of the state change (lifecycles, the page
   below becoming the shown one, its flows resuming) falls after the last moving frame. During the motion no layer
@@ -116,7 +119,7 @@ rendering of every kind (a snap).
   there, as two Backs do. A Back that catches a cancel or a held gesture of the same change continues it from (p, v),
   and so does a state change that arrives while a cancel runs (V2-2). Modals keep their own close: the caller's state
   change comes first and the panel leaves on its spring.
-- **P1 the press comes first.** A click runs after the frame that shows its press: the tap's frame draws the press
+- **P1 the press comes first** (round 5: the press runs in parallel and the click in the lift event, N4). A click runs after the frame that shows its press: the tap's frame draws the press
   (a press released before any frame drew it, as a quick tap in a scroll container, is drawn lit for one frame), and
   the click runs at the start of the next frame. A Back or a navigation key that comes before a waiting click runs
   that click first and is handled once its state change is composed, so input keeps its order.
@@ -338,8 +341,97 @@ with a temporary trace of the back events and the drawn pose, not committed.
 - A Back right after a modal opened found the root handler still disabled (it followed the targets one composition
   late); it now follows them at once.
 
+### Round 5 (2026-11-28): one navigation state machine
+
+Three rounds of fixes did not converge on navigation: each added logic for races between a gesture and a Back
+(deferred Backs, queued Backs, landed Backs, a retarget of a running cancel), and the measurements and the review of
+round 4 found new defects in exactly that logic (R3-1 the page under a second gesture sat still and then vanished,
+R3-2 the bar showed target, old, target, R9-2 to R9-4 lost and replayed Backs) and in the delays it introduced (R3-3
+a tap's push started 250 to 680 ms after the tap, a Back after 50 to 170 ms). The navigation part of the framework is
+replaced by **one state machine per host**; the scroll, fling, overscroll and press models, the springs and tokens,
+the boundary check and the invariant tests stay.
+
+**N1 one source of truth.** Each host (the app's pages, the top-level sections, the Settings sub-pages in every
+layout, the onboarding steps, the debug catalog, every in-place switcher) holds an `NbNavState`: its logical stack
+(the stack every input has already been applied to; its top is what the host shows at rest, what Back leaves and
+what fixed elements show) and **one** motion `NbMotion(from, to, p, v, drive, target)`, drive in {Finger, Spring}
+(no motion = idle). `NbNavReducer.reduce(state, event)` is a pure function: there is no deferred, queued or replayed
+input, no token and no abort bookkeeping. `NbTransition` only holds the state as snapshot state, applies events,
+pumps display frames into the reducer while a motion exists and draws the two layers as pure functions of p.
+
+**N2 every input is an event, applied at once.** A tap, a link, a round button, the bar, the rail, a key, a view
+model's step (`Go`), the back gesture (`GestureStart`, `GestureMove`, `GestureEnd(commit)`), a display frame
+(`Frame`) and a layout change (`Abort`). A Back changes the machine first and is then reported to the host's caller
+(`onBack`: the controller pops, the view model steps back) in the same event; the caller's change then meets a
+machine that already shows it (a no-op). The app's pages change only through the framework's calls (`nbPush`,
+`nbGo`, `nbReset`, `nbPopTo`, `nbPop`), which apply the controller's new stack to the machine in the same input
+event, and through the router's Back. A caller whose state disagrees with the machine at rest for two frames (its
+Back did nothing) is followed by the machine.
+
+**N3 a new event catches the running motion.** A `Go` whose new top is one of the motion's two states only changes
+its target, from the current (p, v): a reversal, a retarget, a Back during a held gesture or during a cancel's return.
+The layers, the pose functions and p stay, so every catch is C1-continuous by construction (the reducer never swaps
+the layers and never maps p to 1 - p). Velocity follows R0 (kept towards the target, dropped away from it, capped
+towards a visible rest) and the stopped-pointer rule (a finger that rested 40 ms has none; review R0-1). A gesture
+start on a motion between the logical top and the page Back leads to (a cancel still returning, a push still
+entering) takes it over at its current p: the finger's offset is the upper layer's current edge, nothing jumps
+(R3-1). A commit is a spring to the commit side from (p, v), a cancel a spring back; a commit the platform sends
+without a start, or after a voided gesture, is a Back: a `Go` that catches the motion where it is (R3-1). A third
+state (neither of the two) ends the running motion at its target (R2) and starts the new one from rest: the only
+discontinuity, and only between two different changes.
+
+**N4 one kind, one spring, one pose, whatever the trigger; the first frame moves.** A motion from rest is set up
+pre-advanced by one display frame (R7's first-frame bound, now exact): the frame that first draws a tap's push, a
+Back, a bar tap or a key already shows the spring one frame in, and the next frames follow the R7 clock (at most
+`FRAME_STALL_MS` per frame). Clicks run in the lift event (P1, round 5: the press is drawn in the same frame; round 4
+ran the click two frames later). The entering page is composed in that first frame; R8's wait for its content is gone
+for pages, sections and switchers (it delayed every push by up to 300 ms and differed by trigger, R3-3, R3-4): an
+entering page shows what it has. Modals keep R8 for their own panel, and the explainer sheet is composed and drawn
+once, invisibly, shortly after launch (`ModalHost(prewarm)`, R3-5).
+
+**N5 the gesture maps the finger linearly.** The upper layer's edge is its edge at the gesture's start plus the
+finger's travel (touch x minus its x at the start, along the motion's side, over the host width): `u = u0 + g`, with
+u the upper layer's travel share `1 - s^2.2` and p its inverse. It is a pure function of the touch x, so the same x
+draws the same edge in both directions (R3-8; the remaining difference measured on the emulator is the platform's
+own resampling of `touchX`, V2-6). Its velocity comes from the platform's least-squares tracker on u, times dp/du.
+
+**N6 the bar shows the logical section.** The fixed elements of the section host (the bar, the rail) show its
+logical top: the target of a spring from its first frame (a tap, a key, Back), and during a back gesture the section
+it started from until the release commits; a cancel never changes it. One value, so no third state (R3-2).
+
+**N7 one path for every Back.** Every Back control goes through the router: the shell's round Back button routes
+itself (`ShellRoundButton` with the Back glyph), so the Settings sub-page bars, the two-pane and tabletop back rows
+and the onboarding Back (button and text button) are the same event as Esc, Alt+Left, 3-button Back, TalkBack and the
+gesture (R9-1). The router decides on the machines' logical stacks, so a second Back right after a first one goes to
+the next level at once (R9-2 to R9-4 cannot occur: there is nothing deferred to land, queue or replay). Night stepping
+(buttons, swipe, keys) changes the night pager's value: a `Go` of the same reducer.
+
+**N8 in-place results.** History's list / calendar toggle and its filters (including "Show all nights") are a Swap of
+the same machine (`rememberNbSwap`): the old results fade out over the first half, the new ones in over the second;
+the items change at p = 1/2, where both are invisible (MIG-1). The modal scrim takes taps through the framework's tap
+(`nbTap`: tap slop, the same click path; P1-1). A reveal's reversal follows R0 (REV-1).
+
+Superseded by N1 to N8: R2's snap of a reversal (a reversal is a new target), R3's "the leaving state is dropped and
+its entry completed in the first frame after p settles" stays, R8 for pages, R9 (the state change no longer waits for
+the motion: the machine changes at once and the controller's entries stay in transition, the leaving page alive and
+the page below not resumed, until the motion settles) and P1 (the click no longer waits for its press frame).
+
+Tests (`NavMachineTest`, `NavFramesTest`; each fails on round 4, as stated per test): random sequences of 80 events
+(taps, Backs, gesture start, moves, cancel and commit, frames at random intervals with 220 ms stalls, layout changes)
+over 400 seeds: the logical stack equals the instant model's after every event; the motion rests on the logical top;
+p is unchanged and v kept or reduced (never reversed) at every catch; a motion from rest starts exactly one frame in;
+no frame advances a spring by more than the stall bound; every sequence settles within 3 s. Frames: R3-1 (a second
+gesture during a cancel's return, with moves, without moves, without a start: the edge follows the finger and the
+commit runs monotonically over at least 6 frames, never a jump); R3-2 (the bar changes once per committed change);
+R3-3 / R3-4 (a tap, a Back, a bar change, a gesture commit and a pager step move in the first frame after the input,
+at most one spring frame in); R3-8 (the edge equals the finger's travel within 1 px both ways, from any start); R3-5 /
+R3-7 (the first sheet open and the first gesture frames within twice the median frame).
+
 ### Enforcement
 
+- Navigation: `NavMachineTest` (reducer properties over random event sequences) and `NavFramesTest` (frames of
+  the open items of round 4); the boundary forbids the controller's `navigate` and `popBackStack`, `composable<`,
+  NavHost and its transition parameters outside the framework, so every navigation is an event of a machine.
 - `tools/check-interaction.sh` (pre-commit hook and the CI checks job) and `InteractionBoundaryTest` (`./gradlew
   test`) read one list of forbidden APIs (`tools/interaction-forbidden.txt`) and one allowlist
   (`tools/interaction-allowlist.txt`, empty; it may only shrink). They also forbid spring or tween literals outside

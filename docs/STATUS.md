@@ -68,6 +68,14 @@ Live project state. A new session starts here. Updated after every step. Last fu
   sources is reached one tap deep at three sizes. Verified on the emulator (nb-phone alone, temporary trace): fast
   back gesture release continuous, pop composed after the last moving frame. V2-6 (platform touchX resampling) and
   V2-8 (touch-mode exit eats the first key) are platform behaviour. Not yet felt on the phone (ask).
+  Round 5 (2026-11-28, ADR 0011 "Round 5"): navigation replaced by one state machine per host (`NbNavReducer`:
+  logical stack + one motion (from, to, p, v, drive, target); every input an event applied at once; a catch only
+  changes the target from (p, v); no deferred / queued / landed Backs). Clicks run in the lift event; a motion from
+  rest is set up one frame in, so every trigger moves in its first frame; R8 kept for modals only; the explainer sheet
+  is prewarmed; the bar shows the machine's logical section; every Back control goes through the router; History's
+  view / filter changes are a Swap. Verified on the JVM and Robolectric (`NavMachineTest`, `NavFramesTest`, the
+  existing suites); not measured on the emulator or felt on the phone yet (ask). Open: R3-9 (first key after a touch,
+  platform touch mode), R3-6 (rare weak flings, unattributed).
 
 ## Next
 1. Fix → build dev.6 → install (ask) → confirm the night is processed automatically; then a further new night without
