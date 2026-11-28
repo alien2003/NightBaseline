@@ -2,6 +2,7 @@ package io.github.alien2003.nightbaseline.nav
 
 import androidx.navigation.NavHostController
 import io.github.alien2003.nightbaseline.ui.components.TopLevel
+import io.github.alien2003.nightbaseline.ui.interaction.nbGo
 import io.github.alien2003.nightbaseline.ui.onboarding.OnboardingStep
 import io.github.alien2003.nightbaseline.ui.settings.SettingsPage
 import java.time.LocalDate
@@ -39,12 +40,12 @@ object AppScreens {
             // Home while the baseline learns (fewer nights than the algorithm needs): the Learning screen.
             add(AppScreen("section Home learning", nights = LEARNING_NIGHTS) { _, _ -> toTop(TopLevel.Home) })
             SettingsPage.entries.filter { it != SettingsPage.Main }.forEach { page ->
-                add(AppScreen("settings ${page.name}") { _, _ -> navigate(SettingsRoute(page.name)) })
+                add(AppScreen("settings ${page.name}") { _, _ -> nbGo(SettingsRoute(page.name)) })
             }
-            add(AppScreen("night") { date, _ -> navigate(NightRoute(date.toString(), TopLevel.History.name)) })
-            add(AppScreen("metric") { date, metric -> navigate(MetricRoute(metric, date.toString(), TopLevel.Home.name)) })
+            add(AppScreen("night") { date, _ -> nbGo(NightRoute(date.toString(), TopLevel.History.name)) })
+            add(AppScreen("metric") { date, metric -> nbGo(MetricRoute(metric, date.toString(), TopLevel.Home.name)) })
             OnboardingStep.entries.forEach { step ->
-                add(AppScreen("onboarding ${step.name}") { _, _ -> navigate(OnboardingRoute(step.name, rerun = true)) })
+                add(AppScreen("onboarding ${step.name}") { _, _ -> nbGo(OnboardingRoute(step.name, rerun = true)) })
             }
         }
 

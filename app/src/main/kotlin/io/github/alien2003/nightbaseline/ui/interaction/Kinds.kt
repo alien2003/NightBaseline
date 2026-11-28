@@ -1,6 +1,12 @@
 package io.github.alien2003.nightbaseline.ui.interaction
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import kotlin.math.max
 import kotlin.math.pow
 
@@ -92,13 +98,45 @@ data class NbLayerPose(
     val scale: Float = 1f,
     val alpha: Float = 1f,
     val dim: Float = 0f,
+    /** The horizontal range of the layer's own content that is drawn, px (a member of a residual group). */
+    val clipStart: Float = Float.NEGATIVE_INFINITY,
+    val clipEnd: Float = Float.POSITIVE_INFINITY,
 ) {
     /** True when the layer draws exactly as without a transform. */
-    val atRest: Boolean get() = tx == 0f && ty == 0f && scale == 1f && alpha == 1f && dim == 0f
+    val atRest: Boolean get() = tx == 0f && ty == 0f && scale == 1f && alpha == 1f && dim == 0f && !clipped
+
+    /** True when only [clipStart] to [clipEnd] of the layer is drawn. */
+    val clipped: Boolean get() = clipStart.isFinite() || clipEnd.isFinite()
+
+    /**
+     * This pose applied to a group, [width] px wide, whose member draws [own] (a residual exit group, ADR 0011 round
+     * 6): the member moves with the group and is drawn only inside the group's own bounds, as if the group were one
+     * layer (a member beside the group's place never shows beside it).
+     */
+    fun compose(
+        own: NbLayerPose,
+        width: Float,
+    ): NbLayerPose {
+        val x = tx + scale * own.tx
+        val s = scale * own.scale
+        return NbLayerPose(
+            tx = x,
+            ty = ty + scale * own.ty,
+            scale = s,
+            alpha = alpha * own.alpha,
+            dim = 1f - (1f - dim) * (1f - own.dim),
+            // The group spans [tx, tx + width] on screen: in the member's own coordinates, (screen - x) / s.
+            clipStart = (tx - x) / s,
+            clipEnd = (tx + width * scale - x) / s,
+        )
+    }
 
     companion object {
         /** No transform. */
         val Rest: NbLayerPose = NbLayerPose()
+
+        /** Not drawn: a path layer one step or more from the position (fully covered, fully out, faded out). */
+        val Gone: NbLayerPose = NbLayerPose(alpha = 0f)
     }
 }
 
@@ -222,4 +260,20 @@ object NbGestureMap {
         g: Float,
         p0: Float,
     ): Float = (p0.coerceIn(0f, 1f) + g.coerceIn(0f, 1f)).coerceIn(0f, 1f)
+}
+
+/** The rectangle from [start] to [end] (px of the layer's own content, full height): a residual member's clip. */
+internal class NbClipShape(
+    private val start: Float,
+    private val end: Float,
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val left = start.coerceIn(0f, size.width)
+        val right = end.coerceIn(left, size.width)
+        return Outline.Rectangle(Rect(left, 0f, right, size.height))
+    }
 }

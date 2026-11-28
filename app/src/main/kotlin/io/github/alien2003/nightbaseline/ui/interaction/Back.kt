@@ -3,6 +3,7 @@ package io.github.alien2003.nightbaseline.ui.interaction
 import android.os.SystemClock
 import androidx.activity.BackEventCompat
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -249,7 +250,7 @@ internal fun NbBackRoot(router: NbBackRouter) {
     val reduced by rememberUpdatedState(LocalNbMotion.current.reduced)
     val enabled = router.hasTarget
     val owner = LocalOnBackPressedDispatcherOwner.current ?: return
-    val callback = remember(router) { RootBackCallback(router) { reduced } }
+    val callback = remember(router, owner) { RootBackCallback(router, owner.onBackPressedDispatcher) { reduced } }
     SideEffect { callback.isEnabled = enabled }
     // A target registered or removed takes effect at once, not one composition of the root later: a Back right
     // after a modal opened (within a frame of its click, P1) reached nothing while the handler was still disabled.
@@ -263,15 +264,22 @@ internal fun NbBackRoot(router: NbBackRouter) {
     }
 }
 
-/** The one back callback of the app (ADR 0011 R4): routes start, moves, cancel and commit to one target. */
-private class RootBackCallback(
+/**
+ * The one back callback of the app (ADR 0011 R4): routes start, moves, cancel and commit to one target.
+ *
+ * A Back that is not a swipe (the 3-button Back key, a hardware key: the platform may still send it as a predictive
+ * back sequence with a synthetic progress, with no swipe edge) is not followed: it is the app's own Back, the same
+ * spring as Esc (round 6, measurement 5). Only a sequence that starts from a swipe edge ([isSwipe]) drives a finger.
+ */
+internal class RootBackCallback(
     private val router: NbBackRouter,
+    private val dispatcher: OnBackPressedDispatcher?,
     private val reduced: () -> Boolean,
 ) : OnBackPressedCallback(false) {
     private var target: NbBackTarget? = null
 
     override fun handleOnBackStarted(backEvent: BackEventCompat) {
-        target = if (reduced()) null else router.top()?.also { it.start(backEvent.swipeEdge, backEvent.touchX) }
+        target = if (reduced() || !isSwipe(backEvent)) null else router.top()?.also { it.start(backEvent.swipeEdge, backEvent.touchX) }
     }
 
     override fun handleOnBackProgressed(backEvent: BackEventCompat) {
@@ -287,7 +295,20 @@ private class RootBackCallback(
     override fun handleOnBackPressed() {
         val t = target
         target = null
-        if (t != null) t.commit() else router.back()
+        if (t != null) {
+            t.commit()
+        } else if (!router.back()) {
+            // L1: nothing takes it (the last Back emptied the targets before the handler saw it): the system's Back.
+            isEnabled = false
+            dispatcher?.onBackPressed()
+            isEnabled = router.hasTarget
+        }
+    }
+
+    companion object {
+        /** True for a back sequence that a finger drives: one that starts from the left or right swipe edge. */
+        fun isSwipe(event: BackEventCompat): Boolean =
+            event.swipeEdge == BackEventCompat.EDGE_LEFT || event.swipeEdge == BackEventCompat.EDGE_RIGHT
     }
 }
 

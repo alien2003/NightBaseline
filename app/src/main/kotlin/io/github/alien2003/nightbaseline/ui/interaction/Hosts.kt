@@ -91,18 +91,25 @@ private fun HostSync(
         // A motion set up in this composition gets its frames from now on (its first frame was drawn pre-advanced, R7).
         transition.ensurePump()
     }
-    // The caller did not follow a Back of the machine (its Back did nothing, or its state changed before the machine
-    // saw it): once both are at rest and still disagree two frames later, the machine goes to the caller's state.
+    // M4: a Back of the machine is acknowledged explicitly: the caller's state reaching the stack the Back led to
+    // clears it. A caller that does not follow within the timeout is reported ([NbMotionProbe.unfollowedBack]: tests
+    // fail on it) and then followed by the machine; there is no frame-count resync.
+    val pending = transition.pendingFollow
+    if (pending != null && stack == pending.first) SideEffect { transition.acknowledge(stack) }
     val latest by rememberUpdatedState(stack)
     val goNow by rememberUpdatedState(go)
-    val logical = transition.logical
-    val atRest = !transition.moving
-    LaunchedEffect(stack, logical, atRest) {
-        if (!atRest || stack == logical) return@LaunchedEffect
-        repeat(2) { withFrameNanos { } }
-        if (!transition.running && latest != transition.state.stack) transition.dispatch(goNow(transition.state.stack))
+    LaunchedEffect(pending) {
+        val (expected, at) = pending ?: return@LaunchedEffect
+        while (NbClock.nowNanos() - at < FOLLOW_TIMEOUT_NANOS) withFrameNanos { }
+        if (transition.pendingFollow?.first != expected || latest == expected) return@LaunchedEffect
+        transition.acknowledge(expected)
+        NbMotionProbe.reportUnfollowed(transition.hostId, expected, latest)
+        if (latest != transition.state.stack) transition.dispatch(goNow(transition.state.stack))
     }
 }
+
+/** How long a caller may take to follow a Back of the machine before it is reported and followed (M4), ns. */
+private const val FOLLOW_TIMEOUT_NANOS = 500_000_000L
 
 /**
  * The plain memory of a host: the values it knew, the page it parked. Never read by drawing. It is written only after
@@ -115,8 +122,8 @@ private class HostMemory<T> : SyncMemory() {
     /** The values of the keys of applied compositions: a leaving layer still draws its value. */
     val values = HashMap<Any, T>()
 
-    /** The page parked below the top while at rest (kept composed through the next change, review V8). */
-    var parked: Any? = null
+    /** The pages parked below the top while at rest (kept composed through the next change, review V8). */
+    val parkedSet = LinkedHashSet<Any>()
 
     /** The host's width in px (the travel of a back gesture over it). */
     var width: Float = 0f
@@ -197,21 +204,24 @@ internal fun <T : Any> StackHost(
         if (saveable) memory.forgotten(holder, live)
         settled.value()
     }
-    // The page below the top is composed, measured, placed and drawn ahead, parked (an invisible layer: no semantics,
-    // no input, no focus): a back gesture or a pop starts on a page whose layer and display lists already exist (V5,
-    // R1-3). While a motion runs, the page parked before it stays composed, and the page that will be below the top
-    // after a pop is composed ahead (V8).
-    val below = logical.getOrNull(logical.size - 2)
+    // The two pages below the top are composed, measured, placed and drawn ahead at rest, parked (an invisible layer:
+    // no semantics, no input, no focus): a back gesture, a pop or a double Back starts on pages whose layers and
+    // display lists already exist, so the start of a motion composes and measures nothing new (V5, R1-3; round 6 H2:
+    // the page two below used to be composed in a gesture's first frame). While a motion runs, the pages parked
+    // before it stay composed.
     val running = transition.moving
+    val ahead = listOfNotNull(logical.getOrNull(logical.size - 2), logical.getOrNull(logical.size - BELOW_NEXT))
     val parkedKeys =
         buildList {
-            if (running) {
-                memory.parked?.let { if (it in logical) add(it) }
-                logical.getOrNull(logical.size - BELOW_NEXT)?.let { add(it) }
-            }
-            below?.let { add(it) }
+            if (running) memory.parkedSet.filter { it in current || it in memory.values }.forEach { add(it) }
+            addAll(ahead)
         }.filter { it !in layers }.distinct()
-    SideEffect { if (!running) memory.parked = below }
+    SideEffect {
+        if (!running) {
+            memory.parkedSet.clear()
+            memory.parkedSet.addAll(ahead)
+        }
+    }
     val composed = parkedKeys + layers
     Box(modifier.fillMaxSize().onSizeChanged { memory.width = it.width.toFloat() }) {
         composed.forEach { k ->
@@ -231,7 +241,8 @@ internal fun <T : Any> StackHost(
                             .then(if (isTop) Modifier else Hidden),
                 ) {
                     if (value != null) {
-                        CompositionLocalProvider(LocalNbBackScope provides child) {
+                        val cap = remember(transition, k) { NbLayerCap(transition, k) }
+                        CompositionLocalProvider(LocalNbBackScope provides child, LocalNbLayerCap provides cap) {
                             if (saveable) holder.SaveableStateProvider(k) { content(value) } else content(value)
                         }
                     }
@@ -294,47 +305,84 @@ internal class HostBackTarget(
         touchX: Float,
     ) {
         voided = false
+        gestureId = 0L
+        taken = false
         val back = backOf(transition.state.stack) ?: return
         val dir = edgeSide(edge, side)
         // A page leaves to the side of the swipe; a section to the bar-order side whatever the edge (Home is first).
         val e = if (kind == NbKind.Tab) side else dir
+        val id = nextGestureId++
+        gestureId = id
         transition.dispatch(
-            NbNavEvent.GestureStart(back, kind, toIsUpper = false, e = e, x = touchX, width = width(), now = NbClock.nowNanos(), dir = dir),
+            NbNavEvent.GestureStart(
+                back,
+                kind,
+                toIsUpper = false,
+                e = e,
+                x = touchX,
+                width = width(),
+                now = NbClock.nowNanos(),
+                dir = dir,
+                id = id,
+            ),
         )
+        taken = transition.motion?.let { it.drive == NbDrive.Finger && it.gestureId == id } == true
     }
 
     override fun progress(move: NbBackMove) {
-        transition.dispatch(NbNavEvent.GestureMove(move.touchX, move.progress, move.timeMillis, NbClock.nowNanos()))
+        if (taken) transition.dispatch(NbNavEvent.GestureMove(move.touchX, move.progress, move.timeMillis, NbClock.nowNanos()))
     }
 
     override fun cancel() {
         voided = false
-        transition.dispatch(NbNavEvent.GestureEnd(commit = false, now = NbClock.nowNanos()))
+        val id = gestureId
+        val wasTaken = taken
+        gestureId = 0L
+        taken = false
+        if (wasTaken) transition.dispatch(NbNavEvent.GestureEnd(commit = false, now = NbClock.nowNanos(), id = id))
     }
 
+    @Suppress("ReturnCount", "ComplexCondition") // Voided, held, resolved, a Back; the held gesture is this one.
     override fun commit() {
+        val id = gestureId
+        val wasTaken = taken
+        gestureId = 0L
+        taken = false
         // The rest of a gesture a layout change dropped does nothing (R6).
         if (voided) {
             voided = false
             return
         }
-        // A gesture that never started here (the platform committed without a start, R3-1): a Back like any other,
-        // caught from wherever the host's motion is.
-        if (!transition.gesture) {
-            back()
+        val m = transition.motion
+        if (wasTaken && m != null && m.drive == NbDrive.Finger && m.gestureId == id) {
+            val before = transition.top
+            transition.dispatch(NbNavEvent.GestureEnd(commit = true, now = NbClock.nowNanos(), id = id))
+            if (transition.top != before) followed()
             return
         }
-        val before = transition.top
-        transition.dispatch(NbNavEvent.GestureEnd(commit = true, now = NbClock.nowNanos()))
-        if (transition.top != before) onBack()
+        // L2: the finger's gesture was resolved by something else while it held (a key Back, the caller's change):
+        // its commit does nothing more, so one gesture never goes back twice.
+        if (wasTaken) return
+        // A gesture that never took a motion here (the platform committed without a start, R3-1; a start while the
+        // motion was more than one page away): a Back like any other, caught from wherever the host's motion is.
+        back()
     }
 
     override fun back() {
         val back = backOf(transition.state.stack) ?: return
         val before = transition.top
         transition.dispatch(NbNavEvent.Go(back, kind, toIsUpper = false, e = side, now = NbClock.nowNanos()))
-        if (transition.top != before) onBack()
+        if (transition.top != before) followed()
     }
+
+    /** The machine went back: the caller must follow (M4: an explicit acknowledgement is expected). */
+    private fun followed() {
+        transition.expectFollow(transition.state.stack)
+        onBack()
+    }
+
+    private var gestureId = 0L
+    private var taken = false
 
     override fun abort() {
         if (transition.gesture) voided = true
@@ -343,6 +391,11 @@ internal class HostBackTarget(
 
     /** True after a layout change dropped this target's gesture, until the gesture ends or a new one starts. */
     private var voided = false
+
+    private companion object {
+        /** Gesture ids of every host target (unique in the process; 0 is none). */
+        var nextGestureId = 1L
+    }
 }
 
 /** The Back target of a [NbStackHost]: pops the top page. */
@@ -559,7 +612,7 @@ fun <T : Any> NbSwitcher(
             handoff = step?.first
             val speed = step?.second ?: 0f
             val v0 = if (memory.width > 0f) speed / memory.width else 0f
-            NbNavEvent.Go(listOf(k), NbKind.Pager, toIsUpper = true, e = forward * side, now = NbClock.nowNanos(), v0 = v0)
+            NbNavEvent.Go(listOf(k), NbKind.Pager, toIsUpper = forward > 0, e = side, now = NbClock.nowNanos(), v0 = v0)
         } else {
             NbNavEvent.Go(listOf(k), NbKind.Swap, toIsUpper = true, e = side, now = NbClock.nowNanos())
         }
@@ -618,17 +671,14 @@ fun <T : Any> rememberNbSwap(
     HostSync(transition, memory, listOf(k)) { NbNavEvent.Go(listOf(k), NbKind.Swap, toIsUpper = true, e = 1, now = NbClock.nowNanos()) }
     SideEffect { memory.values[k] = value }
     LaunchedEffect(transition.settled) { if (!transition.running) memory.values.keys.retainAll(setOf(transition.top, k)) }
-    val leaving by remember(transition) {
-        derivedStateOf { transition.motion?.let { m -> if (m.p < HALF) m.from else null } }
-    }
-    val shownKey = leaving ?: k
+    // The value nearest the position is the one shown (its alpha is the larger one); it changes where both are 0.
+    val nearest by remember(transition) { derivedStateOf { transition.motion?.let { m -> m.keyAt(m.q) } } }
+    val shownKey = nearest ?: k
 
     @Suppress("UNCHECKED_CAST")
     val shown = if (shownKey == k) value else (memory.values[shownKey] ?: value)
     return NbSwapState(shown, transition, shownKey)
 }
-
-private const val HALF = 0.5f
 
 /** Draws the Swap pose of [swap]'s shown content (alpha only; reported to [NbMotionProbe] once per drawn state). */
 fun Modifier.nbSwapLayer(swap: NbSwapState<*>): Modifier =
@@ -637,7 +687,7 @@ fun Modifier.nbSwapLayer(swap: NbSwapState<*>): Modifier =
         if (m == null) {
             alpha = 1f
         } else {
-            with(swap.transition) { applyPose(if (m.p < HALF) m.from else m.to) }
+            with(swap.transition) { applyPose(m.keyAt(m.q)) }
             swap.transition.reportNow(size.width)
         }
     }

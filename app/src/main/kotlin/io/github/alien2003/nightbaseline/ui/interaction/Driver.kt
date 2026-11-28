@@ -75,6 +75,15 @@ internal object NbClock {
     /** [NbPhysics.FRAME_STALL_MS] in ns. */
     const val STALL_NANOS = NbPhysics.FRAME_STALL_MS * 1_000_000L
 
+    /** A drawn frame after the first advances a run by at most this many display frames (one missed vsync). */
+    const val STEP_CAP_FRAMES = 2L
+
+    /**
+     * The most a drawn frame after a run's first advances it, ns (round 6): two display frames of [framePeriod], never
+     * more than [STALL_NANOS]. A long frame slows the motion instead of catching up (no hold-then-jump).
+     */
+    fun stepCap(framePeriod: Long = framePeriodNanos): Long = minOf(STALL_NANOS, STEP_CAP_FRAMES * framePeriod)
+
     /**
      * The time origin of a run whose first frame is at [frameNanos], asked for at [origin] ([nowNanos] at the request
      * or release, null when there is none): the earlier of the two, so the first frame already shows the motion that
@@ -89,20 +98,21 @@ internal object NbClock {
 /**
  * The play time of one run (ADR 0011 rule R7, round 3): the time the spring is drawn at in each frame.
  *
- * - The first frame of a run that **continues a motion** ([moving]: a release with the finger's velocity, a reversal,
- *   a retarget) is at `frame - origin` from the origin (the frame that drew the last sample, the last frame of the
- *   motion it reverses): no frame repeats the last pose.
+ * - The first frame of a run that **continues a motion** (a release with the finger's velocity, a reversal, a
+ *   retarget) is at `frame - origin` from the origin (the frame that drew the last sample, the last frame of the
+ *   motion it reverses), at most one display frame (round 6: a long release frame holds, it never jumps): no frame
+ *   repeats the last pose.
  * - The first frame of a run **from rest** is at most one display frame ([NbClock.framePeriodNanos]) into the spring:
  *   the screen showed the start pose until then, so the time a slow set-up frame took (composing the entering page,
  *   a first open) is never caught up as a jump (V2-3, V2-4: such runs started at p 0.2 to 0.95).
- * - Every later frame advances by the frame interval, at most [NbPhysics.FRAME_STALL_MS]: a stalled frame slows the
+ * - Every later frame advances by the frame interval, at most [NbClock.stepCap] (two display frames, never more than
+ *   [NbPhysics.FRAME_STALL_MS]): a stalled frame slows the
  *   motion instead of jumping it (V2-1: a long frame used to be caught up in one frame, hundreds of px).
  *
  * Without stalls every frame is exactly the spring at `frame - origin` (a pure function of time).
  */
 internal class NbPlayClock(
     private val origin: Long?,
-    private val moving: Boolean,
 ) {
     private var last = Long.MIN_VALUE
     private var play = 0L
@@ -111,10 +121,10 @@ internal class NbPlayClock(
     fun at(frameNanos: Long): Long {
         play =
             if (last == Long.MIN_VALUE) {
-                val cap = if (moving) NbClock.STALL_NANOS else NbClock.framePeriodNanos
-                (frameNanos - NbClock.startOf(origin, frameNanos)).coerceIn(0L, cap)
+                // A continuation's first frame too: at most one display frame from its origin (round 6).
+                (frameNanos - NbClock.startOf(origin, frameNanos)).coerceIn(0L, NbClock.framePeriodNanos)
             } else {
-                play + (frameNanos - last).coerceIn(0L, NbClock.STALL_NANOS)
+                play + (frameNanos - last).coerceIn(0L, NbClock.stepCap())
             }
         last = frameNanos
         return play
@@ -154,7 +164,7 @@ internal suspend fun nbRunSpring(
         return NbRunEnd.Settled
     }
     val anim = TargetBasedAnimation(spring.spec(threshold), Float.VectorConverter, start, target, AnimationVector1D(v0))
-    val clock = NbPlayClock(origin, moving = v0 != 0f)
+    val clock = NbPlayClock(origin)
     var end: NbRunEnd? = null
     while (end == null) {
         withFrameNanos { frame ->
@@ -424,4 +434,24 @@ object NbMotionProbe {
     /** Receives (host id, layer key) whenever a parked layer (placed and drawn ahead, invisible) updates its layer. */
     @Volatile
     var parked: ((String, Any) -> Unit)? = null
+
+    /**
+     * Receives (host id, the stack a Back of the machine led to, the caller's stack) when a host's caller did not
+     * follow a Back within the timeout (ADR 0011 round 6 M4). Tests fail on it; without a sink it is logged.
+     */
+    @Volatile
+    var unfollowedBack: ((String, List<Any>, List<Any>) -> Unit)? = null
+
+    internal fun reportUnfollowed(
+        host: String,
+        expected: List<Any>,
+        caller: List<Any>,
+    ) {
+        val sink = unfollowedBack
+        if (sink != null) {
+            sink(host, expected, caller)
+        } else {
+            android.util.Log.w("NbNav", "host $host: a Back to $expected was not followed by its caller ($caller)")
+        }
+    }
 }

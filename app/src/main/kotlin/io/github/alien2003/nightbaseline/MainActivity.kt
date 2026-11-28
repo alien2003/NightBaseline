@@ -10,10 +10,8 @@ import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
 import android.view.KeyboardShortcutInfo
 import android.view.Menu
-import android.view.MotionEvent
 import android.view.Window
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
@@ -50,6 +48,7 @@ import io.github.alien2003.nightbaseline.nav.rememberWindowLayoutInputs
 import io.github.alien2003.nightbaseline.ui.components.NbIconButton
 import io.github.alien2003.nightbaseline.ui.components.NbIcons
 import io.github.alien2003.nightbaseline.ui.components.ShellRoundButton
+import io.github.alien2003.nightbaseline.ui.interaction.NbActivity
 import io.github.alien2003.nightbaseline.ui.interaction.NbStackHost
 import io.github.alien2003.nightbaseline.ui.layout.resolveLayout
 import io.github.alien2003.nightbaseline.ui.material.GlassPreference
@@ -74,7 +73,7 @@ import io.github.alien2003.nightbaseline.work.notify.NightIntents
  * While it is in use it asks for the panel's highest refresh rate ([HighRefreshRate], ADR 0008).
  */
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : NbActivity() {
     private val root: AppRootViewModel by viewModels()
     private val deepLink = mutableStateOf<DeepLink?>(null)
     private val refreshRate = HighRefreshRate(this)
@@ -93,7 +92,10 @@ class MainActivity : ComponentActivity() {
 
     // The app-wide shortcuts work without keyboard focus too (after a touch nothing is focused): a key the window
     // leaves unconsumed goes to the shortcut handler of the navigation graph.
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean = shortcuts.dispatch(event) { super.dispatchKeyEvent(it) }
+    override fun onWindowKey(
+        event: KeyEvent,
+        window: (KeyEvent) -> Boolean,
+    ): Boolean = shortcuts.dispatch(event, window)
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
@@ -119,11 +121,7 @@ class MainActivity : ComponentActivity() {
         refreshRate.onUserInteraction()
     }
 
-    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        val handled = super.dispatchTouchEvent(ev)
-        refreshRate.onTouch(ev.actionMasked)
-        return handled
-    }
+    override fun onTouchAction(action: Int) = refreshRate.onTouch(action)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

@@ -63,7 +63,7 @@ class HighRefreshRate(
         scheduleRelease()
     }
 
-    /** Call after `dispatchTouchEvent` with the event's masked action: no release while a finger is down. */
+    /** Call after the activity dispatched a touch, with the event's masked action: no release while a finger is down. */
     fun onTouch(actionMasked: Int) {
         if (!resumed) return
         when (actionMasked) {

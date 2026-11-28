@@ -59,6 +59,7 @@ import io.github.alien2003.nightbaseline.ui.interaction.NbNavStack
 import io.github.alien2003.nightbaseline.ui.interaction.NbPageNavigator
 import io.github.alien2003.nightbaseline.ui.interaction.NbSectionHost
 import io.github.alien2003.nightbaseline.ui.interaction.NbStackHost
+import io.github.alien2003.nightbaseline.ui.interaction.nbBatch
 import io.github.alien2003.nightbaseline.ui.interaction.nbGo
 import io.github.alien2003.nightbaseline.ui.interaction.nbKeyIntents
 import io.github.alien2003.nightbaseline.ui.interaction.nbPop
@@ -184,8 +185,11 @@ fun AppNavHost(
         if (!onboardingDoneNow) return@LaunchedEffect
         when (link) {
             is DeepLink.Night -> {
-                navController.toTop(TopLevel.Home)
-                if (link.date != newestNight) navController.nbGo(NightRoute(link.date, TopLevel.Home.name))
+                // One change of the pages (round 6 H1): back to Home and the night over it run as one motion.
+                navController.nbBatch {
+                    toTop(TopLevel.Home)
+                    if (link.date != newestNight) nbGo(NightRoute(link.date, TopLevel.Home.name))
+                }
             }
 
             is DeepLink.Fix -> {
@@ -200,8 +204,10 @@ fun AppNavHost(
                     }
 
                     FixProblem.SourceSync -> {
-                        navController.toTop(TopLevel.Settings)
-                        navController.nbGo(SettingsRoute(SettingsPage.SourcePicker.name))
+                        navController.nbBatch {
+                            toTop(TopLevel.Settings)
+                            nbGo(SettingsRoute(SettingsPage.SourcePicker.name))
+                        }
                     }
                 }
             }

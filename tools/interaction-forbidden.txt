@@ -51,5 +51,13 @@ import androidx\.compose\.material\.
 # (nbPush, nbGo, nbReset, nbPopTo, nbPop and the router's Back); NavHost and its transition parameters are gone.
 \.navigate\(
 \.popBackStack\b
+# Round 6 (M5): the same calls without a receiver dot (inside a NavHostController lambda), the other controller
+# changes, every other Back entry point, platform windows, view animation and raw key or touch dispatch.
+\b(navigate|navigateUp|popBackStack|clearBackStack|handleDeepLink)\(
+\b(onBackPressedDispatcher|addCallback|onBackPressed)\b
+import androidx\.compose\.ui\.window\.
+\bandroidx\.compose\.ui\.window\.(Dialog|Popup)\b
+\.animate\(
+\b(dispatchKeyEvent|onKeyDown|onKeyUp|onKeyPreIme|dispatchTouchEvent|setOnTouchListener|setOnKeyListener)\b
 \b(enterTransition|exitTransition|popEnterTransition|popExitTransition|sizeTransform|predictivePopEnterTransition|predictivePopExitTransition)\b
 \bcomposable<

@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -68,7 +69,7 @@ class NbTransition internal constructor(
     /** The structure the composition reads: the layers (lower first) and the logical top. */
     private val structure by derivedStateOf {
         val m = state.motion
-        if (m == null) listOf(state.top) else listOf(m.lowerKey, m.upperKey)
+        if (m == null) listOf(state.top) else NbNavReducer.layerKeys(m)
     }
 
     /** The motion, null at rest. */
@@ -77,11 +78,11 @@ class NbTransition internal constructor(
     /** The kind of the running motion (Page at rest). */
     val kind: NbKind get() = state.motion?.kind ?: NbKind.Page
 
-    /** The state being left, null at rest. */
-    val from: Any? get() = state.motion?.from
+    /** The state the motion started from, null at rest. */
+    val from: Any? get() = state.motion?.let { it.keyAt(it.home.toFloat()) }
 
     /** The state being reached, null at rest. */
-    val to: Any? get() = state.motion?.to
+    val to: Any? get() = state.motion?.targetKey
 
     /** True while a finger drives p. */
     val gesture: Boolean get() = state.motion?.drive == NbDrive.Finger
@@ -95,8 +96,8 @@ class NbTransition internal constructor(
     /** True while no layer takes input: a finger drives p. */
     internal val inputBlocked: Boolean get() = gesture
 
-    /** The p drawn now. Reads snapshot state: call it in layer lambdas. */
-    fun drawnP(): Float = state.motion?.p ?: 0f
+    /** The distance of the position from where the motion started (p of a one-step motion). Reads snapshot state. */
+    fun drawnP(): Float = state.motion?.drawnP ?: 0f
 
     /** The layers to compose, lower first (reads only what changes the structure). */
     internal fun layers(): List<Any> = structure
@@ -118,15 +119,64 @@ class NbTransition internal constructor(
         if (result.state != before) state = result.state
         if (event !is NbNavEvent.Frame) drawnAt = Long.MIN_VALUE
         if (result.ended != null && result.state.motion == null) settled++
+        motionChanged(before.motion != null, result.state.motion != null, before)
         if (!inComposition) ensurePump()
         return result
     }
 
-    /** Tests: draws the running motion at [p] (as if its spring had run so far). */
+    /** Runs when the host starts moving (true) or comes to rest (false), in the input event or frame that did it. */
+    private val moveListeners = ArrayList<(Boolean) -> Unit>()
+
+    /** The pages' lifecycle caps follow the host's motion ([NbCappedLifecycle], round 6 H2). */
+    internal fun onMoving(listener: (Boolean) -> Unit): () -> Unit {
+        moveListeners += listener
+        return { moveListeners -= listener }
+    }
+
+    private fun motionChanged(
+        was: Boolean,
+        now: Boolean,
+        before: NbNavState? = null,
+    ) {
+        if (was == now) return
+        if (now) {
+            restTop = before?.top
+            motionSerial++
+        }
+        moveListeners.toList().forEach { it(now) }
+    }
+
+    /** Counts the motions that started from rest (the lifecycle cap tells a page that entered in this one). */
+    internal var motionSerial: Int = 0
+        private set
+
+    /** The top the host showed at rest when its motion began (its page leaves; it is never capped). */
+    internal var restTop: Any? = null
+        private set
+
+    /**
+     * A Back of the machine led to the logical stack that the caller must follow, with the time it was asked for
+     * (M4); null when nothing is pending. Snapshot state: the host's sync reads it.
+     */
+    internal var pendingFollow: Pair<List<Any>, Long>? by mutableStateOf(null)
+        private set
+
+    /** The caller must now follow the machine to [stack]. */
+    internal fun expectFollow(stack: List<Any>) {
+        pendingFollow = stack to NbClock.nowNanos()
+    }
+
+    /** The caller's state reached [stack]: a pending Back to it is acknowledged. */
+    internal fun acknowledge(stack: List<Any>) {
+        if (pendingFollow?.first == stack) pendingFollow = null
+    }
+
+    /** Tests: draws the running motion at [p] of its step (as if its spring had run so far). */
     @VisibleForTesting
     internal fun holdAt(p: Float) {
         val m = state.motion ?: return
-        state = state.copy(motion = m.copy(p = p))
+        val dir = if (m.toward >= m.home) 1f else -1f
+        state = state.copy(motion = m.copy(q = m.home + dir * p))
     }
 
     /** Starts the frame pump while a motion exists (call after a composition that dispatched is applied). */
@@ -157,49 +207,21 @@ class NbTransition internal constructor(
         nanos: Long,
         scale: Float,
     ) {
+        val was = state.motion != null
         val result = NbNavReducer.reduce(state, NbNavEvent.Frame(nanos, drawnAt), env(scale))
         if (result.state != state) state = result.state
         if (reportFrames) result.state.motion?.let { report(it, 0f) }
         if (result.ended != null && result.state.motion == null) settled++
+        motionChanged(was, result.state.motion != null)
     }
 
     /** The pose of layer [key] of a host [width] px wide. Reads snapshot state: call it in layer lambdas. */
-    @Suppress("CyclomaticComplexMethod") // Three kinds of pose, two layers each.
     fun poseOf(
         key: Any,
         width: Float,
     ): NbLayerPose {
         val m = state.motion ?: return NbLayerPose.Rest
-        val p = m.p
-        return when (m.kind) {
-            NbKind.Page, NbKind.Tab -> {
-                val s = if (m.toIsUpper) p else 1f - p
-                val (upper, lower) = NbPoses.stack(s, m.e, width, dark)
-                when (key) {
-                    m.upperKey -> upper
-                    m.lowerKey -> lower
-                    else -> NbLayerPose.Rest
-                }
-            }
-
-            NbKind.Pager -> {
-                val pose = NbPoses.pager(p, m.e, width)
-                when (key) {
-                    m.to -> pose.to
-                    m.from -> pose.from
-                    else -> NbLayerPose.Rest
-                }
-            }
-
-            else -> {
-                val pose = NbPoses.swap(p)
-                when (key) {
-                    m.to -> pose.to
-                    m.from -> pose.from
-                    else -> NbLayerPose.Rest
-                }
-            }
-        }
+        return NbNavReducer.poseOf(m, key, width, dark)
     }
 
     /** Draws layer [key]'s pose in a graphics layer and reports the frame to [NbMotionProbe]. */
@@ -208,13 +230,21 @@ class NbTransition internal constructor(
         val pose = poseOf(key, width)
         val m = state.motion
         // The pose set up by the last input is on screen once the layer it brings in has drawn it.
-        if (m != null && key == m.to && drawnAt == Long.MIN_VALUE) drawnAt = NbClock.nowNanos()
-        if (m != null && key == m.to) report(m, width)
+        if (m != null && key == m.targetKey && drawnAt == Long.MIN_VALUE) drawnAt = NbClock.nowNanos()
+        if (m != null && key == m.targetKey) report(m, width)
         translationX = pose.tx
         translationY = pose.ty
         scaleX = pose.scale
         scaleY = pose.scale
         alpha = pose.alpha * (1f - pose.dim)
+        // A member of a residual group is drawn only inside the group (round 6).
+        if (pose.clipped) {
+            clip = true
+            shape = NbClipShape(pose.clipStart, pose.clipEnd)
+        } else if (clip) {
+            clip = false
+            shape = RectangleShape
+        }
     }
 
     /**
@@ -238,11 +268,14 @@ class NbTransition internal constructor(
         val sink = NbMotionProbe.frames ?: return
         if (reported === m) return
         reported = m
-        // Reported towards the state the motion was asked to reach (a gesture and its cancel: the commit side).
+        // Reported towards the state the motion was asked to reach (a gesture and its cancel: the commit side), as the
+        // share of the step from its neighbour on the side q is on.
         val reached = m.keyAt(m.toward)
-        val left = m.keyAt(1f - m.toward)
-        val p = if (m.toward >= 1f) m.p else 1f - m.p
-        sink(NbFrame(hostId, m.kind, m.kind.spring, p, reached, left, poseOf(reached, width), poseOf(left, width), gesture, width))
+        val away = if (m.q > m.toward || (m.q == m.toward && m.home > m.toward)) 1f else -1f
+        val left = m.keyAt(m.toward + away)
+        sink(
+            NbFrame(hostId, m.kind, m.kind.spring, m.reportedP, reached, left, poseOf(reached, width), poseOf(left, width), gesture, width),
+        )
     }
 }
 

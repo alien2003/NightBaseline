@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions") // The navigator, the host and the framework's page calls.
+
 package io.github.alien2003.nightbaseline.ui.interaction
 
 import android.os.Bundle
@@ -7,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigation.NavBackStackEntry
@@ -52,12 +53,17 @@ class NbPageNavigator : Navigator<NbPageNavigator.Destination>() {
      * through the framework's calls ([nbPush], [nbGo], [nbReset], [nbPopTo], [nbPop]) is an event of its input, so its
      * first frame is the next display frame and a Back right after it goes back from what it opened.
      */
+    @Suppress("ReturnCount") // Batching, no machine, nothing changed.
     internal fun sync() {
+        if (batching > 0) return
         val m = machine ?: return
         val keys = backStack.value.map { it.id }
         if (keys.isEmpty() || keys == m.state.stack) return
         m.dispatch(stackGo(m.state.stack, keys, side))
     }
+
+    /** Nesting of [nbBatch]: the stack is applied to the machine once, when the outermost batch ends. */
+    internal var batching = 0
 
     /** Entries whose change has not settled yet. */
     internal val inTransition get() = state.transitionsInProgress
@@ -161,7 +167,8 @@ fun NbNavStack(
         },
     ) { entry ->
         val destination = entry.destination as? NbPageNavigator.Destination
-        if (destination != null) entry.LocalOwnersProvider(holder) { destination.content(entry) }
+        // The entry's lifecycle is capped at CREATED while the pages move (round 6 H2): nothing restarts in a commit.
+        if (destination != null) entry.LocalOwnersProvider(holder) { NbCappedLifecycle { destination.content(entry) } }
     }
 }
 
@@ -172,12 +179,25 @@ fun NbNavStack(
  */
 
 /**
- * Pushes [route] from a tap: only while the top entry is resumed. During a motion the entries are in transition (not
- * resumed), so a second tap (a fast double tap, a tap on another row) does not push a second page over the first.
+ * Pushes [route] from a tap. There is no lifecycle gate (round 6, M1): input during a motion follows the one rule of
+ * every host, the machine catches it (a tap on the entering page pushes from it at once, on the same path). A tap only
+ * reaches the logical top (the leaving layer blocks input), so a double tap on a row cannot push twice.
  */
-fun <T : Any> NavHostController.nbPush(route: T) {
-    val top = currentBackStackEntry ?: return
-    if (top.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) nbGo(route)
+fun <T : Any> NavHostController.nbPush(route: T) = nbGo(route)
+
+/**
+ * Runs the navigations of [block] (a deep link: back to a section, then a page over it) as one change of the pages'
+ * machine (round 6 H1): the controller's stack after the block is applied once, so one motion runs instead of two.
+ */
+fun NavHostController.nbBatch(block: NavHostController.() -> Unit) {
+    val navigator = pageNavigator()
+    navigator.batching++
+    try {
+        block()
+    } finally {
+        navigator.batching--
+    }
+    navigator.sync()
 }
 
 /** Pushes [route] whatever runs (a deep link, a fold that re-projects a pane as a page). */
