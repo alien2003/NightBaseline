@@ -145,19 +145,23 @@ class NbClockLawTest {
         val w = 1080f
         for (speed in floatArrayOf(1f, 2.5f, 5f)) {
             for (end in floatArrayOf(0.3f, 0.5f, 0.7f)) {
-                // Through the hosts' own gesture path: a transition's back gesture fed with the finger's travel.
-                val transition = NbTransition("t", CoroutineScope(clock + Dispatchers.Unconfined))
-                val token = transition.beginGesture("top", "below", NbKind.Page, toIsUpper = false, e = 1)
+                // Through the hosts' own gesture path: the navigation reducer's back gesture fed with the finger.
+                var state =
+                    NbNavReducer
+                        .reduce(
+                            NbNavState(listOf("below", "top")),
+                            NbNavEvent.GestureStart(listOf("below"), NbKind.Page, toIsUpper = false, e = 1, x = 0f, width = w, now = 0L),
+                        ).state
                 val steps = 8
                 val dt = ManualClock.FRAME_NANOS / MS
                 var t = 0L
                 for (k in steps downTo 0) {
                     val u = end - speed * k * dt / 1e3f
                     if (u < 0f) continue
-                    transition.drag(token, u, t)
+                    state = NbNavReducer.reduce(state, NbNavEvent.GestureMove(u * w, u, t, t * MS)).state
                     t += dt
                 }
-                val v = transition.driver.releaseVelocity(clock.now)
+                val v = NbNavReducer.velocityAt(state.motion!!, (t - dt) * MS)
                 // dp/dt = dp/du * du/dt at the release, from the map's derivative.
                 val h = 1e-3f
                 val dpdu = (NbGestureMap.stackPop(end + h, 0f) - NbGestureMap.stackPop(end - h, 0f)) / (2 * h)

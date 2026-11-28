@@ -243,13 +243,13 @@ class PredictiveBackTest {
         startGesture()
         progress(0.5f)
         assertEquals(metric, last("pages")?.from)
-        // Commit and start the next gesture before the pop has settled. R9: the pop is applied when its motion ends,
-        // so 100 ms in the state still shows Metric leaving; the next gesture lands it (the pop happens now) and goes
-        // back from Night, as two Backs do.
+        // Commit and start the next gesture before the pop has settled. Round 5 (ADR 0011 N2): the pop is applied at
+        // the commit, so 100 ms in the controller is on Night already; the next gesture goes back from Night, as two
+        // Backs do (the Metric page's motion ends where it was heading, R2).
         compose.mainClock.autoAdvance = false
         back.onBackPressed()
         compose.mainClock.advanceTimeBy(100)
-        assertTrue("the pop is applied after its motion (R9): ${route()}", route().contains("MetricRoute"))
+        assertTrue("the pop is applied at the commit (N2): ${route()}", route().contains("NightRoute"))
         back.dispatchOnBackStarted(BackEventCompat(0f, TOUCH_Y, 0f, BackEventCompat.EDGE_LEFT))
         compose.mainClock.advanceTimeByFrame()
         val night = nav.currentBackStackEntry!!.id

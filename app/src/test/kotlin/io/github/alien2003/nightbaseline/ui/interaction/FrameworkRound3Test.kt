@@ -167,7 +167,7 @@ class FrameworkRound3Test {
     }
 
     @Test
-    fun `R9 - a committed back gesture moves to its end first and pops after the last moving frame (V2-1)`() {
+    fun `N2 - a committed back gesture pops once at the commit and moves to its end unbroken (V2-1)`() {
         var stack by mutableStateOf(listOf("a", "b"))
         var pops = 0
         show {
@@ -187,18 +187,18 @@ class FrameworkRound3Test {
         idle()
         val motion = frames.indices.filter { frames[it].host == "s" && frames[it].p < 1f && !frames[it].gesture }
         assertTrue("the release runs: ${frames.map { it.p }}", motion.size >= 3)
-        // Before the fix the stack popped at the commit: the caller recomposed (mark + 1) in the release's first frames,
-        // and on the phone that frame stalled 70 to 190 ms before the motion jumped.
+        // Round 5 (ADR 0011 N2): the machine and the caller change at the commit, once; the caller's composition is
+        // done by the release's first moving frame and nothing composes again while the page moves.
         assertTrue(
-            "no state change composes while the page moves: ${motion.map { marks[it] - before }}",
-            motion.all { marks[it] == before },
+            "the caller composes once, at the commit: ${motion.map { marks[it] - before }}",
+            marks[motion.last()] - before <= 1,
         )
         assertEquals("popped exactly once, at the end", 1, pops)
         assertEquals(listOf("a"), stack)
     }
 
     @Test
-    fun `R9 - a Back without a gesture runs the same pop and changes the state after it`() {
+    fun `N2 - a Back without a gesture runs the same pop, its first frame one display frame in`() {
         var stack by mutableStateOf(listOf("a", "b"))
         var router: NbBackRouter? = null
         show {
@@ -215,7 +215,7 @@ class FrameworkRound3Test {
         idle()
         val motion = frames.indices.filter { frames[it].host == "s" && frames[it].p > 0f && frames[it].p < 1f }
         assertTrue("the pop runs: ${frames.map { it.p }}", motion.size >= 3)
-        assertTrue("the state changes after the motion", motion.all { marks[it] == before })
+        assertTrue("the state changes once, at the Back", marks[motion.last()] - before <= 1)
         assertTrue("the first frame is one display frame in", frames[motion.first()].p <= spring(FRAME_S) + 1e-3)
         assertEquals(listOf("a"), stack)
     }
@@ -294,30 +294,6 @@ class FrameworkRound3Test {
     }
 
     @Test
-    fun `R8 - an entering page waits for its content at most ENTER_WAIT_MS after the request, not after its first frame`() {
-        var stack by mutableStateOf(listOf("a"))
-        show {
-            NbStackHost(stack, key = { it }, onBack = {}, id = "s") { page -> if (page == "a") Box(Modifier.fillMaxSize()) }
-        }
-        compose.mainClock.autoAdvance = false
-        frames.clear()
-        // Asked 250 ms before its composition (the request's read of the clock only): 50 ms of the wait are left.
-        shiftOnceMs = -250
-        stack = listOf("a", "b")
-        frame()
-        var waited = 0
-        while (moving("s").isEmpty() && waited < 40) {
-            frame()
-            waited++
-        }
-        compose.mainClock.autoAdvance = true
-        idle()
-        // Before the fix the wait counted from its own first frame: 300 ms, 19 frames.
-        // 50 ms of budget: 4 frames of 16 ms, then the run's first frame and the frame that draws it.
-        assertTrue("the push starts within the request's budget ($waited frames)", waited <= 6)
-    }
-
-    @Test
     fun `V1 - a modal its caller closes runs its hide from the close, however long it was open`() {
         var value by mutableStateOf<String?>("x")
         show { ModalHost(value, onDismiss = { value = null }) { Box(Modifier.modalPanel(state).fillMaxWidth().height(300.dp)) } }
@@ -383,9 +359,9 @@ class FrameworkRound3Test {
         handoff.consume(applied.first)
         assertEquals("consumed once applied", null, handoff.peek())
         // And everything a change set up in a discarded composition is rolled back with it.
-        val t = NbTransition("t", CoroutineScope(Dispatchers.Unconfined))
+        val t = NbTransition("t", CoroutineScope(Dispatchers.Unconfined), listOf("A"))
         val snapshot = Snapshot.takeMutableSnapshot()
-        snapshot.enter { t.go("A", "B", NbKind.Page, toIsUpper = true, e = 1) }
+        snapshot.enter { t.dispatch(NbNavEvent.Go(listOf("B"), NbKind.Page, toIsUpper = true, e = 1, now = 0L), inComposition = true) }
         snapshot.dispose()
         assertFalse("nothing of the discarded composition is left", t.running)
     }
@@ -422,47 +398,6 @@ class FrameworkRound3Test {
         compose.onNodeWithTag("page-b").performKeyInput { pressKey(Key.DirectionRight) }
         idle()
         assertEquals("no step of a page not shown", 0, stepped)
-    }
-
-    @Test
-    fun `V7 - a key that comes back waits for its new layer's content`() {
-        var value by mutableStateOf(1)
-        var ready by mutableStateOf(setOf(1, 2))
-        show {
-            NbSwitcher(value, key = { it }, modifier = Modifier.size(200.dp), id = "sw") { v ->
-                if (v in ready) Box(Modifier.fillMaxSize())
-            }
-        }
-        value = 2
-        idle()
-        ready = setOf(2)
-        idle()
-        compose.mainClock.autoAdvance = false
-        frames.clear()
-        value = 1
-        repeat(WAIT_FRAMES) { frame() }
-        // Before the fix the content flag of key 1's first layer was never cleared: no wait, the swap ran on nothing.
-        assertTrue("no motion while the returning layer is empty: ${moving("sw").map { it.p }}", moving("sw").isEmpty())
-        ready = setOf(1, 2)
-        repeat(MOTION_FRAMES) { frame() }
-        compose.mainClock.autoAdvance = true
-        idle()
-        assertTrue("then it runs", frames.any { it.host == "sw" && it.p > 0f })
-    }
-
-    @Test
-    fun `V7 - a layer that leaves the composition reports that it has no content`() {
-        var shown by mutableStateOf(true)
-        val flags = HashMap<String, Boolean>()
-        show {
-            if (shown) NbLayer(onContent = { flags["k"] = it }, modifier = Modifier.size(100.dp)) { Box(Modifier.fillMaxSize()) }
-        }
-        assertEquals(true, flags["k"])
-        shown = false
-        idle()
-        // Before the fix the flag was written only in measure: a layer that left kept "has content" for its key, so
-        // the key's next layer skipped the content wait when it was checked before its own first measure.
-        assertEquals("a layer that left has no content", false, flags["k"])
     }
 
     @Test

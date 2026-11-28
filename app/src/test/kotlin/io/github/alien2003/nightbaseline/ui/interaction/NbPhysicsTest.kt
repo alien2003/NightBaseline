@@ -319,18 +319,20 @@ class NbPhysicsTest {
         for (kind in listOf(NbKind.Page, NbKind.Tab, NbKind.Pager, NbKind.Swap)) {
             for (i in 0..20) {
                 val p = i / 20f
-                val t = NbTransition("t", CoroutineScope(Dispatchers.Unconfined))
-                t.go("A", "B", kind, toIsUpper = true, e = 1)
+                val t = NbTransition("t", CoroutineScope(Dispatchers.Unconfined), listOf("A"))
+                t.dispatch(NbNavEvent.Go(listOf("B"), kind, toIsUpper = true, e = 1, now = 0L), inComposition = true)
                 t.holdAt(p)
                 val before = listOf(t.poseOf("A", w), t.poseOf("B", w))
-                t.go("B", "A", kind, toIsUpper = false, e = 1)
+                // The navigation reducer: a change back to the state being left is a new target of the same motion.
+                t.dispatch(NbNavEvent.Go(listOf("A"), kind, toIsUpper = false, e = 1, now = 0L), inComposition = true)
                 val after = listOf(t.poseOf("A", w), t.poseOf("B", w))
+                assertEquals(0f, t.motion!!.target, 0f, "$kind: it now heads back")
                 before.zip(after).forEach { (x, y) ->
                     assertEquals(x.tx, y.tx, 1e-3f, "$kind at p=$p: tx")
                     assertEquals(x.alpha, y.alpha, 1e-5f, "$kind at p=$p: alpha")
                     assertEquals(x.dim, y.dim, 1e-5f, "$kind at p=$p: dim")
                 }
-                assertEquals(1f - p, t.drawnP(), 1e-6f)
+                assertEquals(p, t.drawnP(), 1e-6f)
             }
         }
         // Rest poses: a fully shown upper page and an uncovered lower page draw untransformed.

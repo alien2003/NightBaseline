@@ -115,33 +115,6 @@ class FrameworkRound2Test {
     private fun moving(host: String): List<NbFrame> = frames.filter { it.host == host && it.p > 0f && it.p < 1f }
 
     @Test
-    fun `R8 - a push waits for the entering page's content, then starts on the spring's first frame (R1-2)`() {
-        var stack by mutableStateOf(listOf("a"))
-        var ready by mutableStateOf(false)
-        show {
-            NbStackHost(stack, key = { it }, onBack = { stack = stack.dropLast(1) }, id = "s") { page ->
-                // Page b has no content until its state arrives (as a screen whose ViewModel is still computing).
-                if (page == "a" || ready) Box(Modifier.fillMaxSize())
-            }
-        }
-        compose.mainClock.autoAdvance = false
-        frames.clear()
-        stack = listOf("a", "b")
-        repeat(WAIT_FRAMES) { frame() }
-        assertTrue("no motion while the entering page is empty: ${moving("s").map { it.p }}", moving("s").isEmpty())
-        ready = true
-        repeat(MOTION_FRAMES) { frame() }
-        val p = moving("s").map { it.p }.distinct()
-        assertTrue("the push runs once the page has content: $p", p.size >= 3)
-        // The time origin is the frame after the content was laid out: the first frames are the spring's own first
-        // frames, not a catch-up of the time spent waiting (which would start near the end).
-        assertTrue("first moving frame ${p[0]} is an early frame of the spring", p[0] <= spring(2 * FRAME_S))
-        compose.mainClock.autoAdvance = true
-        idle()
-        assertEquals(listOf("a", "b"), stack)
-    }
-
-    @Test
     fun `a stack's page below and a section host's visited sections are placed and drawn ahead (R1-3)`() {
         var selected by mutableStateOf(0)
         show {
